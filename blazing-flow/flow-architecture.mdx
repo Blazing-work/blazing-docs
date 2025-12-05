@@ -1,0 +1,277 @@
+---
+title: Architecture Overview
+label: Architecture
+description: Understanding Blazing Flow's distributed architecture
+position: 3
+---
+
+Blazing Flow is built on a hierarchical architecture inspired by manufacturing, where Foremen manage workers executing tasks. This design provides scalability, reliability, and operational flexibility.
+
+## System Components
+
+### Foreman
+
+The Foreman manages workers on a single machine:
+
+- **Worker Lifecycle**: Spawns, monitors, and stops worker processes
+- **Mix Optimization**: Dynamically adjusts async/blocking worker ratios
+- **Resource Management**: Monitors CPU, memory, and queue depths
+- **Health Checks**: Detects and restarts failed workers
+
+**Key Features:**
+- Hysteresis-driven optimization to prevent thrashing
+- Urgency scoring based on queue depth and age
+- Graceful worker replacement
+
+### Workers
+
+Workers execute tasks from routes and stations:
+
+#### Async Workers
+- Run on event loop (uvloop)
+- Best for I/O-bound tasks (API calls, database queries)
+- High concurrency with low overhead
+- Share connections efficiently
+
+#### Blocking Workers
+- Thread-based execution
+- Best for CPU-intensive tasks
+- Isolated from event loop
+- Prevents blocking async workers
+
+```python
+# Configure worker mix
+app = Blazing(
+    redis_config={...},
+    worker_config={
+        'async_workers': 4,
+        'blocking_workers': 2,
+        'auto_optimize': True  # Enable dynamic optimization
+    }
+)
+```
+
+## Data Flow
+
+### Route Execution Flow
+
+```
+1. Client → Queue Route Task
+              ↓
+2. Worker → Dequeue Task
+              ↓
+3. Worker → Execute Route
+              ↓
+4. Route → Call Stations
+              ↓
+5. Stations → Use Skillsets
+              ↓
+6. Worker → Return Result
+```
+
+### Example Flow
+
+```python
+@app.route
+async def process_order(order_id: str):
+    # Step 1: Fetch order details
+    order = await fetch_order_station(order_id)
+
+    # Step 2: Validate inventory
+    validated = await validate_inventory_station(order)
+
+    # Step 3: Process payment
+    payment = await process_payment_station(validated)
+
+    # Step 4: Ship order
+    shipment = await ship_order_station(payment)
+
+    return shipment
+```
+
+When you call `process_order("12345")`:
+
+1. Task queued with `order_id="12345"`
+2. Available worker dequeues task
+3. Worker executes route, calling each station in sequence
+4. Each station may spawn its own tasks
+5. Caller receives result or task ID for async tracking
+
+## State Management
+
+### DAO Layer
+
+Blazing uses a Data Access Object (DAO) pattern for all state:
+
+- **ForemanDAO**: Foreman state and metrics
+- **ConnectorDAO**: Connection pool definitions
+- **StationDAO**: Station metadata
+- **UnitDAO**: Individual task state
+- **OperationDAO**: Execution history
+
+### Persistence Model
+
+All operations are durably recorded:
+
+```python
+# Each route execution creates a Unit
+unit = Unit(
+    route_name="process_order",
+    arguments={"order_id": "12345"},
+    status="pending",
+    created_at=datetime.utcnow()
+)
+
+# Each station call creates an Operation
+operation = Operation(
+    unit_id=unit.id,
+    station_name="fetch_order_station",
+    status="running",
+    started_at=datetime.utcnow()
+)
+```
+
+This enables:
+- Resume after failures
+- Audit trails
+- Performance analysis
+- Debugging
+
+## Worker Mix Optimization
+
+Blazing automatically optimizes the balance between async and blocking workers based on your workload. The system monitors queue depths and task patterns to adjust worker allocation in real-time.
+
+You don't need to configure this - it happens automatically. You can monitor the optimization decisions and worker mix through the **btop** dashboard available on [blazing.work](https://blazing.work).
+
+## Connection Management
+
+### Connector Types
+
+Blazing supports multiple connector types:
+
+#### SQL Connectors
+```python
+from blazing.connectors import SQLConnector
+
+db = SQLConnector(
+    type="postgresql",
+    host="db.example.com",
+    port=5432,
+    database="prod",
+    credentials_encrypted=True
+)
+```
+
+#### HTTP Connectors
+```python
+from blazing.connectors import HTTPConnector
+
+api = HTTPConnector(
+    base_url="https://api.example.com",
+    headers={"Authorization": "Bearer ..."},
+    timeout=30
+)
+```
+
+#### SSH Connectors
+```python
+from blazing.connectors import SSHConnector
+
+ssh = SSHConnector(
+    host="server.example.com",
+    port=22,
+    username="deploy",
+    key_path="/path/to/key"
+)
+```
+
+### Connection Pooling
+
+Connectors maintain connection pools to avoid overhead:
+
+- **Async Pools**: Shared across async workers
+- **Blocking Pools**: Thread-local for blocking workers
+- **Lifecycle**: Connections persist across operations
+- **Health Checks**: Automatic reconnection on failure
+
+## Monitoring & Observability
+
+### Built-in Tools
+
+#### btop - Real-time Dashboard
+```bash
+python -m blazing.monitoring.btop
+```
+
+Shows:
+- Queue depths
+- Worker states
+- Throughput metrics
+- Error rates
+
+#### Foreman Charts
+```bash
+python -m blazing.monitoring.monitor_foreman_charts
+```
+
+Visualizes:
+- Worker mix over time
+- Queue trends
+- Optimization decisions
+
+### Breadcrumb Logging
+
+Every operation logs structured breadcrumbs:
+
+```python
+from blazing.util import log_breadcrumb
+
+log_breadcrumb(
+    operation_id=op.id,
+    message="Processing order",
+    metadata={"order_id": "12345"}
+)
+```
+
+Access breadcrumbs for debugging:
+
+```bash
+# View breadcrumbs for a specific unit
+blazing breadcrumbs <unit_id>
+```
+
+## Scalability
+
+### Horizontal Scaling
+
+Add more Foreman instances:
+
+```bash
+# On machine 1
+python -m blazing.foreman
+
+# On machine 2
+python -m blazing.foreman
+
+# On machine 3
+python -m blazing.foreman
+```
+
+All Foremen process tasks cooperatively.
+
+### Vertical Scaling
+
+Increase workers per Foreman:
+
+```python
+app = Blazing(
+    redis_config={...},
+    worker_config={
+        'async_workers': 16,  # Scale up for I/O workloads
+        'blocking_workers': 8  # Scale up for CPU workloads
+    }
+)
+```
+
+## Next Steps
+

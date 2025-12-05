@@ -1,0 +1,254 @@
+---
+title: Quick Start Guide
+label: Quick Start
+description: Build your first Blazing Flow pipeline in minutes
+position: 2
+---
+
+Get started with Blazing Flow and build your first asynchronous pipeline in just a few minutes.
+
+## Prerequisites
+
+- Python 3.11 or higher
+- Redis or KeyDB server
+- Basic understanding of Python async/await
+
+## Installation
+
+Install Blazing Flow using pip or uv:
+
+```bash
+# Using pip
+pip install blazing
+
+# Using uv (recommended)
+uv pip install blazing
+```
+
+Or install from source:
+
+```bash
+git clone https://github.com/your-org/blazing.git
+cd blazing
+uv sync
+source .venv/bin/activate
+```
+
+## Start Redis
+
+Blazing Flow requires a Redis server for state management. You can use Docker to quickly spin one up:
+
+```bash
+# Pull the Redis Stack image
+docker pull redis/redis-stack
+
+# Run Redis on port 6380
+docker run --name blazing_redis -p 6380:6379 -d redis/redis-stack
+```
+
+## Your First Pipeline
+
+Let's create a simple data processing pipeline that demonstrates the core concepts of Blazing Flow.
+
+### Step 1: Define a Skillset
+
+Skillsets encapsulate your business logic and can be reused across different stations:
+
+```python
+from blazing import BaseSkillset
+
+class DataProcessor(BaseSkillset):
+    """A skillset for processing data"""
+
+    async def fetch_data(self, source_id: str):
+        """Fetch data from a source"""
+        # Simulate fetching data
+        return {"id": source_id, "data": [1, 2, 3, 4, 5]}
+
+    async def transform_data(self, data: dict):
+        """Transform the data"""
+        # Apply some transformation
+        transformed = {
+            "id": data["id"],
+            "sum": sum(data["data"]),
+            "count": len(data["data"])
+        }
+        return transformed
+
+    async def save_result(self, result: dict):
+        """Save the processed result"""
+        # Save to database, file, or API
+        print(f"Saved result: {result}")
+        return result
+```
+
+### Step 2: Create a Blazing Application
+
+Initialize your Blazing application with Redis configuration:
+
+```python
+from blazing import Blazing
+
+# Create the app
+app = Blazing(
+    redis_config={
+        'host': 'localhost',
+        'port': 6380
+    },
+    skillsets=[DataProcessor]
+)
+```
+
+### Step 3: Define Stations
+
+Stations are individual processing steps in your pipeline:
+
+```python
+@app.station
+async def fetch_station(source_id: str, skillsets):
+    """Station that fetches data"""
+    processor = skillsets['DataProcessor']
+    data = await processor.fetch_data(source_id)
+    return data
+
+@app.station
+async def transform_station(data: dict, skillsets):
+    """Station that transforms data"""
+    processor = skillsets['DataProcessor']
+    result = await processor.transform_data(data)
+    return result
+
+@app.station
+async def save_station(result: dict, skillsets):
+    """Station that saves the result"""
+    processor = skillsets['DataProcessor']
+    final = await processor.save_result(result)
+    return final
+```
+
+### Step 4: Define a Route
+
+Routes orchestrate stations into a complete workflow:
+
+```python
+@app.route
+async def data_pipeline(source_id: str):
+    """Complete data processing pipeline"""
+    # Fetch data
+    data = await fetch_station(source_id)
+
+    # Transform data
+    result = await transform_station(data)
+
+    # Save result
+    final = await save_station(result)
+
+    return final
+```
+
+### Step 5: Start the System
+
+Put it all together and start your application:
+
+```python
+import asyncio
+
+async def main():
+    # Initialize and start the system
+    await app.start()
+
+    # Execute the pipeline
+    result = await data_pipeline("source_123")
+    print(f"Pipeline result: {result}")
+
+    # Stop the system
+    await app.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Complete Example
+
+Here's the complete code in one file:
+
+```python
+import asyncio
+from blazing import Blazing, BaseSkillset
+
+class DataProcessor(BaseSkillset):
+    async def fetch_data(self, source_id: str):
+        return {"id": source_id, "data": [1, 2, 3, 4, 5]}
+
+    async def transform_data(self, data: dict):
+        return {
+            "id": data["id"],
+            "sum": sum(data["data"]),
+            "count": len(data["data"])
+        }
+
+    async def save_result(self, result: dict):
+        print(f"Saved result: {result}")
+        return result
+
+app = Blazing(
+    redis_config={'host': 'localhost', 'port': 6380},
+    skillsets=[DataProcessor]
+)
+
+@app.station
+async def fetch_station(source_id: str, skillsets):
+    processor = skillsets['DataProcessor']
+    return await processor.fetch_data(source_id)
+
+@app.station
+async def transform_station(data: dict, skillsets):
+    processor = skillsets['DataProcessor']
+    return await processor.transform_data(data)
+
+@app.station
+async def save_station(result: dict, skillsets):
+    processor = skillsets['DataProcessor']
+    return await processor.save_result(result)
+
+@app.route
+async def data_pipeline(source_id: str):
+    data = await fetch_station(source_id)
+    result = await transform_station(data)
+    final = await save_station(result)
+    return final
+
+async def main():
+    await app.start()
+    result = await data_pipeline("source_123")
+    print(f"Pipeline result: {result}")
+    await app.stop()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Running the Example
+
+Save the code to `my_pipeline.py` and run it:
+
+```bash
+python my_pipeline.py
+```
+
+You should see output like:
+
+```
+Saved result: {'id': 'source_123', 'sum': 15, 'count': 5}
+Pipeline result: {'id': 'source_123', 'sum': 15, 'count': 5}
+```
+
+## Next Steps
+
+Now that you have a basic pipeline running, explore more advanced features:
+
+
+## Need Help?
+
+- Join our [Discord community](https://discord.gg/blazing)
+- Contact support at [admin@blazing.work](mailto:admin@blazing.work)

@@ -1,0 +1,427 @@
+---
+title: Organizational Hierarchy
+label: Organizational Hierarchy
+description: Understanding organizations, projects, and clusters in Blazing
+position: 1
+---
+
+Blazing Core Compose uses a hierarchical organizational model to manage infrastructure at scale:
+
+```
+Organization
+  └── Project
+      └── Cluster
+          └── RegionSet
+              └── Services
+```
+
+## Overview
+
+### Organization
+
+The top-level entity representing your company or team.
+
+```yaml
+# Determined by API authentication
+organization_id: <derived from API key>
+```
+
+**Characteristics:**
+- One organization per company/team
+- Contains multiple projects
+- Shared billing and access control
+- Organization-wide policies
+
+**Use Cases:**
+- Company: "Acme Corp"
+- Team: "Platform Engineering"
+- Department: "Data Science"
+
+### Project
+
+Logical grouping of related clusters within an organization.
+
+```yaml
+# Declared in compose.yaml
+project_id: production
+```
+
+**Characteristics:**
+- Groups related infrastructure
+- Separate billing tracking
+- Project-level policies
+- Resource quotas per project
+
+**Use Cases:**
+- Environment: "production", "staging", "development"
+- Product: "mobile-api", "web-backend", "ml-pipeline"
+- Customer: "customer-acme", "customer-beta"
+
+### Cluster
+
+A deployment unit with its own regional infrastructure and services.
+
+```yaml
+# Declared in compose.yaml
+cluster_id: api-cluster-v2
+
+cluster:
+  name: Production API Cluster v2
+```
+
+**Characteristics:**
+- Contains multiple services
+- Deployed across multiple regions
+- Isolated network and security
+- Independent scaling and updates
+
+**Use Cases:**
+- Service cluster: "api-backend", "data-processing"
+- Application: "mobile-app", "admin-portal"
+- Version: "api-v1", "api-v2"
+
+### RegionSet
+
+Geographic distribution of your cluster infrastructure.
+
+```yaml
+regions:
+  geographic_scope: NA
+  count: 5
+  strategy:
+    cost: 60
+    latency: 30
+    compliance: 10
+```
+
+**Characteristics:**
+- Automatic region selection by server
+- Provider-specific distribution
+- Geographic constraints
+- High availability zones
+
+### Services
+
+Individual application components running within a cluster.
+
+```yaml
+services:
+  api:
+    image: myapp:latest
+    cpu: 2
+    memory: 4Gi
+
+  worker:
+    image: myworker:latest
+    cpu: 4
+    memory: 8Gi
+```
+
+**Characteristics:**
+- Docker container-based
+- Independent scaling
+- Service-level configuration
+- Inter-service networking
+
+## Complete Example
+
+Here's how all levels work together:
+
+```yaml
+version: "v0.2"
+
+# Organization: Determined by API authentication
+# └─ organization_id: acme-corp (from API key)
+
+# Project: Logical grouping
+project_id: production
+
+# Cluster: Deployment unit
+cluster_id: api-backend-cluster
+
+cluster:
+  name: Production API Backend
+
+# Provider configuration (cluster-level)
+providers:
+  gcp:
+    status: prefer
+    network_tier: Standard
+
+  dfc:
+    status: prefer
+
+  akash:
+    status: fallback
+
+# Regional distribution (cluster-level)
+regions:
+  geographic_scope: NA
+  count: 3
+  strategy:
+    cost: 50
+    latency: 40
+    compliance: 10
+
+# Services (cluster-level)
+services:
+  # Service 1
+  api:
+    image: acme/api:v2.1.0
+    cpu: 2
+    memory: 4Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 3
+      max_replicas: 20
+    network:
+      ingress:
+        expose:
+          - port: 443
+            tls:
+              auto: true
+
+  # Service 2
+  worker:
+    image: acme/worker:v2.1.0
+    cpu: 4
+    memory: 8Gi
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 50
+    gpu:
+      count: 1
+      model: nvidia-a100
+```
+
+## Resource Hierarchy
+
+### API Paths
+
+Resources are accessed via hierarchical API paths:
+
+```
+/organizations/{org_id}
+  /projects/{project_id}
+    /clusters/{cluster_id}
+      /regions
+      /services/{service_name}
+```
+
+Example API calls:
+
+```bash
+# List all projects
+GET /v0.2/organizations/acme-corp/projects
+
+# Get specific cluster
+GET /v0.2/organizations/acme-corp/projects/production/clusters/api-backend-cluster
+
+# List services in cluster
+GET /v0.2/organizations/acme-corp/projects/production/clusters/api-backend-cluster/services
+```
+
+### CLI Commands
+
+The CLI respects this hierarchy:
+
+```bash
+# Set organization context (from login)
+core login
+
+# List projects
+core projects list
+
+# Set project context
+core project use production
+
+# List clusters in project
+core clusters list
+
+# Deploy a cluster
+core apply compose.yaml
+
+# List services in cluster
+core services list --cluster api-backend-cluster
+```
+
+## Access Control
+
+### Organization-Level Permissions
+
+| Role | Permissions |
+|------|-------------|
+| **Owner** | Full access to all resources |
+| **Admin** | Manage projects and clusters |
+| **Developer** | Deploy and manage clusters |
+| **Viewer** | Read-only access |
+
+### Project-Level Permissions
+
+Permissions can be scoped to specific projects:
+
+```yaml
+# Grant developer access to production project only
+access:
+  - user: alice@acme.com
+    role: developer
+    scope: project:production
+```
+
+### Cluster-Level Isolation
+
+Each cluster has:
+- Isolated network (separate VPCs/VNets)
+- Separate service accounts
+- Independent secrets management
+- Per-cluster encryption keys
+
+## Billing and Quotas
+
+### Billing Hierarchy
+
+```
+Organization Billing Account
+  ├── Project: production ($1,250/month)
+  │   ├── Cluster: api-backend ($800/month)
+  │   └── Cluster: worker-pool ($450/month)
+  │
+  └── Project: staging ($320/month)
+      └── Cluster: staging-env ($320/month)
+```
+
+### Resource Quotas
+
+Set limits at organization and project levels:
+
+```yaml
+# Organization-level quotas
+organization:
+  quotas:
+    max_projects: 10
+    max_clusters_per_project: 20
+    total_cpu: 1000
+    total_memory: 2000Gi
+    total_gpu: 50
+
+# Project-level quotas
+project:
+  quotas:
+    max_clusters: 5
+    cpu_per_cluster: 100
+    memory_per_cluster: 500Gi
+```
+
+## Multi-Tenant Patterns
+
+### Pattern 1: Project Per Customer
+
+Isolate customers at the project level:
+
+```
+Organization: Acme SaaS
+  ├── Project: customer-apple
+  │   └── Cluster: app-cluster
+  ├── Project: customer-google
+  │   └── Cluster: app-cluster
+  └── Project: customer-meta
+      └── Cluster: app-cluster
+```
+
+Benefits:
+- Strong isolation
+- Per-customer billing
+- Customer-specific policies
+- Easy offboarding
+
+### Pattern 2: Cluster Per Environment
+
+Separate environments within projects:
+
+```
+Organization: Acme Corp
+  └── Project: mobile-app
+      ├── Cluster: production
+      ├── Cluster: staging
+      └── Cluster: development
+```
+
+Benefits:
+- Environment isolation
+- Shared project policies
+- Unified billing per product
+- Progressive deployment
+
+### Pattern 3: Cluster Per Service
+
+Microservices architecture:
+
+```
+Organization: Acme Corp
+  └── Project: production
+      ├── Cluster: api-gateway
+      ├── Cluster: auth-service
+      ├── Cluster: payment-service
+      └── Cluster: notification-service
+```
+
+Benefits:
+- Service isolation
+- Independent scaling
+- Service-specific configuration
+- Team autonomy
+
+## Best Practices
+
+### Naming Conventions
+
+Use consistent naming:
+
+```yaml
+# project_id format
+project_id: <environment>-<product>
+# Examples: prod-api, staging-web, dev-ml
+
+# cluster_id format
+cluster_id: <service>-<version>-<purpose>
+# Examples: api-v2-backend, worker-v1-batch, db-v3-primary
+```
+
+### Organization Structure
+
+For small teams (1-10 people):
+```
+1 Organization
+  2-3 Projects (prod, staging, dev)
+    1-5 Clusters per project
+```
+
+For medium teams (10-50 people):
+```
+1 Organization
+  5-10 Projects (by product/service)
+    3-10 Clusters per project
+```
+
+For large teams (50+ people):
+```
+1 Organization
+  10-50 Projects (by team/product)
+    5-20 Clusters per project
+```
+
+### Migration Strategy
+
+Start simple and grow:
+
+1. **Phase 1**: Single project, single cluster
+2. **Phase 2**: Add staging project
+3. **Phase 3**: Split into multiple clusters
+4. **Phase 4**: Organize by product/team
+
+## Next Steps
+
+- Learn about [Provider Configuration](/docs/overview)
+- Understand [Access Control](/docs/organizational-hierarchy)
+- Explore [Multi-Tenancy Patterns](/docs/organizational-hierarchy)

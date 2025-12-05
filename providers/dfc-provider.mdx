@@ -1,0 +1,509 @@
+---
+title: DFC Provider Configuration
+label: DFC Provider
+description: Configure Digital Frontier Cloud for cost-effective Akash-based deployments
+position: 2
+---
+
+Digital Frontier Cloud (DFC) provides curated, cost-effective infrastructure on the Akash Network with zero egress fees and ~60% cost savings compared to GCP.
+
+## What is DFC?
+
+DFC runs on the Akash Network but with **curated, high-reliability providers** vetted by Digital Frontier. This gives you:
+
+- **Zero egress fees**: No data transfer costs
+- **60% cheaper compute**: Compared to equivalent GCP resources
+- **Reliability**: Vetted providers with proven uptime
+- **Same interface**: Standard Kubernetes deployment
+
+## Basic Configuration
+
+```yaml
+providers:
+  dfc:
+    status: prefer
+    public_gateway:
+      enabled: false
+```
+
+## Configuration Reference
+
+### Status Field
+
+```yaml
+dfc:
+  status: prefer | allow | fallback
+```
+
+Define DFC's priority in provider selection:
+
+- **prefer**: Primary provider (use first)
+- **allow**: Acceptable provider (use if preferred unavailable)
+- **fallback**: Emergency provider (use only when others fail)
+
+### Akash Provider Whitelist
+
+Optionally restrict to specific Akash providers:
+
+```yaml
+dfc:
+  akash_provider_whitelist:
+    - "akash1aaul837r7en7hpk9wv2svg8u78fdq0t2j2e82z"  # DFC Sofia, Bulgaria
+    - "akash1xmz9es9ay9ln9x2m3q5dlu0hkpqyg37h4gqd3l"  # DFC Frankfurt, Germany
+```
+
+**When to use whitelist**:
+- Compliance requirements (specific countries)
+- Performance optimization (specific regions)
+- Cost predictability (known providers)
+
+**When to omit whitelist**:
+- Maximum flexibility
+- Geographic diversity
+- Automatic failover to any DFC provider
+
+### Public Gateway Configuration
+
+```yaml
+dfc:
+  public_gateway:
+    enabled: true | false
+```
+
+**Important**: Only enable gateway on **one provider** per deployment.
+
+**Recommendation**: Use GCP gateway for maximum reliability:
+
+```yaml
+gcp:
+  public_gateway:
+    enabled: true          # Main gateway
+
+dfc:
+  public_gateway:
+    enabled: false         # Workers only
+```
+
+## Complete Examples
+
+### Cost-Optimized Setup
+
+DFC as primary, GCP as backup:
+
+```yaml
+providers:
+  dfc:
+    status: prefer         # Primary for cost savings
+    public_gateway:
+      enabled: true        # DFC gateway (saves $49/month)
+
+  gcp:
+    status: allow          # Backup for reliability
+    network_tier: Standard
+    node_pools:
+      burst: spot
+    public_gateway:
+      enabled: false
+```
+
+**Result**: Maximum cost savings with GCP fallback.
+
+### Reliability-First Setup
+
+GCP primary, DFC for burst:
+
+```yaml
+providers:
+  gcp:
+    status: prefer         # Primary for reliability
+    network_tier: Standard
+    node_pools:
+      baseline: standard
+      burst: spot
+    public_gateway:
+      enabled: true        # Reliable gateway
+
+  dfc:
+    status: prefer         # Also primary for burst capacity
+    public_gateway:
+      enabled: false       # Workers only
+```
+
+**Result**: Reliable baseline with cost-effective burst.
+
+### Geographic Restriction
+
+EU-only deployment:
+
+```yaml
+providers:
+  dfc:
+    status: prefer
+    akash_provider_whitelist:
+      - "akash1aaul837r7en7hpk9wv2svg8u78fdq0t2j2e82z"  # Sofia, Bulgaria
+      - "akash1xmz9es9ay9ln9x2m3q5dlu0hkpqyg37h4gqd3l"  # Frankfurt, Germany
+    public_gateway:
+      enabled: true
+
+regions:
+  geographic_scope: EU
+  count: 3
+```
+
+**Result**: Compliant EU deployment on DFC.
+
+## DFC Locations
+
+Current DFC provider locations (growing):
+
+### North America
+- **Chicago, IL**: `akash1...chicago`
+- **Ashburn, VA**: `akash1...ashburn`
+- **Los Angeles, CA**: `akash1...la`
+
+### Europe
+- **Sofia, Bulgaria**: `akash1aaul837r7en7hpk9wv2svg8u78fdq0t2j2e82z`
+- **Frankfurt, Germany**: `akash1xmz9es9ay9ln9x2m3q5dlu0hkpqyg37h4gqd3l`
+- **London, UK**: `akash1...london`
+
+### Asia-Pacific
+- **Singapore**: `akash1...singapore`
+- **Tokyo, Japan**: `akash1...tokyo`
+
+## Cost Comparison
+
+### Compute Costs
+
+Based on 2 CPU, 4GB RAM workload:
+
+| Provider | Compute | Egress (1TB) | Total/Month | Savings |
+|----------|---------|--------------|-------------|---------|
+| **GCP Standard** | $40 | $5 | **$45** | Baseline |
+| **DFC** | $24 | $0 | **$24** | **47%** |
+| **Akash** | $12 | $0 | **$12** | **73%** |
+
+### Example: 10 Replica Service
+
+With `min_replicas: 3, max_replicas: 10`:
+
+#### All GCP Standard
+
+```yaml
+providers:
+  gcp:
+    status: prefer
+    node_pools:
+      burst: standard
+```
+
+**Cost**: ~$450/month (10 replicas × $45)
+
+#### GCP Baseline + DFC Burst
+
+```yaml
+providers:
+  gcp:
+    status: prefer         # 3 baseline replicas
+    node_pools:
+      baseline: standard
+      burst: spot
+
+  dfc:
+    status: prefer         # 7+ burst replicas
+```
+
+**Cost**: ~$303/month
+- GCP baseline (3): $135
+- DFC burst (7): $168
+
+**Savings**: $147/month (33%)
+
+#### DFC Primary + GCP Fallback
+
+```yaml
+providers:
+  dfc:
+    status: prefer         # 10 replicas on DFC
+
+  gcp:
+    status: fallback       # Rarely used
+```
+
+**Cost**: ~$240/month (10 replicas × $24)
+
+**Savings**: $210/month (47%)
+
+## DFC Features
+
+### Compute
+- ✅ CPU: Any size
+- ✅ Memory: Any size
+- ✅ GPU: NVIDIA GPUs available
+- ✅ Autoscaling: Full HPA support
+- ✅ Spot pricing: Built-in with Akash bidding
+
+### Networking
+- ✅ Zero egress fees
+- ✅ Public IPs: Via gateway
+- ✅ TLS: Let's Encrypt automation
+- ✅ Load balancing: Gateway-based
+- ⚠️ IPv6: Provider-dependent
+
+### Storage
+- ✅ Persistent volumes: Provider-dependent
+- ✅ Ephemeral storage: Full support
+- ✅ Encrypted volumes: Provider-dependent
+- ⚠️ Managed databases: Use external services
+
+### Security
+- ✅ VPC isolation: Provider-dependent
+- ✅ Network policies: Full Kubernetes support
+- ⚠️ Confidential compute: Roadmap
+- ⚠️ Compliance certs: GDPR self-certification
+
+## Best Practices
+
+### 1. Use DFC for Stateless Workloads
+
+**Good**: API servers, workers, batch jobs
+
+```yaml
+services:
+  api:
+    image: myapp:latest
+    autoscaling:
+      min_replicas: 3
+      max_replicas: 20
+
+  worker:
+    image: myworker:latest
+    autoscaling:
+      min_replicas: 2
+      max_replicas: 50
+```
+
+**Avoid**: Databases without replication, single-instance services
+
+### 2. Combine with GCP for Reliability
+
+```yaml
+providers:
+  gcp:
+    status: prefer         # Baseline (3 replicas)
+
+  dfc:
+    status: prefer         # Burst (7+ replicas)
+```
+
+This provides:
+- Reliable baseline on GCP
+- Cost-effective burst on DFC
+- Automatic failover
+
+### 3. Use GCP Gateway
+
+```yaml
+gcp:
+  public_gateway:
+    enabled: true          # More reliable
+
+dfc:
+  public_gateway:
+    enabled: false         # Workers only
+```
+
+GCP gateway provides:
+- Global load balancing
+- Better uptime SLA
+- Integrated monitoring
+
+### 4. Monitor Provider Performance
+
+Track DFC provider metrics:
+
+```yaml
+observability:
+  metrics:
+    endpoint: /metrics
+    format: prometheus
+    custom_labels:
+      provider: dfc
+```
+
+Watch for:
+- High latency providers
+- Frequent restarts
+- Low availability
+
+## Limitations
+
+### Current Limitations
+
+1. **No managed databases**: Use external DB services or GCP
+2. **Variable provider performance**: Some providers better than others
+3. **No automatic provider scoring**: Manual whitelist for consistency
+4. **Limited compliance certifications**: GDPR via self-certification only
+
+### Workarounds
+
+**Database Workloads**:
+```yaml
+providers:
+  gcp:
+    status: prefer         # Databases on GCP
+
+  dfc:
+    status: prefer         # App servers on DFC
+```
+
+**Consistent Performance**:
+```yaml
+dfc:
+  akash_provider_whitelist:
+    - "akash1aaul837r7en7hpk9wv2svg8u78fdq0t2j2e82z"  # Proven uptime
+```
+
+**Compliance Requirements**:
+```yaml
+providers:
+  gcp:
+    status: prefer         # Compliance workloads
+
+  dfc:
+    status: allow          # Non-sensitive workloads
+```
+
+## Provider Selection Algorithm
+
+DFC providers are scored based on:
+
+```python
+def score_dfc_provider(provider):
+    score = 0
+
+    # Capacity (40 points)
+    if provider.has_capacity():
+        score += 40
+
+    # Uptime history (30 points)
+    uptime_pct = provider.uptime_last_30d
+    score += (uptime_pct / 100) * 30
+
+    # Cost (20 points)
+    cost_score = 100 - (provider.cost_relative * 100)
+    score += (cost_score / 100) * 20
+
+    # Whitelist bonus (10 points)
+    if provider in whitelist:
+        score += 10
+
+    return score
+```
+
+## Troubleshooting
+
+### "Provider capacity exceeded"
+
+**Error**:
+```
+ERROR: DFC provider cannot provision requested resources
+```
+
+**Solution 1**: Remove whitelist for more options:
+```yaml
+dfc:
+  # Remove akash_provider_whitelist
+```
+
+**Solution 2**: Add GCP fallback:
+```yaml
+gcp:
+  status: fallback
+```
+
+### "High latency from DFC"
+
+**Issue**: DFC provider in distant region
+
+**Solution**: Use geographic scope:
+```yaml
+regions:
+  geographic_scope: NA    # Restrict to North America
+```
+
+### "Gateway unreachable"
+
+**Error**:
+```
+ERROR: Cannot reach DFC gateway
+```
+
+**Solution**: Switch to GCP gateway:
+```yaml
+gcp:
+  public_gateway:
+    enabled: true
+
+dfc:
+  public_gateway:
+    enabled: false
+```
+
+## Migration Path
+
+### From All-GCP to GCP+DFC
+
+**Phase 1**: Add DFC as fallback
+
+```yaml
+providers:
+  gcp:
+    status: prefer
+
+  dfc:
+    status: fallback       # Test with minimal traffic
+```
+
+**Phase 2**: Promote DFC to allow
+
+```yaml
+providers:
+  gcp:
+    status: prefer
+
+  dfc:
+    status: allow          # Handle burst traffic
+```
+
+**Phase 3**: DFC as primary for burst
+
+```yaml
+providers:
+  gcp:
+    status: prefer         # Baseline only
+
+  dfc:
+    status: prefer         # Burst capacity
+```
+
+Monitor costs at each phase and adjust based on performance.
+
+## DFC Roadmap
+
+### Coming Soon
+- **Confidential compute**: TEE support on select providers
+- **Managed databases**: PostgreSQL, MySQL via DFC
+- **Enhanced monitoring**: Provider performance dashboard
+- **Auto-whitelist**: AI-driven provider selection
+
+### Future Plans
+- **Geographic guarantees**: Certified provider locations
+- **Compliance certifications**: SOC2, ISO27001
+- **Multi-region replication**: Automated data sync
+
+## Next Steps
+
+- [Akash Provider Configuration](/docs/akash-provider)
+- [Provider Configuration](/docs/overview)
+- 
+- [Service Configuration](/docs/service-basics)

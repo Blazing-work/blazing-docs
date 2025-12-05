@@ -1,0 +1,251 @@
+---
+title: Documentation Versioning
+label: Versioning
+description: Understanding documentation versions and API compatibility
+position: 2
+---
+
+Blazing Core Compose follows semantic versioning for both the API and documentation. This guide explains how to navigate different versions and maintain compatibility.
+
+## Current Version
+
+**Latest Stable**: v0.2.0 (December 2025)
+
+This documentation reflects **v0.2.0** of the Core Compose specification.
+
+## Version Format
+
+Blazing uses semantic versioning (semver):
+
+```
+v{MAJOR}.{MINOR}.{PATCH}
+
+Example: v0.2.0
+  ├─ 0 = Major version (breaking changes)
+  ├─ 2 = Minor version (new features, backward compatible)
+  └─ 0 = Patch version (bug fixes)
+```
+
+## YAML Version Declaration
+
+Every `compose.yaml` file must declare its version:
+
+```yaml
+version: "v0.2"  # Major.Minor only
+
+services:
+  api:
+    image: myapp:latest
+    # ...
+```
+
+**Important**: Only specify `major.minor` in YAML (e.g., `v0.2`, not `v0.2.0`). Patch versions are backward compatible within the same minor version.
+
+## Version Compatibility
+
+### API Compatibility Matrix
+
+| YAML Version | API Versions | Status | Notes |
+|--------------|--------------|--------|-------|
+| v0.2 | v0.2.0, v0.2.1, v0.2.2 | **Current** | Active development |
+| v0.1 | v0.1.0 - v0.1.9 | Deprecated | Supported until Q2 2026 |
+| v0.0 | v0.0.x | Unsupported | Migrate to v0.2 |
+
+### Backward Compatibility
+
+**Minor version updates** (e.g., v0.1 → v0.2) may include:
+- ✅ New optional fields
+- ✅ New provider support
+- ✅ Enhanced features
+- ❌ No breaking changes to existing configurations
+
+**Major version updates** (e.g., v1.0 → v2.0) may include:
+- ⚠️  Breaking changes
+- ⚠️  Field renames or removals
+- ⚠️  Changed defaults
+- ✅  Migration guides provided
+
+## Viewing Specific Versions
+
+### Documentation Versions
+
+Access documentation for specific versions:
+
+- **Latest (v0.2.0)**: [https://blazing.work/docs](https://blazing.work/docs)
+- **v0.1**: [https://blazing.work/docs/v0.1](https://blazing.work/docs/v0.1)
+- **All Versions**: [https://blazing.work/docs/versions](https://blazing.work/docs/versions)
+
+### CLI Version Management
+
+Check your CLI version:
+
+```bash
+core --version
+```
+
+Install a specific version:
+
+```bash
+# Install latest
+brew install blazing-cli
+
+# Install specific version
+brew install blazing-cli@0.2.0
+
+# Pin to version
+brew pin blazing-cli@0.2.0
+```
+
+## Schema Validation
+
+### Version-Specific Schemas
+
+Each version has a JSON schema for validation:
+
+```yaml
+# Schema URL format
+schema: https://docs.blazing.work/core/v0.2.0/schema
+```
+
+The CLI automatically fetches the correct schema based on your `version` field.
+
+### Validate Against Specific Version
+
+```bash
+# Validate with current CLI version
+core validate
+
+# Validate with specific schema version
+core validate --schema v0.2.0
+```
+
+## Migration Between Versions
+
+### Checking for Updates
+
+```bash
+# See if newer version available
+core check-updates
+
+# View changelog
+core changelog v0.2.0
+```
+
+### Migration Tools
+
+Automated migration between versions:
+
+```bash
+# Migrate from v0.1 to v0.2
+core migrate --from v0.1 --to v0.2 compose.yaml
+
+# Preview changes without applying
+core migrate --from v0.1 --to v0.2 --dry-run compose.yaml
+```
+
+Sample migration output:
+
+```
+Migrating compose.yaml from v0.1 to v0.2
+
+Changes:
+  ✓ Updated version: v0.1 → v0.2
+  ✓ Renamed: placement.regions → regions.geographic_scope
+  ✓ Added required field: project_id
+  ⚠️  Deprecated field removed: legacy_mode
+
+Migration successful. Review changes before deploying.
+```
+
+## Version-Specific Features
+
+### Feature Availability by Version
+
+Use the feature registry to check availability:
+
+```bash
+# Check if feature available in version
+core features list --version v0.2.0
+
+# Check specific feature
+core features check GPU-MIG --version v0.2.0
+```
+
+### Changelog
+
+View detailed changes between versions:
+
+```bash
+core changelog --from v0.1.0 --to v0.2.0
+```
+
+## Deprecation Policy
+
+### Deprecation Timeline
+
+1. **Announcement** (Version N): Feature marked as deprecated
+2. **Warning Period** (6 months): Warnings in CLI/docs
+3. **Removal** (Version N+2): Feature removed
+
+Example timeline:
+
+```
+v0.1.0 (Jan 2025)  - Feature X introduced
+v0.2.0 (Dec 2025)  - Feature X deprecated (warnings)
+v0.3.0 (Jun 2026)  - Feature X still works (warnings)
+v1.0.0 (Jan 2027)  - Feature X removed
+```
+
+### Deprecated Features
+
+Current deprecations in v0.2.0:
+
+| Feature | Deprecated In | Removed In | Replacement |
+|---------|---------------|------------|-------------|
+| `legacy_mode` | v0.2.0 | v1.0.0 | Use standard mode |
+| `placement.regions` | v0.2.0 | v1.0.0 | Use `regions.geographic_scope` |
+
+## Staying Up to Date
+
+### Release Notifications
+
+Subscribe to release notifications:
+
+```bash
+core subscribe releases
+```
+
+Or follow:
+- [GitHub Releases](https://github.com/blazing/core-compose/releases)
+- [Changelog](https://blazing.work/changelog)
+- [Twitter @blazingcloud](https://twitter.com/blazingcloud)
+
+### Version Pinning
+
+Pin your deployment to a specific version:
+
+```yaml
+version: "v0.2"  # Pin to v0.2.x
+
+# Optionally lock CLI version
+cli_version_min: "0.2.0"
+cli_version_max: "0.2.99"
+```
+
+## API Version Negotiation
+
+The CLI and API negotiate versions automatically:
+
+```
+1. CLI reads compose.yaml version: v0.2
+2. CLI connects to API: GET /v0.2/validate
+3. API checks compatibility:
+   - If supported: ✓ Proceed
+   - If unsupported: ❌ Error with migration guide
+```
+
+## Need Help?
+
+- [Migration Guide](/docs/versioning)
+- [Breaking Changes](/docs/versioning)
+- [Support](mailto:admin@blazing.work)

@@ -1,0 +1,272 @@
+---
+title: Quick Start Guide
+label: Quick Start
+description: Deploy your first Blazing Core cluster in 10 minutes
+position: 1
+---
+
+Get started with Blazing Core by deploying the complete infrastructure in under 10 minutes.
+
+## Prerequisites
+
+### Required Tools
+
+- **gcloud CLI** - Google Cloud command-line tools
+- **kubectl** - Kubernetes command-line tool
+- **Terraform** - Infrastructure as Code (for GCP resources)
+- **Ansible** - Application deployment automation
+- **Python 3.12+** - For running tests and automation scripts
+
+### Required Access
+
+- GCP project access (`digitalfrontier-main`)
+- GCP billing account (for infrastructure costs)
+
+### Initial Authentication
+
+**CRITICAL**: Always authenticate with GCloud first:
+
+```bash
+gcloud auth login
+gcloud auth application-default login
+```
+
+## Single Command Deployment
+
+Deploy the entire infrastructure with one command:
+
+```bash
+# Clone repository
+git clone https://github.com/your-org/DigitalFrontier-infra.git
+cd DigitalFrontier-infra
+
+# Authenticate with GCP
+gcloud auth login
+gcloud auth application-default login
+
+# Deploy everything (uses cost-effective Firestore backend by default)
+./deploy-all.sh
+```
+
+This command:
+
+1. Deploys GCP infrastructure (Terraform)
+2. Creates GKE Autopilot cluster
+3. Sets up Firestore + Pub/Sub for task queue
+4. Deploys Control-Plane API (Ansible)
+5. Configures DNS (api.blazing.work)
+6. Verifies connectivity
+
+## Deployment Options
+
+```bash
+# Default: Firestore backend ($1-10/month)
+./deploy-all.sh
+
+# High-performance: Spanner backend ($657/month)
+BACKEND_TYPE=spanner ./deploy-all.sh
+
+# With comprehensive health checks
+./deploy-all.sh --with-health-check
+
+# With E2E tests (validates entire system)
+./deploy-all.sh --with-e2e-tests
+
+# Full verification suite
+./deploy-all.sh --with-health-check --with-e2e-tests
+```
+
+## What Gets Deployed
+
+### GCP Resources (via Terraform)
+
+- GKE Autopilot cluster (europe-southwest1)
+- Cloud DNS zone (blazing.work)
+- Service accounts (cert-manager, control-plane-api)
+- Cloud KMS (Vault auto-unseal)
+- Firestore database (task queue)
+- Pub/Sub topic (background-tasks)
+- Firewall rules
+
+### Kubernetes Workloads (via Ansible)
+
+- control-plane namespace
+- control-plane-api deployment
+- LoadBalancer service (IPv4, Standard tier)
+- cert-manager for Let's Encrypt
+- ConfigMaps and Secrets
+
+## Verify Deployment
+
+### Check API Health
+
+```bash
+# API endpoint (public)
+curl -s https://api.blazing.work/health | jq
+
+# Expected response
+{
+  "status": "healthy",
+  "timestamp": "2025-11-17T...",
+  "version": "0.1.0"
+}
+```
+
+### Via Port-Forward (Local Development)
+
+```bash
+# Start port-forward
+./scripts/start-port-forward.sh
+
+# Check health
+curl -s http://localhost:8088/health | jq
+```
+
+## Create Your First Cluster
+
+### 1. Create Organization
+
+```bash
+# Create organization (returns API key)
+curl -X POST "https://api.blazing.work/v1/admin/organizations" \
+  -H "X-Admin-Key: $ADMIN_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "organization_id": "acme-corp",
+    "name": "Acme Corporation"
+  }'
+
+# Save the API key from response
+export API_KEY="<api-key-from-response>"
+```
+
+### 2. Create Project
+
+```bash
+# Create project
+curl -X POST "https://api.blazing.work/v1/organizations/acme-corp/projects" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project_id": "production",
+    "name": "Production Environment"
+  }'
+```
+
+### 3. Create Cluster
+
+```bash
+# Create cluster (async - returns task_id)
+curl -X POST "https://api.blazing.work/v1/organizations/acme-corp/projects/production/clusters" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cluster_id": "us-west-cluster",
+    "consul_replicas": 3
+  }'
+
+# Save the cluster_id from response
+export CLUSTER_ID="us-west-cluster"
+```
+
+### 4. Check Cluster Status
+
+```bash
+# Get cluster status
+curl -s "https://api.blazing.work/v1/organizations/acme-corp/projects/production/clusters/$CLUSTER_ID" \
+  -H "X-API-Key: $API_KEY" | jq
+
+# Cluster is ready when status shows "running"
+```
+
+### 5. Get Worker Credentials
+
+```bash
+# Get credentials for joining workers to the cluster
+curl -s "https://api.blazing.work/v1/organizations/acme-corp/projects/production/clusters/$CLUSTER_ID/credentials" \
+  -H "X-API-Key: $API_KEY" | jq
+
+# Response includes:
+# - Consul HTTP address
+# - Consul ACL token
+# - Consul CA certificate
+# - Mesh gateway address
+```
+
+## Run E2E Tests
+
+Validate the entire system with automated tests:
+
+```bash
+# Full system validation
+python3 MASTER_TEST.py
+
+# This creates:
+# - Organization with API key
+# - Project
+# - Cluster (with Consul service mesh)
+# - Regional burst worker
+# - Akash worker
+# - Validates mesh connectivity
+```
+
+Test results and logs saved to `.tmp/` directory.
+
+## Cost Considerations
+
+### Infrastructure Costs
+
+| Component | Standard Tier | Notes |
+|-----------|---------------|-------|
+| GKE Autopilot | ~$150-300/month | Scales with usage |
+| Network Egress | $0.005/GB | Standard tier (17x cheaper) |
+| Firestore Backend | $1-10/month | Recommended for most cases |
+| Spanner Backend | $657/month | High-performance option |
+| LoadBalancer | ~$18/month each | Per-cluster cost |
+
+### Recommendations
+
+- **Development**: Firestore backend, 1-node Consul clusters
+- **Production**: Firestore backend (unless >10k tasks/day), 3-node Consul clusters
+- **High-throughput**: Spanner backend, 5-node Consul clusters
+
+## Troubleshooting
+
+### kubectl permission denied
+
+**Solution**: Run `gcloud auth login` first
+
+### API returns 404
+
+Check deployment status:
+
+```bash
+kubectl get pods -n control-plane
+kubectl logs -n control-plane deployment/control-plane-api --tail=50
+```
+
+### Cluster creation stuck
+
+Check task status:
+
+```bash
+# Check Pub/Sub for pending tasks
+gcloud pubsub subscriptions describe background-tasks-sub
+
+# Check worker logs
+kubectl logs -n control-plane deployment/control-plane-api | grep -i "task"
+```
+
+## Next Steps
+
+### For Operators
+- [Service Configuration](/docs/service-basics) - Configure and deploy workers
+- [Deployment Lifecycle](/docs/deployment-lifecycle) - Manage deployments
+
+### For Developers
+- [Architecture Overview](/docs/architecture) - System design
+- [Data Model](/docs/organizational-hierarchy) - Understanding the data hierarchy
+
+### For Infrastructure Engineers
+- [Provider Configuration](/docs/overview) - Cloud provider setup
+- [Deployment Lifecycle](/docs/deployment-lifecycle) - Production operations guide

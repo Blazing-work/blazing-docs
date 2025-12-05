@@ -1,0 +1,509 @@
+---
+title: Akash Provider Configuration
+label: Akash Provider
+description: Configure Akash Network for decentralized, cost-effective overflow capacity
+position: 3
+---
+
+Akash Network is a decentralized compute marketplace with global capacity, offering the lowest costs and maximum geographic diversity as an emergency fallback provider.
+
+## What is Akash Network?
+
+Akash is a **peer-to-peer cloud compute marketplace** where:
+
+- Anyone can offer compute capacity
+- Users bid on available resources
+- Providers compete on price and performance
+- No central authority controls the network
+
+## When to Use Akash
+
+### Recommended Use Cases
+
+✅ **Emergency overflow capacity** (fallback status)
+```yaml
+akash:
+  status: fallback         # Use when GCP/DFC exhausted
+```
+
+✅ **Cost-sensitive batch workloads**
+```yaml
+services:
+  batch-processor:
+    image: processor:latest
+```
+
+✅ **Geographic diversity** (50+ countries)
+```yaml
+regions:
+  geographic_scope: GLOBAL
+  count: 10
+```
+
+### Not Recommended For
+
+❌ **Production databases** (variable uptime)
+❌ **Compliance-sensitive workloads** (no guarantees)
+❌ **Real-time applications** (latency variability)
+❌ **Baseline capacity** (use prefer status)
+
+## Basic Configuration
+
+```yaml
+providers:
+  akash:
+    status: fallback       # Emergency only
+    public_gateway:
+      enabled: false       # Use GCP/DFC gateway
+```
+
+## Configuration Reference
+
+### Status Field
+
+```yaml
+akash:
+  status: prefer | allow | fallback
+```
+
+**Strong Recommendation**: Use `fallback` status only.
+
+| Status | Recommended | Reason |
+|--------|-------------|--------|
+| fallback | ✅ **Yes** | Safe overflow capacity |
+| allow | ⚠️ Sometimes | Testing or very cost-sensitive |
+| prefer | ❌ No | Too variable for primary |
+
+### Public Gateway Configuration
+
+```yaml
+akash:
+  public_gateway:
+    enabled: true | false
+```
+
+**Recommendation**: Disable Akash gateway, use GCP instead:
+
+```yaml
+gcp:
+  public_gateway:
+    enabled: true          # Reliable gateway
+
+akash:
+  public_gateway:
+    enabled: false         # Workers only
+```
+
+Akash gateways are:
+- Provider-dependent (variable reliability)
+- Not load-balanced
+- Limited monitoring
+
+## Complete Examples
+
+### Safe Fallback Configuration
+
+Primary: GCP + DFC, Fallback: Akash
+
+```yaml
+providers:
+  gcp:
+    status: prefer         # Primary baseline
+    network_tier: Standard
+    node_pools:
+      baseline: standard
+      burst: spot
+    public_gateway:
+      enabled: true
+
+  dfc:
+    status: prefer         # Primary burst
+    public_gateway:
+      enabled: false
+
+  akash:
+    status: fallback       # Emergency only
+    public_gateway:
+      enabled: false
+```
+
+**Result**:
+- GCP handles baseline (reliable)
+- DFC handles burst (cost-effective)
+- Akash handles extreme overflow (rare)
+
+### Cost-Optimized Testing
+
+Aggressive cost savings for dev/test:
+
+```yaml
+providers:
+  akash:
+    status: prefer         # Primary (testing only!)
+    public_gateway:
+      enabled: true
+
+  dfc:
+    status: allow          # Backup
+
+  gcp:
+    status: fallback       # Emergency
+```
+
+**Warning**: Only for non-production environments.
+
+### Batch Processing Configuration
+
+Long-running batch jobs:
+
+```yaml
+providers:
+  akash:
+    status: prefer         # Cheapest for batch
+
+  dfc:
+    status: allow
+
+services:
+  batch-processor:
+    image: processor:latest
+    cpu: 8
+    memory: 16Gi
+
+    autoscaling:
+      enabled: true
+      min_replicas: 0      # Scale to zero
+      max_replicas: 100    # Massive scale
+```
+
+**Use Case**: Video encoding, data processing, simulations
+
+## Akash Network Characteristics
+
+### Costs
+
+Lowest in the industry:
+
+| Resource | Akash | DFC | GCP |
+|----------|-------|-----|-----|
+| **2 CPU, 4GB RAM** | $12/mo | $24/mo | $45/mo |
+| **4 CPU, 8GB RAM** | $24/mo | $48/mo | $90/mo |
+| **8 CPU, 16GB RAM** | $48/mo | $96/mo | $180/mo |
+| **Egress (1TB)** | $0 | $0 | $5/mo |
+
+**Savings**: 70-80% vs GCP, 50% vs DFC
+
+### Global Coverage
+
+Akash providers in 50+ countries:
+
+**North America**: USA, Canada, Mexico
+**South America**: Brazil, Argentina, Chile
+**Europe**: 30+ countries (UK, Germany, France, etc.)
+**Asia**: India, Singapore, Japan, South Korea
+**Africa**: South Africa, Kenya, Nigeria
+**Oceania**: Australia, New Zealand
+
+### Provider Characteristics
+
+| Aspect | Typical Range | Notes |
+|--------|---------------|-------|
+| **Uptime** | 85-99.5% | Highly variable |
+| **Performance** | Variable | No SLA |
+| **Latency** | Regional | Depends on location |
+| **Support** | Community | No enterprise support |
+
+## Akash Bidding System
+
+### How Bidding Works
+
+1. **You specify requirements**:
+   ```yaml
+   services:
+     app:
+       cpu: 2
+       memory: 4Gi
+   ```
+
+2. **Providers bid**:
+   ```
+   Provider A: $10/month (US-East)
+   Provider B: $8/month (EU-West)
+   Provider C: $12/month (Asia-SE)
+   ```
+
+3. **Server selects winner**:
+   - Lowest price (if prefer/allow)
+   - Available capacity (if fallback)
+   - Geographic constraints
+
+### Price Volatility
+
+Akash pricing fluctuates based on:
+- Network demand
+- Provider supply
+- Geographic region
+- Resource type (CPU vs GPU)
+
+**Example**: Same workload over 30 days:
+- Low: $8/month
+- High: $15/month
+- Average: $12/month
+
+**Mitigation**: Use `fallback` status for predictable baseline costs.
+
+## Akash Features
+
+### Compute
+- ✅ CPU: Any size
+- ✅ Memory: Any size
+- ✅ GPU: NVIDIA, AMD (provider-dependent)
+- ⚠️ Autoscaling: Supported but slower
+- ✅ Spot pricing: Built-in (all is "spot")
+
+### Networking
+- ✅ Zero egress fees
+- ⚠️ Public IPs: Provider-dependent
+- ⚠️ TLS: Manual or gateway-based
+- ⚠️ Load balancing: Limited
+- ⚠️ IPv6: Provider-dependent
+
+### Storage
+- ⚠️ Persistent volumes: Provider-dependent (risky)
+- ✅ Ephemeral storage: Yes
+- ⚠️ Encrypted volumes: Provider-dependent
+- ❌ Managed databases: Not recommended
+
+### Security & Compliance
+- ⚠️ VPC isolation: Provider-dependent
+- ⚠️ Network policies: Basic K8s
+- ❌ Confidential compute: Not available
+- ❌ Compliance certifications: None
+
+## Best Practices
+
+### 1. Use as Fallback Only
+
+```yaml
+akash:
+  status: fallback         # Not prefer or allow
+```
+
+This ensures:
+- Predictable costs (Akash rarely used)
+- Reliable baseline (GCP/DFC handle normal load)
+- Emergency capacity (Akash available for spikes)
+
+### 2. Disable Public Gateway
+
+```yaml
+gcp:
+  public_gateway:
+    enabled: true
+
+akash:
+  public_gateway:
+    enabled: false         # Use GCP gateway
+```
+
+Akash gateways are unreliable for production traffic.
+
+### 3. Stateless Workloads Only
+
+**Good**: API servers, workers, batch jobs
+
+```yaml
+services:
+  api:
+    image: myapp:latest
+    autoscaling:
+      min_replicas: 0      # Can tolerate restarts
+      max_replicas: 100
+```
+
+**Bad**: Databases, caches, stateful apps
+
+### 4. Set Realistic Expectations
+
+Akash is:
+- ✅ Cheap
+- ✅ Globally distributed
+- ❌ Not reliable
+- ❌ Not compliant
+- ❌ Not for production baseline
+
+### 5. Monitor Closely
+
+```yaml
+observability:
+  metrics:
+    endpoint: /metrics
+    custom_labels:
+      provider: akash
+
+  alerts:
+    - name: akash_high_restart_rate
+      query: rate(akash_restarts[5m]) > 0.1
+      action: page
+```
+
+Watch for:
+- Frequent pod restarts
+- High latency
+- Provider unavailability
+
+## Limitations
+
+### Hard Limitations
+
+1. **No SLA**: Providers can go offline anytime
+2. **No compliance**: No GDPR, SOC2, PCI-DSS guarantees
+3. **Variable performance**: CPU/network speeds vary
+4. **Community support**: No enterprise helpdesk
+5. **Limited observability**: Provider-dependent monitoring
+
+### Practical Limitations
+
+1. **Deployment time**: Slower than GCP/DFC (bidding process)
+2. **Provider churn**: May need to migrate between providers
+3. **Network isolation**: Limited inter-service networking
+4. **Storage reliability**: Persistent volumes risky
+5. **Debugging**: Limited access to underlying infrastructure
+
+## Troubleshooting
+
+### "No bids received"
+
+**Issue**: No Akash providers bidding on your deployment
+
+**Causes**:
+- Resources too large (e.g., 64 CPU)
+- GPU requirements (limited availability)
+- Price ceiling too low
+
+**Solutions**:
+
+1. Reduce resources:
+   ```yaml
+   services:
+     app:
+       cpu: 4              # Instead of 16
+       memory: 8Gi         # Instead of 32Gi
+   ```
+
+2. Remove GPU requirement temporarily:
+   ```yaml
+   services:
+     app:
+       # gpu:              # Comment out
+       #   count: 1
+   ```
+
+3. Add DFC as fallback:
+   ```yaml
+   dfc:
+     status: allow         # Backup for Akash
+   ```
+
+### "Pod keeps restarting on Akash"
+
+**Issue**: Akash provider unstable
+
+**Solution**: Exclude problematic providers (future feature):
+```yaml
+akash:
+  provider_blacklist:      # Roadmap
+    - "akash1bad..."
+```
+
+**Temporary fix**: Promote DFC/GCP:
+```yaml
+dfc:
+  status: prefer           # Use DFC instead
+
+akash:
+  status: fallback         # Demote Akash
+```
+
+### "High latency from Akash"
+
+**Issue**: Provider in distant geographic region
+
+**Solution**: Use geographic scope:
+```yaml
+regions:
+  geographic_scope: NA     # North America only
+  count: 3
+```
+
+Akash will only bid from North American providers.
+
+### "Akash costs higher than expected"
+
+**Issue**: Bidding prices increased due to demand
+
+**Solution**: Set maximum budget in org policy:
+```yaml
+policy:
+  budget:
+    max_monthly: 500       # Cap at $500/month
+    alerts:
+      - threshold: 80%     # Alert at $400
+```
+
+## Akash vs DFC vs GCP
+
+### Quick Comparison
+
+| Factor | GCP | DFC | Akash |
+|--------|-----|-----|-------|
+| **Reliability** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
+| **Cost** | $$$$ | $$ | $ |
+| **Compliance** | ✅ Full | ⚠️ Self-cert | ❌ None |
+| **Support** | ✅ Enterprise | ✅ Email | ⚠️ Community |
+| **Geographic** | 35+ regions | 8+ locations | 50+ countries |
+| **SLA** | 99.95% | ~99% | None |
+| **Egress fees** | $0.005/GB | $0 | $0 |
+
+### Decision Matrix
+
+**Use GCP when**:
+- Production baseline
+- Compliance required
+- Need SLA
+- Databases
+
+**Use DFC when**:
+- Cost-sensitive
+- Burst capacity
+- Stateless workloads
+- No strict compliance
+
+**Use Akash when**:
+- Extreme cost optimization
+- Emergency overflow
+- Batch processing
+- Testing/dev environments
+
+## Roadmap
+
+### Akash Network Roadmap
+
+- **Confidential Compute**: TEE support (2026)
+- **Provider Tiers**: Certified vs community providers
+- **SLA Options**: Premium providers with guarantees
+- **Persistent Storage**: Replicated, reliable storage layer
+
+### Blazing Integration Roadmap
+
+- **Provider scoring**: AI-driven provider selection
+- **Blacklist support**: Exclude bad providers
+- **Cost caps**: Per-provider budget limits
+- **Performance monitoring**: Real-time provider metrics
+
+## Next Steps
+
+- [Provider Configuration](/docs/overview)
+- 
+- [Provider Scoring](/docs/overview)
+- [Multi-Provider Setup](/docs/overview)

@@ -1,0 +1,124 @@
+---
+title: Introduction to Blazing Core
+label: Introduction
+description: Multi-tenant edge compute platform with intelligent workload management
+position: 0
+---
+
+Blazing Core is a **multi-tenant edge compute platform** that provides intelligent workload placement across multiple cloud providers with built-in service mesh networking.
+
+## What is Blazing Core?
+
+Blazing Core enables you to deploy and manage containerized workloads across a global network of compute providers:
+
+- **Regional Workers** – Fast, predictable performance on Google Kubernetes Engine
+- **Akash Network** – Cost-effective burst capacity on decentralized providers
+- **Service Mesh** – Built-in mTLS, service discovery, and traffic management with HashiCorp Consul
+- **Intelligent Placement** – AI-powered region selection based on latency, cost, and compliance
+
+## Key Benefits
+
+### 1. Multi-Tenant Isolation
+Each cluster gets its own isolated Kubernetes namespace with dedicated service mesh, ensuring complete separation between tenants.
+
+### 2. Intelligent Workload Placement
+Automated provider selection based on:
+- Geographic latency requirements
+- Cost optimization
+- Compliance and data residency
+- Provider availability and health
+
+### 3. Built-in Service Mesh
+Every cluster includes:
+- HashiCorp Consul for service discovery
+- Automatic mTLS between services
+- ACL-based access control
+- Edge Envoy mesh gateway
+
+### 4. Cost-Effective Backend Options
+Choose your data layer based on needs:
+- **Firestore**: $1-10/month for most workloads
+- **Spanner**: $657/month for high-throughput requirements
+
+### 5. Production-Ready Infrastructure
+- Let's Encrypt TLS certificates
+- Cloud DNS integration
+- GKE Autopilot for auto-scaling
+- Comprehensive API with RESTful endpoints
+
+## Architecture Overview
+
+Blazing Core operates with a **control plane + worker** architecture:
+
+### Control Plane
+- RESTful API (FastAPI/Python)
+- Organization and project management
+- Cluster orchestration
+- Background task processing (Pub/Sub)
+- Credential management
+
+### Worker Nodes
+- Join cluster service mesh via Consul
+- Run containerized workloads
+- Automatic health checking
+- mTLS communication
+
+### Data Hierarchy
+
+```text
+Organization (billing/org entity)
+├── API Keys (with scopes, expiration)
+└── Projects (organizational grouping)
+    └── Clusters (isolated service meshes)
+        ├── Namespace: c-{uuid}
+        ├── Consul Cluster (service mesh)
+        ├── Edge-Envoy Mesh Gateway
+        └── RegionSet (multi-cloud regions)
+```
+
+## Use Cases
+
+### API Services
+Run production APIs with geographic distribution, automatic failover, and compliance guarantees.
+
+### Batch Processing
+Deploy compute-intensive workloads across the most cost-effective providers with automatic resource provisioning.
+
+### Multi-Region Applications
+Distribute workloads across regions for low latency access with built-in service mesh networking.
+
+### Development & Testing
+Rapid cluster creation for development environments with isolated service meshes.
+
+## Core Concepts
+
+### Clusters (formerly Tenants)
+Isolated Kubernetes namespaces with dedicated service mesh. Each cluster gets:
+- UUID-based namespace (e.g., `c-855b414c-...`)
+- 1-5 node Consul cluster with ACL + TLS
+- Edge Envoy mesh gateway (LoadBalancer)
+- Wildcard TLS certificate (`*.blazing.work`)
+
+### Workers
+Two types of workers can join a cluster's service mesh:
+
+1. **Regional Workers** (GKE-based)
+   - Run in Google Kubernetes Engine
+   - Fast, predictable performance
+   - Higher cost (~$150-300/month)
+
+2. **Akash Workers** (Decentralized)
+   - Run on Akash Network providers
+   - Cost-effective burst capacity
+   - Variable provider quality
+
+### Service Mesh
+HashiCorp Consul provides:
+- Service discovery and health checking
+- mTLS between services
+- Traffic management via Envoy proxies
+- ACL-based access control
+
+## Next Steps
+
+Ready to get started? Follow our [Quick Start Guide](/docs/quick-start) to deploy your first cluster with Blazing Core.

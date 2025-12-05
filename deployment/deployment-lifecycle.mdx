@@ -1,0 +1,564 @@
+---
+title: Deployment Lifecycle
+label: Deployment Lifecycle
+description: Understanding the deployment process from plan to production
+position: 0
+---
+
+Blazing Core Compose follows a structured deployment lifecycle: **validate → plan → apply → monitor**.
+
+## Lifecycle Overview
+
+```
+┌─────────────┐
+│   Source    │  compose.yaml
+│   (YAML)    │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│  Validate   │  Schema + Policy checks (CLI)
+│   (Local)   │  ✓ Fast feedback (50-200ms)
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    Plan     │  Show intent (CLI + Server)
+│  (Preview)  │  ✓ Cost estimate, region selection
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    Apply    │  Provision infrastructure (Server)
+│  (Deploy)   │  ✓ Atomic execution
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   Monitor   │  Track health and performance
+│ (Operation) │  ✓ Metrics, logs, alerts
+└─────────────┘
+```
+
+## Phase 1: Validate
+
+Local validation of YAML configuration.
+
+### Command
+
+```bash
+core validate compose.yaml
+```
+
+### What It Checks
+
+1. **YAML Syntax**: Valid YAML structure
+2. **Schema Compliance**: Matches Core Compose v0.2.0 schema
+3. **Feature Availability**: Requested features are supported
+4. **Policy Requirements**: Org-level policies are met
+5. **Control Satisfaction**: Compliance controls can be satisfied
+
+### Sample Output
+
+```
+Validating compose.yaml...
+
+✓ YAML syntax valid
+✓ Schema compliance (v0.2.0)
+✓ Feature checks passed
+✓ Policy requirements met
+✓ Controls validated
+
+Configuration is valid and ready to deploy.
+```
+
+### Validation Errors
+
+```bash
+$ core validate compose.yaml
+
+ERROR: Validation failed
+
+compose.yaml:15:7
+  services.api.cpu: must be a number
+  Found: "2GB" (string)
+  Expected: 2 (number)
+
+compose.yaml:32:9
+  services.api.autoscaling.min_replicas: must be ≥ 0
+  Found: -1
+  Expected: 0 or greater
+
+2 errors found. Fix these issues and try again.
+```
+
+## Phase 2: Plan
+
+Preview what will be deployed without actually deploying.
+
+### Command
+
+```bash
+core plan compose.yaml
+```
+
+### What It Shows
+
+1. **Provider Selection**: Which providers will be used
+2. **Region Allocation**: Specific regions to be provisioned
+3. **Resource Summary**: CPU, memory, GPU, storage
+4. **Cost Estimate**: Monthly cost with variance
+5. **Compliance Status**: Controls met/unmet
+6. **Placement Rationale**: Why providers were chosen
+
+### Sample Output
+
+```bash
+$ core plan compose.yaml
+
+Computing deployment plan...
+
+═══════════════════════════════════════════════
+  Deployment Plan
+═══════════════════════════════════════════════
+
+Organization: acme-corp
+Project:      production
+Cluster:      api-backend-cluster
+
+───────────────────────────────────────────────
+  Provider Selection
+───────────────────────────────────────────────
+
+Primary Providers:
+  • GCP (3 regions)  - Reliability + spot savings
+  • DFC (2 regions)  - Cost optimization
+
+Fallback Providers:
+  • Akash (global)   - Emergency capacity
+
+───────────────────────────────────────────────
+  Regional Distribution
+───────────────────────────────────────────────
+
+GCP Regions:
+  ├─ us-central1 (Iowa)          $52/mo
+  ├─ us-east1 (South Carolina)   $52/mo
+  └─ us-west1 (Oregon)            $52/mo
+
+DFC Regions:
+  ├─ chicago (Illinois)           $31/mo
+  └─ ashburn (Virginia)           $31/mo
+
+───────────────────────────────────────────────
+  Services
+───────────────────────────────────────────────
+
+api (myapp/api:v2.1.0):
+  • 3-20 replicas (autoscaling enabled)
+  • Resources: 2 CPU, 4Gi memory per replica
+  • Ingress: HTTPS (TLS auto-provisioned)
+  • Cost: $45-180/mo (depends on load)
+
+worker (myapp/worker:v2.1.0):
+  • 2-50 replicas (autoscaling enabled)
+  • Resources: 4 CPU, 8Gi memory per replica
+  • Cost: $90-450/mo (depends on queue depth)
+
+───────────────────────────────────────────────
+  Compliance
+───────────────────────────────────────────────
+
+✓ PCI-DSS-4.0:        Met (TLS + WAF enabled)
+✓ DATA-RESIDENCY-NA:  Met (US/CA regions only)
+
+───────────────────────────────────────────────
+  Cost Estimate
+───────────────────────────────────────────────
+
+Monthly Cost: $218 ± 35%
+  ├─ Baseline (min replicas): $135/mo
+  ├─ Burst (autoscaling):     $50-250/mo
+  ├─ Networking:              $18/mo
+  └─ Storage:                 $15/mo
+
+Annual Cost (estimated): $2,616
+
+───────────────────────────────────────────────
+  Placement Rationale
+───────────────────────────────────────────────
+
+1. GCP selected for baseline (score: 92/100)
+   ✓ High reliability (99.95% SLA)
+   ✓ Spot instances (60% savings)
+   ✓ Standard tier (17x cheaper egress)
+   ✓ All features available
+
+2. DFC selected for burst (score: 87/100)
+   ✓ Zero egress fees
+   ✓ 60% cheaper than GCP standard
+   ✓ Curated providers (>99% uptime)
+
+3. Akash on standby (score: 65/100)
+   ✓ Available for overflow
+   ✗ Variable reliability
+
+═══════════════════════════════════════════════
+
+Ready to deploy? Run: core apply compose.yaml
+```
+
+### Plan Options
+
+```bash
+# Show detailed provider scoring
+core plan --show-scoring
+
+# Show effective merged YAML
+core plan --show-effective
+
+# Export plan as JSON
+core plan --output json > plan.json
+
+# Estimate cost for specific load
+core plan --load-profile high    # High traffic scenario
+```
+
+## Phase 3: Apply
+
+Execute the deployment plan.
+
+### Command
+
+```bash
+core apply compose.yaml
+```
+
+### What It Does
+
+1. **Server-Side Orchestration**: API runs placement algorithm
+2. **Resource Provisioning**: Creates compute nodes, IPs, storage
+3. **Network Setup**: Configures ingress/egress, TLS certificates
+4. **Service Deployment**: Deploys containers across regions
+5. **Health Verification**: Waits for readiness probes
+6. **Audit Logging**: Records deployment details
+
+### Sample Output
+
+```bash
+$ core apply compose.yaml
+
+Applying deployment...
+
+⚙  Validating configuration...
+✓  Configuration valid
+
+⚙  Computing placement...
+✓  Selected 5 regions (3 GCP, 2 DFC)
+
+⚙  Provisioning infrastructure...
+├─ Creating GCP clusters... done
+├─ Creating DFC deployments... done
+├─ Allocating IPs... done
+└─ Provisioning storage... done
+
+⚙  Configuring networking...
+├─ Setting up ingress... done
+├─ Configuring TLS... done
+└─ Applying firewall rules... done
+
+⚙  Deploying services...
+├─ api: 3 replicas... healthy
+└─ worker: 2 replicas... healthy
+
+✓  Deployment successful!
+
+───────────────────────────────────────────────
+  Deployment Summary
+───────────────────────────────────────────────
+
+Deployment ID: df-2025-12-03-00412
+Status:        live
+Endpoints:     https://api-backend.blazing.app
+
+Services:
+  • api (3 replicas) - healthy
+  • worker (2 replicas) - healthy
+
+View logs:    core logs api
+View metrics: core metrics api
+Scale service: core scale api --replicas 5
+
+───────────────────────────────────────────────
+```
+
+### Apply Options
+
+```bash
+# Auto-approve (skip confirmation)
+core apply --yes
+
+# Dry-run (validate but don't deploy)
+core apply --dry-run
+
+# Watch deployment progress
+core apply --watch
+
+# Set timeout
+core apply --timeout 30m
+```
+
+## Phase 4: Monitor
+
+Track deployed services.
+
+### Monitoring Commands
+
+```bash
+# Service status
+core services list
+
+# Service details
+core services describe api
+
+# Live logs
+core logs api --follow
+
+# Metrics
+core metrics api --last 1h
+
+# Events
+core events list --service api
+
+# Scaling status
+core autoscaling status api
+```
+
+### Sample Monitoring
+
+```bash
+$ core services list
+
+NAME     REPLICAS   STATUS     CPU      MEMORY    UPTIME
+api      8/20       healthy    65%      72%       5h 23m
+worker   12/50      healthy    78%      81%       5h 23m
+
+$ core logs api --follow --tail 10
+
+2025-12-03 15:42:31 [INFO] Request: GET /api/v1/users
+2025-12-03 15:42:31 [INFO] Response: 200 (12ms)
+2025-12-03 15:42:32 [INFO] Request: POST /api/v1/orders
+2025-12-03 15:42:32 [INFO] Response: 201 (45ms)
+```
+
+## Deployment States
+
+| State | Description | Actions Available |
+|-------|-------------|-------------------|
+| **draft** | YAML loaded but not validated | validate, plan |
+| **validated** | Schema checks passed | plan, apply |
+| **planning** | Computing placement | wait |
+| **provisioning** | Creating infrastructure | wait, cancel |
+| **deploying** | Rolling out services | wait, watch |
+| **healthy** | All services running | scale, update, destroy |
+| **degraded** | Some replicas unhealthy | rollback, investigate |
+| **failed** | Deployment failed | retry, rollback |
+
+## Atomic Deployments
+
+Blazing uses **atomic deployments**: all resources succeed or all fail.
+
+### Success Path
+
+```
+1. Provision all infrastructure  ✓
+2. Deploy all services          ✓
+3. Verify health checks         ✓
+4. Update DNS                   ✓
+→ Deployment successful
+```
+
+### Failure Path
+
+```
+1. Provision all infrastructure  ✓
+2. Deploy all services          ✗  (one service fails)
+3. Rollback all changes         ✓
+→ Deployment failed, state restored
+```
+
+**No partial deployments**: Either everything works or nothing changes.
+
+## Update Deployments
+
+Modify existing deployments with `apply`:
+
+```bash
+# Edit compose.yaml
+vim compose.yaml
+
+# Apply changes
+core apply compose.yaml
+```
+
+### Rolling Updates
+
+Updates are rolled out gradually:
+
+```
+1. Deploy new replica    [new]
+2. Wait for health      ✓
+3. Remove old replica   [old] →
+4. Repeat for all replicas
+```
+
+### Zero-Downtime Updates
+
+Guaranteed zero downtime if:
+- `min_replicas ≥ 2`
+- Health checks configured
+- Gradual rollout (default)
+
+### Update Example
+
+```bash
+# Update image version
+vim compose.yaml  # Change image: myapp:v2.1.0 → v2.2.0
+
+# Apply update
+$ core apply compose.yaml
+
+Detected changes:
+  • services.api.image: myapp:v2.1.0 → myapp:v2.2.0
+
+Rolling update strategy:
+  • 1 replica at a time
+  • Wait for health checks
+  • 30 second intervals
+
+Proceed? [y/N]: y
+
+Updating api service...
+├─ Deploying replica 1/8... healthy
+├─ Deploying replica 2/8... healthy
+├─ Deploying replica 3/8... healthy
+...
+└─ Deploying replica 8/8... healthy
+
+✓ Update successful (0 downtime)
+```
+
+## Rollback
+
+Revert to previous deployment:
+
+```bash
+# View deployment history
+core deployments list
+
+# Rollback to previous
+core rollback
+
+# Rollback to specific deployment
+core rollback --to df-2025-12-03-00300
+```
+
+### Automatic Rollback
+
+Blazing automatically rolls back if:
+- Health checks fail
+- Deployment timeout exceeded
+- Critical error during apply
+
+## Deployment Comparison
+
+Compare two deployments:
+
+```bash
+# Compare with previous
+core diff
+
+# Compare with specific deployment
+core diff --compare df-2025-12-03-00300
+
+# Show only service changes
+core diff --services-only
+```
+
+### Sample Diff
+
+```diff
+Comparing deployments:
+  Old: df-2025-12-03-00300 (deployed 2h ago)
+  New: current
+
+services.api:
+  + image: myapp:v2.2.0 (was v2.1.0)
+  + cpu: 4 (was 2)
+  + memory: 8Gi (was 4Gi)
+
+services.api.autoscaling:
+  + max_replicas: 30 (was 20)
+
+services.worker:
+  (no changes)
+
+Estimated cost impact: +$45/mo (+20%)
+```
+
+## Best Practices
+
+### 1. Always Validate First
+
+```bash
+core validate compose.yaml && core plan compose.yaml && core apply compose.yaml
+```
+
+### 2. Review Plans Carefully
+
+Check:
+- Cost estimates
+- Region selection
+- Compliance status
+- Resource allocation
+
+### 3. Use Staged Rollouts
+
+```bash
+# Deploy to staging first
+core apply --project staging
+
+# Verify
+core services list --project staging
+
+# Deploy to production
+core apply --project production
+```
+
+### 4. Monitor After Deploy
+
+```bash
+core apply compose.yaml && core logs api --follow
+```
+
+Watch for errors in the first 5-10 minutes.
+
+### 5. Tag Deployments
+
+```bash
+core apply --tag "release-v2.2.0"
+core apply --tag "hotfix-security"
+```
+
+Makes rollback easier:
+
+```bash
+core rollback --to-tag "release-v2.1.0"
+```
+
+## Next Steps
+
+- 
+- 
+- 
+- 

@@ -1,0 +1,305 @@
+---
+title: Blazing Flow Guide
+label: Guide
+description: Complete guide to building async pipelines with Blazing Flow
+position: 1
+---
+
+Learn how to build resilient, scalable async pipelines with Blazing Flow.
+
+## What is Blazing Flow?
+
+Blazing Flow is a distributed task queue and pipeline orchestration engine that makes it easy to build complex, resilient data workflows. It's built on Redis and provides a simple Python API for defining asynchronous pipelines.
+
+### Key Features
+
+- **🧭 Declarative Pipelines** - Define workflows using simple Python decorators
+- **⚡ Automatic Recovery** - Jobs automatically resume after interruptions
+- **🔄 Dynamic Optimization** - Worker mix automatically adjusts to workload
+- **🔌 Connection Pooling** - Long-lived database and SSH connections
+- **📊 Deep Observability** - Real-time metrics and execution history
+- **⚙️ Flexible Workers** - Mix async and blocking workers for optimal performance
+
+## When to Use Blazing Flow
+
+Blazing Flow excels at:
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
+    <div className="font-semibold mb-2">✅ Complex Workflows</div>
+    <div className="text-sm text-muted-foreground">
+      Multi-stage pipelines with branching logic and conditional execution
+    </div>
+  </div>
+
+  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
+    <div className="font-semibold mb-2">✅ Stateful Processing</div>
+    <div className="text-sm text-muted-foreground">
+      Workflows that need checkpointing and partial recovery
+    </div>
+  </div>
+
+  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
+    <div className="font-semibold mb-2">✅ Mixed Workloads</div>
+    <div className="text-sm text-muted-foreground">
+      Combination of I/O-bound and CPU-intensive tasks
+    </div>
+  </div>
+
+  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
+    <div className="font-semibold mb-2">✅ Long-Running Jobs</div>
+    <div className="text-sm text-muted-foreground">
+      Pipelines that run for hours or days with automatic recovery
+    </div>
+  </div>
+</div>
+
+## Quick Example
+
+Here's a simple data processing pipeline:
+
+```python
+from blazing import Blazing
+
+# Create the app
+app = Blazing(redis_config={'host': 'localhost', 'port': 6380})
+
+# Define processing steps
+@app.station
+async def fetch_data(source_id: str):
+    # Fetch from API or database
+    return {"id": source_id, "data": [1, 2, 3]}
+
+@app.station
+async def transform_data(data: dict):
+    # Transform the data
+    total = sum(data["data"])
+    return {"id": data["id"], "result": total}
+
+# Orchestrate the pipeline
+@app.route
+async def data_pipeline(source_id: str):
+    data = await fetch_data(source_id)
+    result = await transform_data(data)
+    return result
+
+# Publish and start the app
+async def main():
+    # Publish infrastructure (creates Redis indices, registers routes)
+    await app.publish()
+
+    # Start the app (makes routes available to workers)
+    await app.start()
+
+    # Submit a task
+    unit = await app.create_route_task("data_pipeline", source_id="123")
+    result = await unit.result()
+    print(result)  # {"id": "123", "result": 6}
+```
+
+## Core Concepts
+
+### Routes
+
+Routes are the entry points to your pipelines. They orchestrate the flow of data through multiple stations.
+
+```python
+@app.route
+async def process_order(order_id: str, skillsets=None):
+    # Orchestrate multiple steps
+    order = await fetch_order(order_id, skillsets=skillsets)
+    validated = await validate_order(order, skillsets=skillsets)
+    payment = await process_payment(validated, skillsets=skillsets)
+    return payment
+```
+
+### Stations
+
+Stations are individual processing steps. They can optionally receive skillsets to access shared business logic.
+
+```python
+@app.station
+async def fetch_order(order_id: str, skillsets=None):
+    # Use skillsets if you need shared business logic
+    if skillsets:
+        return await skillsets['OrderService'].fetch(order_id)
+    # Or implement logic directly
+    return {"id": order_id, "status": "pending"}
+```
+
+### Skillsets
+
+Skillsets encapsulate your business logic and can be shared across stations.
+
+```python
+class OrderService(BaseSkillset):
+    async def fetch(self, order_id: str):
+        # Your business logic here
+        return {"id": order_id, "status": "pending"}
+```
+
+## Architecture
+
+Blazing Flow uses a hierarchical architecture:
+
+```
+    ┌────────┐
+    │ Foreman │  ← Worker management & optimization
+    └────┬────┘
+         │
+    ┌────┴───────────┐
+    │    Workers     │  ← Execute tasks
+    ├────────────────┤
+    │ Async Workers  │  ← I/O-bound tasks
+    │ Blocking Workers│  ← CPU-bound tasks
+    └────────────────┘
+```
+
+### Components
+
+- **Foreman**: Manages workers on each machine, optimizes worker mix
+- **Workers**: Execute tasks from routes and stations
+  - **Async Workers**: Event-loop based, best for I/O operations
+  - **Blocking Workers**: Thread-based, best for CPU-intensive tasks
+
+## Worker Types
+
+### Async Workers
+
+Best for I/O-bound operations:
+
+- API calls
+- Database queries
+- File I/O
+- Network operations
+
+```python
+@app.station
+async def call_api(url: str, skillsets=None):
+    # Runs on async worker (event loop)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            return await response.json()
+```
+
+### Blocking Workers
+
+Best for CPU-intensive operations:
+
+- Data processing
+- Image/video processing
+- Cryptographic operations
+- Heavy computations
+
+```python
+@app.station
+def process_image(image_data: bytes, skillsets=None):
+    # Automatically runs on blocking worker (note: not async)
+    return heavy_image_processing(image_data)
+```
+
+## Dynamic Worker Optimization
+
+The Foreman automatically adjusts the worker mix based on queue metrics:
+
+- Monitors queue depth and age
+- Calculates urgency scores
+- Increases/decreases async or blocking workers
+- Uses hysteresis to prevent thrashing
+
+You can configure optimization:
+
+```python
+app = Blazing(
+    redis_config={...},
+    worker_config={
+        'async_workers': 4,
+        'blocking_workers': 2,
+        'auto_optimize': True,  # Enable automatic optimization
+        'optimization_interval': 30  # Check every 30 seconds
+    }
+)
+```
+
+## State Management
+
+All operations are durably recorded in Redis:
+
+- **Units**: Represent route executions
+- **Operations**: Represent station calls
+- **Results**: Final outputs and intermediate data
+
+This enables:
+- Automatic recovery after failures
+- Audit trails for compliance
+- Performance analysis
+- Debugging with breadcrumbs
+
+## Error Handling
+
+Blazing Flow provides multiple levels of error handling:
+
+```python
+@app.station
+async def risky_operation(data: dict, skillsets=None):
+    try:
+        if skillsets:
+            result = await skillsets['Service'].risky_call(data)
+            return result
+    except Exception as e:
+        # Log the error
+        logger.error(f"Operation failed: {e}")
+        # Return fallback or raise
+        return {"status": "failed", "error": str(e)}
+```
+
+## Monitoring
+
+Built-in monitoring tools:
+
+### btop - Real-time Dashboard
+
+```bash
+python -m blazing.monitoring.btop
+```
+
+Shows:
+- Queue depths
+- Worker states
+- Throughput metrics
+- Error rates
+
+### Foreman Charts
+
+```bash
+python -m blazing.monitoring.monitor_foreman_charts
+```
+
+Visualizes:
+- Worker mix over time
+- Queue trends
+- Optimization decisions
+
+## Next Steps
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+  <a href="/docs/flow-quick-start" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
+    <div className="font-semibold mb-1">Quick Start →</div>
+    <div className="text-sm text-muted-foreground">Build your first pipeline in 5 minutes</div>
+  </a>
+
+  <a href="/docs/flow-architecture" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
+    <div className="font-semibold mb-1">Architecture →</div>
+    <div className="text-sm text-muted-foreground">Deep dive into how it works</div>
+  </a>
+
+  <a href="/docs/index" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
+    <div className="font-semibold mb-1">Examples →</div>
+    <div className="text-sm text-muted-foreground">Learn from real-world use cases</div>
+  </a>
+
+  <a href="/docs/flow-overview" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
+    <div className="font-semibold mb-1">Best Practices →</div>
+    <div className="text-sm text-muted-foreground">Production deployment tips</div>
+  </a>
+</div>

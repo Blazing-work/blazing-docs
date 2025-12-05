@@ -1,0 +1,520 @@
+---
+title: Features and Controls
+label: Features & Controls
+description: Understanding the governance layer, feature registry, and compliance controls
+position: 0
+---
+
+Blazing Core Compose includes a **governance layer** that tracks platform capabilities and ensures compliance through features and controls.
+
+## Overview
+
+Two registries govern platform capabilities:
+
+| Registry | Purpose | Example |
+|----------|---------|---------|
+| **Feature Registry** | Tracks platform capabilities | GPU-MIG, NET-ANYCAST |
+| **Control Registry** | Defines compliance requirements | PCI-DSS-4.0, GDPR |
+
+Both are version-controlled and audited automatically.
+
+## Feature Registry
+
+### What Are Features?
+
+Features are **specific capabilities** offered by the platform:
+
+- **NET-ANYCAST**: Anycast IP addressing
+- **GPU-MIG**: NVIDIA MIG GPU slicing
+- **EGR-LOCK-COUNTRY**: Egress country lock
+- **TLS-ROTATION**: TLS blue-green rotation
+
+### Feature States
+
+| State | Meaning | Behavior |
+|-------|---------|----------|
+| **implemented** | Fully available | No warnings, works everywhere |
+| **experimental** | Available with warnings | Works but may change |
+| **planned** | Coming soon | Warns or blocks (depends on policy) |
+| **deprecated** | Being phased out | Warns, suggests replacement |
+| **removed** | No longer exists | Blocks deployment |
+
+### Feature Example
+
+```yaml
+# Feature definition (internal)
+- id: GPU-MIG
+  name: NVIDIA MIG GPU Slicing
+  status: planned
+  providers: [DFE, AWS]
+  owner: gpu-team
+  target_version: 0.3.0
+  since: null
+```
+
+### Checking Feature Availability
+
+```bash
+# List all features
+core features list
+
+# Check specific feature
+core features check GPU-MIG
+
+# Check feature by provider
+core features list --provider GCP
+```
+
+Sample output:
+
+```bash
+$ core features check GPU-MIG
+
+Feature: GPU-MIG
+Name: NVIDIA MIG GPU Slicing
+Status: planned
+Providers: DFE, AWS (not GCP, DFC, Akash)
+Target Version: v0.3.0
+Owner: gpu-team
+
+⚠ This feature is planned but not yet implemented.
+Using it will generate a warning.
+
+Workaround: Use whole GPU allocation for now.
+```
+
+## Control Registry
+
+### What Are Controls?
+
+Controls are **compliance policies** that map to business requirements:
+
+- **PCI-DSS-4.0**: Payment Card Industry compliance
+- **GDPR**: European data protection
+- **HIPAA**: Healthcare data compliance
+- **SOC2**: Security and availability standards
+
+### Control Structure
+
+Controls define **required** and **optional** features:
+
+```yaml
+# Control definition (internal)
+- id: PCI-DSS-4.0
+  name: Payment Card Industry Security Standard
+  required_features:
+    - TLS-AUTO
+    - WAF-ENABLED
+    - LOG-AUDIT-IMMUTABLE
+  optional_features:
+    - TEE-ATTESTED-SECRETS
+  enforcement: strict
+  version_introduced: v0.2.0
+```
+
+### Declaring Controls
+
+Add controls to your services:
+
+```yaml
+services:
+  api:
+    image: payment-api:latest
+    controls: [PCI-DSS-4.0, DATA-RESIDENCY-EU]
+
+    # Control requirements automatically enforced
+    network:
+      ingress:
+        protections:
+          waf: enabled        # Required by PCI-DSS
+        tls:
+          auto: true          # Required by PCI-DSS
+
+    observability:
+      logs:
+        retention: 90d        # Required by PCI-DSS
+```
+
+### Enforcement Levels
+
+| Mode | Description | Behavior |
+|------|-------------|----------|
+| **strict** | Blocking | Deployment fails if requirements not met |
+| **advisory** | Warning | Warns but allows deployment |
+| **informative** | Logging | Logs only, no user notification |
+
+## Validation Flow
+
+### Validation Process
+
+```
+1. Load features.yaml and controls.yaml
+2. Load user's compose.yaml
+3. For each feature used:
+   - Check feature status
+   - If planned → warn
+   - If removed → error
+4. For each control declared:
+   - Check required features
+   - If missing → error (strict) or warn (advisory)
+5. Generate audit record
+```
+
+### Validation Pseudocode
+
+```python
+def validate_features(spec, features, policy):
+    for path in spec.get_all_paths():
+        feature_id = FEATURE_MAP.get(path)
+        if not feature_id:
+            continue
+
+        feature = features.get(feature_id)
+
+        if feature.status == "planned":
+            warn(f"FEATURE_NOT_YET_SUPPORTED: {feature_id}")
+            if policy.must_be_implemented:
+                raise ValidationError
+
+        elif feature.status == "removed":
+            error(f"FEATURE_REMOVED: {feature_id}")
+
+def validate_controls(spec, controls):
+    for service in spec.services:
+        for control_id in service.controls:
+            ctrl = controls.get(control_id)
+
+            missing = []
+            for req in ctrl.required_features:
+                if not is_feature_available(req):
+                    missing.append(req)
+
+            if missing:
+                if ctrl.enforcement == "strict":
+                    error(f"CONTROL_NOT_SATISFIED: {control_id}")
+                elif ctrl.enforcement == "advisory":
+                    warn(f"CONTROL_NOT_FULLY_MET: {control_id}")
+```
+
+## Common Controls
+
+### PCI-DSS-4.0
+
+Payment Card Industry compliance:
+
+```yaml
+services:
+  payment-api:
+    controls: [PCI-DSS-4.0]
+
+    # Automatically requires:
+    network:
+      ingress:
+        protections:
+          waf: enabled        # ✓ Web Application Firewall
+        tls:
+          mode: terminate     # ✓ TLS termination
+
+    observability:
+      logs:
+        retention: 90d        # ✓ Audit logs for 90 days
+        immutable: true       # ✓ Tamper-proof logs
+```
+
+### DATA-RESIDENCY-EU
+
+European data residency:
+
+```yaml
+services:
+  user-data:
+    controls: [DATA-RESIDENCY-EU]
+
+    # Automatically requires:
+    placement:
+      residency:
+        require_countries: ["PT", "ES", "FR", "DE", "NL"]
+
+    network:
+      egress:
+        lock_country: true    # ✓ Prevent data leaving EU
+        verification:
+          method: geoip_check # ✓ Verify egress location
+```
+
+### SOC2-TYPE2
+
+Security and availability compliance:
+
+```yaml
+services:
+  saas-api:
+    controls: [SOC2-TYPE2]
+
+    # Automatically requires:
+    autoscaling:
+      enabled: true
+      min_replicas: 3         # ✓ High availability
+
+    observability:
+      logs:
+        retention: 365d       # ✓ 1 year retention
+        encrypted: true       # ✓ Encrypted logs
+
+    placement:
+      confidential_compute: required  # ✓ TEE enforcement
+```
+
+### HIPAA
+
+Healthcare data compliance:
+
+```yaml
+services:
+  patient-records:
+    controls: [HIPAA]
+
+    # Automatically requires:
+    storage:
+      - path: /data
+        size: 100Gi
+        encrypted: true       # ✓ Encryption at rest
+
+    network:
+      ingress:
+        tls:
+          mode: mtls          # ✓ Mutual TLS
+
+    observability:
+      logs:
+        retention: 2555d      # ✓ 7 year retention (HIPAA)
+        audit: true           # ✓ Audit access logs
+```
+
+## Policy Hooks
+
+### Organization-Level Policy
+
+Set global requirements:
+
+```yaml
+# Organization policy (configured via API)
+policy:
+  features:
+    must_be_implemented: true   # Block planned features
+    must_be_verified: true      # Restrict to verified providers
+
+  controls:
+    enforce_all: strict         # All controls are strict
+
+  budget:
+    max_monthly: 10000          # $10k/month cap
+```
+
+### Project-Level Policy
+
+Override for specific projects:
+
+```yaml
+# Staging project policy
+policy:
+  features:
+    must_be_implemented: false  # Allow planned features
+
+  controls:
+    enforce_all: advisory       # Warn instead of block
+```
+
+## Validation Examples
+
+### Example 1: Feature Not Yet Supported
+
+```bash
+$ core validate compose.yaml
+
+⚠ FEATURE_NOT_YET_SUPPORTED: GPU-MIG (planned)
+
+services.ml-trainer.gpu.sharing.mode: mig
+  Feature GPU-MIG is planned for v0.3.0 but not yet available.
+
+  Workaround: Use exclusive mode instead:
+    gpu:
+      sharing:
+        mode: exclusive
+
+Validation passed with 1 warning.
+```
+
+### Example 2: Control Not Satisfied
+
+```bash
+$ core validate compose.yaml
+
+❌ CONTROL_NOT_SATISFIED: PCI-DSS-4.0
+
+services.payment-api.controls: [PCI-DSS-4.0]
+  Missing required feature: WAF-ENABLED
+
+  Required by PCI-DSS:
+    ✓ TLS-AUTO: configured
+    ✗ WAF-ENABLED: missing
+    ✓ LOG-AUDIT-IMMUTABLE: configured
+
+  Fix: Add WAF to ingress:
+    network:
+      ingress:
+        protections:
+          waf: enabled
+
+Validation failed with 1 error.
+```
+
+### Example 3: Feature Removed
+
+```bash
+$ core validate compose.yaml
+
+❌ FEATURE_REMOVED: LEGACY-PLACEMENT
+
+services.api.placement.legacy_mode: true
+  Feature LEGACY-PLACEMENT was removed in v0.2.0.
+
+  Migration: Use new placement syntax:
+    placement:
+      strategy:
+        mode: cost_optimized
+
+  See: https://blazing.work/docs/migration-v0.2
+
+Validation failed with 1 error.
+```
+
+## Audit Records
+
+Every deployment creates an audit record:
+
+```json
+{
+  "deployment_id": "df-2025-12-03-00412",
+  "action": "apply",
+  "actor": "alice@acme.com",
+  "timestamp": "2025-12-03T22:00:00Z",
+  "hash": "sha256:8f9d7e6c...",
+
+  "features_used": {
+    "TLS-AUTO": "implemented",
+    "EGR-LOCK-COUNTRY": "implemented",
+    "GPU-MIG": "planned"
+  },
+
+  "controls_evaluated": {
+    "PCI-DSS-4.0": "passed",
+    "DATA-RESIDENCY-EU": "passed",
+    "SOC2-TYPE2": "failed"
+  },
+
+  "providers": ["GCP", "DFC"],
+  "regions": ["us-central1", "us-east1", "chicago"],
+  "cost_actual": 187.43
+}
+```
+
+### Viewing Audit Logs
+
+```bash
+# List all deployments with audit status
+core audit list
+
+# View specific deployment audit
+core audit show df-2025-12-03-00412
+
+# Export audit logs
+core audit export --from 2025-12-01 --to 2025-12-31 --format json
+```
+
+## Feature Map
+
+The **Feature Map** links YAML paths to feature IDs:
+
+```yaml
+# Internal feature map
+network.ingress.anycast: NET-ANYCAST
+network.egress.lock_country: EGR-LOCK-COUNTRY
+gpu.sharing.mig_profile: GPU-MIG
+tls.rotation.strategy: TLS-ROTATION
+placement.confidential_compute: TEE-COMPUTE
+```
+
+This enables automatic feature detection:
+
+```yaml
+services:
+  api:
+    network:
+      ingress:
+        anycast: true    # → Detected as NET-ANYCAST feature
+```
+
+## Future Extensions
+
+Planned governance enhancements:
+
+| Extension | Description | Target Version |
+|-----------|-------------|----------------|
+| **depends_on** | Feature dependencies | v0.3.0 |
+| **supersedes** | Replacement mapping | v0.3.0 |
+| **conditions** | ALL/ANY evaluation | v0.4.0 |
+| **score** | Weighted compliance | v0.4.0 |
+| **custom_controls** | User-defined controls | v0.5.0 |
+
+## Best Practices
+
+### 1. Declare Controls Early
+
+```yaml
+services:
+  api:
+    controls: [PCI-DSS-4.0]    # Declare at service level
+```
+
+Validation catches issues before deployment.
+
+### 2. Use Advisory Mode for Testing
+
+```yaml
+# Staging environment
+policy:
+  controls:
+    enforce_all: advisory    # Warn, don't block
+```
+
+### 3. Check Features Before Using
+
+```bash
+core features check GPU-MIG
+```
+
+Avoid surprises during deployment.
+
+### 4. Review Audit Logs Regularly
+
+```bash
+core audit list --failed
+```
+
+Track compliance failures.
+
+### 5. Stay Updated
+
+```bash
+core features list --new
+```
+
+See newly available features.
+
+## Next Steps
+
+- [Compliance Guide](/docs/features-and-controls)
+- [Feature Roadmap](/docs/features-and-controls)
+- [Custom Controls](/docs/features-and-controls)
+- [Audit Reports](/docs/features-and-controls)
