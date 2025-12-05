@@ -1,6 +1,6 @@
 {
   "title": "Provider Configuration",
-  "position": 2,
+  "position": 3,
   "description": "Configure cloud providers and infrastructure preferences",
   "product": "blazing-core",
   "category": "guide"
