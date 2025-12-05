@@ -1,7 +1,7 @@
 {
   "title": "Tutorials",
   "label": "Tutorials",
-  "position": 3,
+  "position": 1,
   "description": "Step-by-step tutorials for common Blazing Flow use cases",
   "product": "blazing-flow",
   "category": "guide"

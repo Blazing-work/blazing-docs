@@ -1,7 +1,8 @@
 {
   "title": "Getting Started",
-  "position": 1,
+  "position": 0,
   "description": "Get started with Blazing Gateway and deploy your first edge gateway",
   "product": "blazing-gateway",
+  "parentProduct": "blazing-core",
   "category": "guide"
 }

@@ -1,7 +1,8 @@
 {
   "title": "Examples",
-  "position": 3,
+  "position": 2,
   "description": "Practical examples and use cases for Flow Sandbox",
   "product": "blazing-flow-sandbox",
+  "parentProduct": "blazing-flow",
   "category": "examples"
 }

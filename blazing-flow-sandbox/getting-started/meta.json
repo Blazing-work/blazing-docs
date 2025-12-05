@@ -1,7 +1,8 @@
 {
   "title": "Getting Started",
-  "position": 1,
-  "description": "Get started with Flow Sandbox for testing and development",
+  "position": 0,
+  "description": "Isolated workflow orchestration environment for testing and development",
   "product": "blazing-flow-sandbox",
+  "parentProduct": "blazing-flow",
   "category": "guide"
 }

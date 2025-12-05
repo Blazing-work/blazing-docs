@@ -1,7 +1,0 @@
-{
-  "title": "VoIP Load Balancer",
-  "position": 6,
-  "description": "Global public gateway with optional VoIP capabilities",
-  "product": "blazing-core",
-  "category": "guide"
-}

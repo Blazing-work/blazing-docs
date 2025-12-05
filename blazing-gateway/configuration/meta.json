@@ -1,7 +1,8 @@
 {
   "title": "Configuration",
-  "position": 2,
+  "position": 1,
   "description": "Configure Blazing Gateway routing, security, and advanced features",
   "product": "blazing-gateway",
+  "parentProduct": "blazing-core",
   "category": "guide"
 }

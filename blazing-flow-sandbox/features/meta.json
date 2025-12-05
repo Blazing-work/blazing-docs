@@ -1,7 +1,8 @@
 {
   "title": "Features",
-  "position": 2,
+  "position": 1,
   "description": "Comprehensive guide to Flow Sandbox features and capabilities",
   "product": "blazing-flow-sandbox",
+  "parentProduct": "blazing-flow",
   "category": "guide"
 }

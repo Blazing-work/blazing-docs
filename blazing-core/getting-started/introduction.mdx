@@ -1,124 +1,282 @@
 ---
-title: Introduction to Blazing Core
-label: Introduction
-description: Multi-tenant edge compute platform with intelligent workload management
+title: Blazing Core Introduction
+label: Blazing Core
+description: Multi-cloud orchestration with policy-driven deployment
 position: 0
 ---
 
-Blazing Core is a **multi-tenant edge compute platform** that provides intelligent workload placement across multiple cloud providers with built-in service mesh networking.
+**Blazing Core** is our multi-cloud, policy-driven orchestration service that enables you to describe compute workloads once and deploy them transparently across multiple cloud providers.
 
-## What is Blazing Core?
+## What is Core Compose?
 
-Blazing Core enables you to deploy and manage containerized workloads across a global network of compute providers:
+**Core Compose** is the YAML configuration format used by Blazing Core. It merges the simplicity of Docker Compose with the power of declarative cloud infrastructure. Write your infrastructure once in a `compose.yaml` file, and Blazing Core handles provider selection, placement, networking, security, and compliance automatically.
 
-- **Regional Workers** – Fast, predictable performance on Google Kubernetes Engine
-- **Akash Network** – Cost-effective burst capacity on decentralized providers
-- **Service Mesh** – Built-in mTLS, service discovery, and traffic management with HashiCorp Consul
-- **Intelligent Placement** – AI-powered region selection based on latency, cost, and compliance
+### Supported Providers
 
-## Key Benefits
+- **GCP GKE** - Google Kubernetes Engine
+- **Akash Network** - Decentralized compute network
+- **Digital Frontier Cloud (DFC)** - Managed cloud infrastructure
 
-### 1. Multi-Tenant Isolation
-Each cluster gets its own isolated Kubernetes namespace with dedicated service mesh, ensuring complete separation between tenants.
+#### Coming Soon
 
-### 2. Intelligent Workload Placement
-Automated provider selection based on:
-- Geographic latency requirements
-- Cost optimization
-- Compliance and data residency
-- Provider availability and health
+- **AWS EKS** - Amazon Elastic Kubernetes Service
+- **Azure AKS** - Azure Kubernetes Service
 
-### 3. Built-in Service Mesh
-Every cluster includes:
-- HashiCorp Consul for service discovery
-- Automatic mTLS between services
-- ACL-based access control
-- Edge Envoy mesh gateway
+## Key Features
 
-### 4. Cost-Effective Backend Options
-Choose your data layer based on needs:
-- **Firestore**: $1-10/month for most workloads
-- **Spanner**: $657/month for high-throughput requirements
+### Declarative Configuration
 
-### 5. Production-Ready Infrastructure
-- Let's Encrypt TLS certificates
-- Cloud DNS integration
-- GKE Autopilot for auto-scaling
-- Comprehensive API with RESTful endpoints
+Define your entire infrastructure in a single `compose.yaml` file:
 
-## Architecture Overview
+```yaml filename="compose.yaml"
+version: "0.2"
 
-Blazing Core operates with a **control plane + worker** architecture:
-
-### Control Plane
-- RESTful API (FastAPI/Python)
-- Organization and project management
-- Cluster orchestration
-- Background task processing (Pub/Sub)
-- Credential management
-
-### Worker Nodes
-- Join cluster service mesh via Consul
-- Run containerized workloads
-- Automatic health checking
-- mTLS communication
-
-### Data Hierarchy
-
-```text
-Organization (billing/org entity)
-├── API Keys (with scopes, expiration)
-└── Projects (organizational grouping)
-    └── Clusters (isolated service meshes)
-        ├── Namespace: c-{uuid}
-        ├── Consul Cluster (service mesh)
-        ├── Edge-Envoy Mesh Gateway
-        └── RegionSet (multi-cloud regions)
+services:
+  api:
+    image: myapp:latest
+    cpu: 2
+    memory: "4Gi"
+    replicas: 3
+    network:
+      ingress:
+        expose:
+          - port: 443
+            tls:
+              auto: true
 ```
 
-## Use Cases
+### Intelligent Provider Selection
 
-### API Services
-Run production APIs with geographic distribution, automatic failover, and compliance guarantees.
+Blazing Core automatically selects the best provider based on your requirements:
 
-### Batch Processing
-Deploy compute-intensive workloads across the most cost-effective providers with automatic resource provisioning.
+- **Cost optimization** - Lowest price for your workload
+- **Performance** - Best latency and throughput
+- **Compliance** - Data residency and regulatory requirements
+- **Availability** - High availability with automatic failover
 
-### Multi-Region Applications
-Distribute workloads across regions for low latency access with built-in service mesh networking.
+### Policy-Driven Governance
 
-### Development & Testing
-Rapid cluster creation for development environments with isolated service meshes.
+Enforce compliance and security policies across all deployments:
+
+```yaml
+services:
+  api:
+    image: myapp:latest
+    controls: [PCI-DSS-4.0, DATA-RESIDENCY-EU]
+    placement:
+      residency:
+        require_countries: ["PT", "FR", "ES"]
+```
+
+### Automatic Scaling
+
+Built-in autoscaling with CPU, memory, and custom metrics:
+
+```yaml
+services:
+  api:
+    autoscaling:
+      enabled: true
+      min_replicas: 2
+      max_replicas: 20
+      target_cpu_percent: 70
+```
+
+### GPU Support
+
+First-class GPU support with topology awareness:
+
+```yaml
+services:
+  trainer:
+    gpu:
+      count: 4
+      model: "H100"
+      sharing:
+        mode: mig
+        mig_profile: "3g.40gb"
+```
+
+### Secrets Management
+
+Secure secrets injection with automatic rotation:
+
+```yaml
+services:
+  api:
+    secrets:
+      - secret_ref: db-credentials
+        mode: env
+        keys:
+          username: DB_USER
+          password: DB_PASSWORD
+```
 
 ## Core Concepts
 
-### Clusters (formerly Tenants)
-Isolated Kubernetes namespaces with dedicated service mesh. Each cluster gets:
-- UUID-based namespace (e.g., `c-855b414c-...`)
-- 1-5 node Consul cluster with ACL + TLS
-- Edge Envoy mesh gateway (LoadBalancer)
-- Wildcard TLS certificate (`*.blazing.work`)
+### Services
 
-### Workers
-Two types of workers can join a cluster's service mesh:
+The smallest deployable unit - a container with compute resources, networking, and policies.
 
-1. **Regional Workers** (GKE-based)
-   - Run in Google Kubernetes Engine
-   - Fast, predictable performance
-   - Higher cost (~$150-300/month)
+### Profiles
 
-2. **Akash Workers** (Decentralized)
-   - Run on Akash Network providers
-   - Cost-effective burst capacity
-   - Variable provider quality
+Reusable configuration templates that can be applied to multiple services:
 
-### Service Mesh
-HashiCorp Consul provides:
-- Service discovery and health checking
-- mTLS between services
-- Traffic management via Envoy proxies
-- ACL-based access control
+```yaml
+profiles:
+  production:
+    replicas: 3
+    autoscaling:
+      enabled: true
+    observability:
+      metrics:
+        enabled: true
 
-## Next Steps
+services:
+  api:
+    profiles: [production]
+```
 
-Ready to get started? Follow our [Quick Start Guide](/docs/quick-start) to deploy your first cluster with Blazing Core.
+### Sovereignty
+
+Define organization-wide sovereignty policies that control where and how your workloads run:
+
+```yaml
+policy:
+  placement:
+    residency:
+      require_countries: ["PT", "FR", "ES", "DE"]
+  security:
+    confidential_compute: preferred
+```
+
+### Governance & Compliance
+
+Blazing Core includes feature registry and compliance controls that validate deployments:
+
+- **Feature Registry** - Tracks available capabilities per provider
+- **Control Registry** - Maps compliance requirements to technical controls
+
+## How It Works
+
+### 1. Write Your Configuration
+
+Create a `compose.yaml` file describing your infrastructure.
+
+### 2. Validate
+
+Run `core validate` to check syntax and compliance locally:
+
+```bash
+core validate compose.yaml
+```
+
+### 3. Plan
+
+Preview what will be deployed:
+
+```bash
+core plan compose.yaml
+```
+
+Blazing Core shows:
+- Selected provider and fallback chain
+- Estimated cost
+- Compliance status
+- Resource allocation
+
+### 4. Apply
+
+Deploy your infrastructure:
+
+```bash
+core apply compose.yaml
+```
+
+The Control Plane API:
+- Runs placement algorithms
+- Provisions resources atomically
+- Returns deployment status and audit trail
+
+## Architecture
+
+### Client-Side (CLI)
+
+- **Validation** - Fast local syntax and schema checking
+- **Display** - Shows deployment intent and results
+
+### Server-Side (Control Plane API)
+
+- **Placement** - Intelligent provider and region selection
+- **Provisioning** - Atomic resource creation
+- **Orchestration** - Handles async operations
+- **Auditing** - Complete deployment history
+
+This **server-side intelligence** architecture ensures:
+- Consistent placement across all interfaces (CLI, Web UI, mobile)
+- Real-time provider availability and pricing
+- Atomic operations (all resources created or none)
+- Crash recovery (server continues if client disconnects)
+
+## Use Cases
+
+### Multi-Cloud Deployment
+
+Deploy the same workload across multiple clouds for redundancy:
+
+```yaml
+placement:
+  strategy:
+    mode: high_availability
+    providers: [GCP, Akash, DFC]
+```
+
+### Data Residency Compliance
+
+Ensure data stays within specific countries:
+
+```yaml
+placement:
+  residency:
+    require_countries: ["PT", "FR"]
+network:
+  egress:
+    lock_country: true
+```
+
+### Cost Optimization
+
+Automatically select the cheapest provider:
+
+```yaml
+placement:
+  strategy:
+    mode: cost_optimized
+    max_cost_per_month: 500
+```
+
+### GPU Workloads
+
+Run ML training with GPU slicing:
+
+```yaml
+services:
+  trainer:
+    gpu:
+      count: 1
+      model: "A100"
+      sharing:
+        mode: mig
+        mig_profile: "2g.20gb"
+```
+
+## Getting Started
+
+Ready to deploy your first workload? Check out the [Quick Start](/docs/core-compose-quick-start) guide.
+
+## Learn More
+
+- [Architecture](/docs/architecture) - Understand how Blazing Core works
+- [Service Configuration](/docs/service-basics) - Configure your services and workloads
+- [Provider Capabilities](/docs/overview) - Compare provider features
+- [Governance & Compliance](/docs/features-and-controls) - Features and controls
