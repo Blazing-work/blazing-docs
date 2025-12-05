@@ -1,0 +1,703 @@
+---
+title: Use Cases & Examples
+label: Use Cases
+description: Real-world examples of Blazing Gateway implementations
+position: 0
+---
+
+Explore real-world use cases and implementation examples for Blazing Gateway across different industries and scenarios.
+
+## Call Center Infrastructure
+
+Build scalable call center infrastructure with Blazing Gateway.
+
+### Requirements
+
+- Handle 1000+ concurrent calls
+- Route calls to available agents
+- Record calls for quality assurance
+- Provide real-time analytics
+
+### Implementation
+
+```yaml
+# callcenter-gateway.yaml
+version: 1
+
+gateway:
+  name: callcenter-gateway
+  regions:
+    - us-east-1
+    - us-west-2
+  ha:
+    enabled: true
+    min_instances: 5
+    max_instances: 50
+
+sip:
+  domain: calls.callcenter.com
+  authentication:
+    enabled: true
+    external_auth:
+      endpoint: "https://api.callcenter.com/auth"
+
+media:
+  codecs:
+    - opus
+    - g722
+  processing:
+    recording:
+      enabled: true
+      storage: s3://callcenter-recordings
+    mixing:
+      enabled: true
+      max_participants: 10
+
+routing:
+  rules:
+    - name: "Inbound Calls"
+      match:
+        direction: inbound
+      route:
+        - service: agent-router
+          endpoint: "https://router.callcenter.com"
+
+integration:
+  core:
+    enabled: true
+    services:
+      - name: agent-router
+        endpoint: "https://router.callcenter.com"
+        events:
+          - call.started
+          - call.queued
+
+monitoring:
+  metrics:
+    enabled: true
+  alerts:
+    rules:
+      - name: queue_time_high
+        condition: avg_queue_time > 120s
+        severity: warning
+```
+
+### Agent Router Service
+
+```python
+from blazing import Flow
+
+@Flow.task
+async def route_to_available_agent(call):
+    """Find and route to available agent"""
+
+    # Find available agent
+    agent = await find_available_agent(
+        skills=call.required_skills,
+        language=call.language
+    )
+
+    if not agent:
+        # Queue the call
+        position = await queue_call(call)
+        await play_hold_music(call, position)
+        return
+
+    # Route to agent
+    await transfer_call(call, agent.sip_uri)
+
+    # Track metrics
+    await log_metrics({
+        'call_id': call.id,
+        'agent_id': agent.id,
+        'queue_time': call.queue_duration
+    })
+```
+
+### Benefits
+
+- **Scalability**: Auto-scale from 0 to 1000+ concurrent calls
+- **Reliability**: Multi-region deployment with automatic failover
+- **Analytics**: Real-time metrics on queue times, agent performance
+- **Cost**: Pay only for actual call minutes
+
+---
+
+## SIP Trunking Provider
+
+Build a SIP trunking service with Blazing Gateway.
+
+### Requirements
+
+- Provide SIP trunking to customers
+- Support multiple carriers for redundancy
+- Implement least-cost routing
+- Bill customers accurately
+
+### Implementation
+
+```yaml
+# trunking-gateway.yaml
+version: 1
+
+gateway:
+  name: trunking-gateway
+  regions:
+    - us-east-1
+    - us-west-2
+    - eu-west-1
+    - ap-south-1
+
+routing:
+  strategy: least-cost
+
+  rules:
+    # US Domestic
+    - name: "US Domestic"
+      match:
+        prefix: "+1"
+        exclude:
+          - "+1900"  # Block premium
+      route:
+        - provider: "carrier-a"
+          trunk: "sip:trunk-a.com"
+          priority: 1
+          cost_per_minute: 0.008
+        - provider: "carrier-b"
+          trunk: "sip:trunk-b.com"
+          priority: 1
+          cost_per_minute: 0.009
+        - provider: "carrier-c"
+          trunk: "sip:trunk-c.com"
+          priority: 2  # Failover
+          cost_per_minute: 0.012
+
+    # UK Domestic
+    - name: "UK Domestic"
+      match:
+        prefix: "+44"
+      route:
+        - provider: "uk-carrier"
+          trunk: "sip:uk-trunk.com"
+          cost_per_minute: 0.015
+
+security:
+  fraud_prevention:
+    enabled: true
+    cost_limits:
+      per_customer:
+        per_hour: 50.00
+        per_day: 500.00
+    pattern_detection:
+      enabled: true
+
+integration:
+  webhooks:
+    endpoints:
+      - url: "https://billing.example.com/cdr"
+        events:
+          - call.ended
+        retry:
+          max_attempts: 5
+```
+
+### Billing Integration
+
+```python
+from blazing import Webhook
+
+@Webhook.handler("call.ended")
+async def process_call_billing(event):
+    """Process call for billing"""
+
+    call = event.call
+    customer = await get_customer(call.customer_id)
+
+    # Calculate cost
+    duration_minutes = call.duration / 60
+    cost = call.cost_per_minute * duration_minutes
+    markup = cost * customer.markup_percentage
+
+    # Create invoice line item
+    await create_invoice_item(
+        customer_id=customer.id,
+        description=f"Call to {call.destination}",
+        quantity=duration_minutes,
+        unit_price=call.cost_per_minute + markup,
+        total=cost + markup,
+        metadata={
+            'call_id': call.id,
+            'duration': call.duration,
+            'destination': call.destination
+        }
+    )
+```
+
+### Benefits
+
+- **Multi-Carrier**: Automatic failover between carriers
+- **Cost Optimization**: Intelligent least-cost routing
+- **Global Reach**: Support calls to 200+ countries
+- **Fraud Protection**: Built-in fraud detection and limits
+
+---
+
+## WebRTC Communication Platform
+
+Build a WebRTC-based communication platform with Blazing Gateway.
+
+### Requirements
+
+- WebRTC to SIP calling
+- Video conferencing
+- Screen sharing
+- PSTN connectivity
+
+### Implementation
+
+```yaml
+# webrtc-gateway.yaml
+version: 1
+
+gateway:
+  name: webrtc-gateway
+
+sip:
+  # WebSocket support for WebRTC
+  ws_port: 8080
+  wss_port: 8443
+  transports:
+    - wss  # WebSocket Secure
+
+media:
+  codecs:
+    - opus      # Audio
+    - vp8       # Video
+    - vp9       # Video
+    - h264      # Video
+
+  srtp:
+    enabled: true
+
+  nat_traversal:
+    stun:
+      enabled: true
+    turn:
+      enabled: true
+      servers:
+        - "turn:turn.example.com:3478"
+    ice:
+      enabled: true
+
+  processing:
+    # Video mixing for conferencing
+    mixing:
+      enabled: true
+      max_participants: 50
+      layouts:
+        - grid
+        - speaker
+        - custom
+
+routing:
+  rules:
+    # WebRTC to PSTN
+    - name: "WebRTC to PSTN"
+      match:
+        source: webrtc
+        destination_prefix: "+"
+      route:
+        - provider: "pstn-carrier"
+          trunk: "sip:trunk.carrier.com"
+```
+
+### WebRTC Client Integration
+
+```javascript
+// WebRTC client
+import { BlazingWebRTC } from '@blazing/webrtc-sdk';
+
+const client = new BlazingWebRTC({
+  gateway: 'wss://gateway.example.com:8443',
+  credentials: {
+    username: 'user@example.com',
+    password: 'password'
+  }
+});
+
+// Make a call to PSTN
+const call = await client.call('+14155551234', {
+  audio: true,
+  video: false
+});
+
+// Join a video conference
+const conference = await client.joinConference('meeting-123', {
+  audio: true,
+  video: true,
+  screen: false
+});
+
+// Share screen
+await conference.shareScreen();
+```
+
+### Benefits
+
+- **WebRTC Native**: Built-in WebRTC support
+- **Video Conferencing**: Multi-party video with SFU
+- **PSTN Integration**: Call regular phones from WebRTC
+- **Global Edge**: Low-latency connections worldwide
+
+---
+
+## IoT Device Connectivity
+
+Enable IoT devices to make voice calls with Blazing Gateway.
+
+### Requirements
+
+- Connect IoT devices (doorbells, security systems)
+- Low bandwidth audio codecs
+- Push notifications for incoming calls
+- Emergency calling (E911)
+
+### Implementation
+
+```yaml
+# iot-gateway.yaml
+version: 1
+
+gateway:
+  name: iot-gateway
+
+sip:
+  authentication:
+    enabled: true
+    # Device authentication
+    external_auth:
+      endpoint: "https://api.iot.com/device-auth"
+
+media:
+  codecs:
+    - opus  # Efficient compression
+    - g729  # Low bandwidth
+
+  processing:
+    # Noise suppression for outdoor devices
+    noise_suppression:
+      enabled: true
+      level: aggressive
+
+routing:
+  rules:
+    # Emergency calls
+    - name: "Emergency Services"
+      match:
+        destination: "911"
+      route:
+        - provider: "e911-provider"
+          trunk: "sip:e911.carrier.com"
+          priority: 1
+          # Send device location
+          headers:
+            X-Location: "${device.location}"
+
+    # Regular calls
+    - name: "Regular Calls"
+      match:
+        destination_prefix: "+"
+      route:
+        - provider: "carrier"
+          trunk: "sip:trunk.carrier.com"
+
+integration:
+  webhooks:
+    endpoints:
+      - url: "https://api.iot.com/call-event"
+        events:
+          - call.started
+        # Trigger push notification to mobile app
+```
+
+### Device Integration
+
+```python
+# IoT device code
+from blazing_iot import SIPClient
+
+# Initialize SIP client on device
+client = SIPClient(
+    gateway="sip:gateway.example.com",
+    device_id="doorbell-12345",
+    credentials=get_device_credentials()
+)
+
+# Make call when doorbell pressed
+async def on_doorbell_press():
+    # Get registered mobile numbers
+    numbers = await get_owner_numbers()
+
+    # Call owner's mobile
+    call = await client.call(
+        destination=numbers[0],
+        metadata={
+            'device_id': 'doorbell-12345',
+            'location': get_gps_location(),
+            'video_stream': get_camera_url()
+        }
+    )
+```
+
+### Benefits
+
+- **Device-Optimized**: Low-bandwidth codecs for IoT
+- **Reliable**: Multi-region deployment for high availability
+- **E911 Support**: Emergency calling with location
+- **Scale**: Support millions of connected devices
+
+---
+
+## UCaaS (Unified Communications)
+
+Build a unified communications platform with Blazing Gateway.
+
+### Requirements
+
+- PBX functionality
+- Call forwarding and routing
+- Voicemail
+- Presence and status
+- Integration with Slack, Teams, etc.
+
+### Implementation
+
+```yaml
+# ucaas-gateway.yaml
+version: 1
+
+gateway:
+  name: ucaas-gateway
+
+sip:
+  domain: pbx.company.com
+  authentication:
+    enabled: true
+    users:
+      # Define users and extensions
+      - username: "alice"
+        extension: "1001"
+        display_name: "Alice Smith"
+      - username: "bob"
+        extension: "1002"
+        display_name: "Bob Jones"
+
+routing:
+  rules:
+    # Call forwarding
+    - name: "Call Forwarding"
+      match:
+        destination: "${user.extension}"
+      route:
+        - action: check_presence
+          if_available: ring_user
+          if_busy: send_to_voicemail
+          if_away: forward_to_mobile
+
+    # Voicemail
+    - name: "Voicemail"
+      match:
+        destination: "voicemail"
+      route:
+        - service: voicemail
+          endpoint: "https://voicemail.company.com"
+
+integration:
+  core:
+    enabled: true
+    services:
+      # Presence service
+      - name: presence
+        endpoint: "https://presence.company.com"
+        events:
+          - user.available
+          - user.busy
+          - user.away
+
+      # Slack integration
+      - name: slack
+        endpoint: "https://slack-integration.company.com"
+        events:
+          - call.missed
+          - voicemail.new
+```
+
+### Features Implementation
+
+```python
+from blazing import Flow
+
+@Flow.task
+async def handle_incoming_call(call):
+    """Intelligent call routing based on presence"""
+
+    user = await get_user_by_extension(call.destination)
+
+    # Check user presence
+    presence = await check_presence(user.id)
+
+    if presence == 'available':
+        # Ring user's devices
+        await ring_devices(user.devices)
+
+    elif presence == 'busy':
+        # Check if user allows interruptions
+        if call.priority == 'urgent':
+            await ring_with_notification(user, 'Urgent call')
+        else:
+            await send_to_voicemail(call)
+
+    elif presence == 'away':
+        # Forward to mobile
+        if user.forward_to_mobile:
+            await forward_call(call, user.mobile_number)
+        else:
+            await send_to_voicemail(call)
+
+@Flow.task
+async def notify_missed_call(call):
+    """Notify user of missed call via Slack"""
+
+    await send_slack_message(
+        user=call.destination_user,
+        message=f"Missed call from {call.caller_id}",
+        actions=[
+            {'label': 'Call back', 'action': 'call_back'},
+            {'label': 'Send SMS', 'action': 'send_sms'}
+        ]
+    )
+```
+
+### Benefits
+
+- **Feature-Rich**: Full PBX features without hardware
+- **Integrations**: Connect with Slack, Teams, CRM systems
+- **Mobile**: Works on desk phones, softphones, mobile apps
+- **Analytics**: Detailed call analytics and reporting
+
+---
+
+## Compliance Recording
+
+Implement compliant call recording for regulated industries.
+
+### Requirements
+
+- Record all calls for compliance
+- Store recordings securely with encryption
+- Retention policies
+- Audit logs
+
+### Implementation
+
+```yaml
+# compliance-gateway.yaml
+version: 1
+
+gateway:
+  name: compliance-gateway
+
+media:
+  processing:
+    recording:
+      enabled: true
+      # Record all calls
+      policy: all
+      format: wav
+      sample_rate: 16000
+
+      # Encrypted storage
+      storage: s3://compliance-recordings
+      encryption:
+        enabled: true
+        key_id: "aws:kms:key-id"
+
+      # Metadata
+      metadata:
+        - caller_id
+        - destination
+        - duration
+        - agent_id
+        - customer_id
+
+security:
+  access_control:
+    # Strict access control
+    recording_access:
+      roles:
+        - compliance_officer
+        - supervisor
+      require_mfa: true
+      audit_log: true
+
+monitoring:
+  logging:
+    # Detailed audit logs
+    audit_logs:
+      enabled: true
+      events:
+        - recording.accessed
+        - recording.downloaded
+        - recording.deleted
+      storage: s3://audit-logs
+      retention: 7y
+```
+
+### Retention Policy
+
+```python
+from blazing import Flow
+from datetime import datetime, timedelta
+
+@Flow.schedule("daily")
+async def apply_retention_policy():
+    """Apply recording retention policy"""
+
+    # Get recordings older than retention period
+    cutoff_date = datetime.now() - timedelta(days=2555)  # 7 years
+
+    recordings = await get_recordings(before=cutoff_date)
+
+    for recording in recordings:
+        # Archive to glacier storage
+        await archive_recording(
+            recording_id=recording.id,
+            storage='glacier://long-term-archive'
+        )
+
+        # Delete from active storage
+        await delete_recording(recording.id)
+
+        # Log retention action
+        await log_audit_event(
+            event='recording.archived',
+            recording_id=recording.id,
+            reason='retention_policy',
+            retention_period='7years'
+        )
+```
+
+### Benefits
+
+- **Compliance**: Meet regulatory requirements (MiFID II, GDPR, etc.)
+- **Secure**: Encrypted storage with strict access controls
+- **Auditable**: Complete audit trail of all access
+- **Automated**: Automated retention and archival policies
+
+---
+
+## Next Steps
+
+- [Get started with Blazing Gateway](/docs/gateway-quick-start)
+- [Review configuration options](/docs/gateway-configuration)
+- [Join our community](https://discord.gg/blazing)

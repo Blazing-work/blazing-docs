@@ -1,0 +1,194 @@
+---
+title: Quick Start Guide
+label: Quick Start
+description: Get started with Blazing Gateway in minutes
+position: 0
+---
+
+Get your first Blazing Gateway instance up and running in minutes.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- A Blazing Core account with active subscription
+- Blazing CLI installed (`npm install -g @blazing/cli`)
+- Basic understanding of VoIP or edge networking concepts
+- A SIP trunk provider (optional, for PSTN connectivity)
+
+## Installation
+
+### Install Blazing CLI
+
+```bash
+npm install -g @blazing/cli
+```
+
+### Authenticate
+
+```bash
+blazing login
+```
+
+Follow the prompts to authenticate with your Blazing Core account.
+
+## Your First Gateway
+
+### 1. Initialize Gateway Configuration
+
+Create a new gateway configuration file:
+
+```bash
+blazing gateway init
+```
+
+This creates a `gateway.yaml` file with default configuration:
+
+```yaml
+version: 1
+
+gateway:
+  name: my-first-gateway
+
+  sip:
+    port: 5060
+    tls_port: 5061
+    domain: gateway.example.com
+
+  media:
+    rtp_port_range: 10000-20000
+    codecs:
+      - opus
+      - g722
+      - pcmu
+
+  regions:
+    - us-east-1
+    - eu-west-1
+
+  routing:
+    strategy: least-cost
+    failover: true
+```
+
+### 2. Deploy Gateway
+
+Deploy your gateway to the edge:
+
+```bash
+blazing gateway deploy --config gateway.yaml
+```
+
+The CLI will:
+1. Validate your configuration
+2. Provision edge infrastructure
+3. Configure routing and networking
+4. Deploy your gateway instances
+
+### 3. Verify Deployment
+
+Check gateway status:
+
+```bash
+blazing gateway status my-first-gateway
+```
+
+You should see output like:
+
+```
+Gateway: my-first-gateway
+Status: RUNNING
+Regions: us-east-1, eu-west-1
+Endpoints:
+  - sip.us-east-1.gateway.blazing.run:5060
+  - sip.eu-west-1.gateway.blazing.run:5060
+Health: OK
+Uptime: 2m 34s
+```
+
+## Test Your Gateway
+
+### Make a Test Call
+
+Use a SIP client to test connectivity:
+
+```bash
+# Using sipml5 or similar SIP client
+sip:test@sip.us-east-1.gateway.blazing.run:5060
+```
+
+### Monitor Call Metrics
+
+View real-time metrics:
+
+```bash
+blazing gateway metrics my-first-gateway --live
+```
+
+## Configure Routing
+
+### Add SIP Trunk
+
+Connect a SIP trunk for PSTN calling:
+
+```yaml
+# gateway.yaml
+routing:
+  - match:
+      prefix: "+1"  # North America
+    route:
+      - provider: "twilio"
+        trunk_uri: "sip:trunk.twilio.com"
+        credentials:
+          username: "ACxxxxxx"
+          password: "your-auth-token"
+        priority: 1
+```
+
+Apply the changes:
+
+```bash
+blazing gateway update my-first-gateway --config gateway.yaml
+```
+
+## Next Steps
+
+Now that you have a basic gateway running:
+
+- [Configure advanced routing](/docs/gateway-configuration)
+- [Set up monitoring and alerts](/docs/gateway-monitoring)
+- [Learn about VoIP best practices](/docs/gateway-use-cases)
+- [Integrate with Blazing Core services](/docs/gateway-integration)
+
+## Troubleshooting
+
+### Gateway won't start
+
+Check logs for errors:
+
+```bash
+blazing gateway logs my-first-gateway --tail 100
+```
+
+### Can't connect via SIP
+
+Verify firewall rules allow SIP traffic:
+- Port 5060 (UDP/TCP) for SIP
+- Port 5061 (TCP) for SIP over TLS
+- Ports 10000-20000 (UDP) for RTP media
+
+### Poor call quality
+
+Check network metrics:
+
+```bash
+blazing gateway metrics my-first-gateway --filter network
+```
+
+Look for high jitter or packet loss.
+
+## Getting Help
+
+- Join our [Discord community](https://discord.gg/blazing)
+- Check the [Gateway documentation](/docs/gateway-introduction)
+- Contact support at support@blazing.run

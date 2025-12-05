@@ -6,5 +6,6 @@
   "collapsible": false,
   "collapsed": false,
   "product": "blazing-gateway",
+  "parentProduct": "blazing-core",
   "category": "guide"
 }

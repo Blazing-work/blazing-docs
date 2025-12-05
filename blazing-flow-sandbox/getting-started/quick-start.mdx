@@ -1,0 +1,491 @@
+---
+title: Quick Start Guide
+label: Quick Start
+description: Get started with Flow Sandbox in minutes
+position: 0
+---
+
+Flow Sandbox provides an isolated environment for developing, testing, and debugging Blazing Flow workflows without affecting production systems.
+
+## What is Flow Sandbox?
+
+Flow Sandbox is an isolated workflow orchestration environment that lets you:
+
+- **Test workflows** without affecting production
+- **Debug issues** with detailed execution traces
+- **Develop faster** with instant feedback
+- **Validate changes** before deploying to production
+- **Replay scenarios** to reproduce and fix bugs
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- A Blazing Core account
+- Blazing CLI installed (`npm install -g @blazing/cli`)
+- Basic understanding of Blazing Flow
+- Node.js 18+ or Python 3.8+
+
+## Installation
+
+### Install Blazing CLI
+
+```bash
+npm install -g @blazing/cli
+```
+
+### Authenticate
+
+```bash
+blazing login
+```
+
+## Create Your First Sandbox
+
+### 1. Initialize Sandbox
+
+Create a new sandbox environment:
+
+```bash
+blazing sandbox create my-first-sandbox
+```
+
+This creates an isolated environment with:
+- Dedicated workflow executor
+- Isolated state store
+- Separate event queue
+- Independent metrics
+
+### 2. Configure Sandbox
+
+Create a `sandbox.yaml` configuration:
+
+```yaml
+version: 1
+
+sandbox:
+  name: my-first-sandbox
+
+  # Execution settings
+  execution:
+    timeout: 5m
+    max_retries: 3
+    parallelism: 10
+
+  # State isolation
+  state:
+    storage: memory  # memory, postgres, redis
+    ttl: 24h         # Auto-cleanup after 24 hours
+
+  # Event routing
+  events:
+    mode: isolated   # isolated, mirror, hybrid
+```
+
+Apply the configuration:
+
+```bash
+blazing sandbox apply --config sandbox.yaml
+```
+
+### 3. Deploy Workflow to Sandbox
+
+Deploy a test workflow:
+
+```python
+# workflow.py
+from blazing import Flow
+
+flow = Flow(name="test-workflow")
+
+@flow.task
+async def process_data(data: dict):
+    """Process incoming data"""
+    result = {
+        'processed': True,
+        'input': data,
+        'timestamp': datetime.now().isoformat()
+    }
+    return result
+
+@flow.task
+async def send_notification(result: dict):
+    """Send notification about processed data"""
+    print(f"Data processed: {result}")
+    return result
+```
+
+Deploy to sandbox:
+
+```bash
+blazing sandbox deploy \
+  --sandbox my-first-sandbox \
+  --workflow workflow.py
+```
+
+### 4. Run Workflow in Sandbox
+
+Execute the workflow:
+
+```bash
+blazing sandbox run test-workflow \
+  --sandbox my-first-sandbox \
+  --input '{"data": "test-value"}'
+```
+
+You'll see real-time execution output:
+
+```
+[12:34:56] Starting workflow: test-workflow
+[12:34:56] Task started: process_data
+[12:34:57] Task completed: process_data (1.2s)
+[12:34:57] Task started: send_notification
+[12:34:57] Data processed: {'processed': True, 'input': {'data': 'test-value'}, ...}
+[12:34:57] Task completed: send_notification (0.1s)
+[12:34:57] Workflow completed successfully (1.3s)
+```
+
+### 5. Inspect Execution
+
+View detailed execution trace:
+
+```bash
+blazing sandbox trace <execution-id>
+```
+
+This shows:
+- Task execution timeline
+- Input/output for each task
+- State changes
+- Error details (if any)
+- Resource usage
+
+## Development Workflow
+
+### Local Development
+
+Run sandbox locally for faster iteration:
+
+```bash
+# Start local sandbox
+blazing sandbox local start
+
+# Deploy workflow
+blazing sandbox local deploy workflow.py
+
+# Run workflow
+blazing sandbox local run test-workflow --input test-data.json
+
+# Watch for changes and auto-reload
+blazing sandbox local watch workflow.py
+```
+
+### Testing Workflows
+
+Write tests using the sandbox:
+
+```python
+# test_workflow.py
+import pytest
+from blazing.testing import SandboxClient
+
+@pytest.fixture
+async def sandbox():
+    """Create test sandbox"""
+    client = SandboxClient("test-sandbox")
+    await client.deploy("workflow.py")
+    yield client
+    await client.cleanup()
+
+async def test_process_data(sandbox):
+    """Test data processing workflow"""
+
+    # Run workflow
+    result = await sandbox.run(
+        "test-workflow",
+        input={"data": "test-value"}
+    )
+
+    # Assertions
+    assert result['status'] == 'completed'
+    assert result['output']['processed'] is True
+    assert result['duration'] < 5.0  # < 5 seconds
+
+async def test_error_handling(sandbox):
+    """Test error handling"""
+
+    # Run with invalid input
+    result = await sandbox.run(
+        "test-workflow",
+        input={"invalid": "data"}
+    )
+
+    # Should handle error gracefully
+    assert result['status'] == 'failed'
+    assert 'error' in result
+```
+
+Run tests:
+
+```bash
+pytest test_workflow.py
+```
+
+### Debugging Workflows
+
+Enable debug mode for detailed logging:
+
+```bash
+# Run with debug logging
+blazing sandbox run test-workflow \
+  --sandbox my-first-sandbox \
+  --input test-data.json \
+  --debug
+
+# Stream logs in real-time
+blazing sandbox logs my-first-sandbox --follow
+
+# Get execution trace
+blazing sandbox trace <execution-id> --verbose
+```
+
+## Sandbox Modes
+
+### Isolated Mode (Default)
+
+Complete isolation from production:
+
+```yaml
+sandbox:
+  events:
+    mode: isolated
+```
+
+- Workflows run in complete isolation
+- No interaction with production systems
+- Safe for testing breaking changes
+
+### Mirror Mode
+
+Mirror production events for testing:
+
+```yaml
+sandbox:
+  events:
+    mode: mirror
+    source: production
+    sampling_rate: 0.1  # Mirror 10% of events
+```
+
+- Receive copy of production events
+- Test with real data patterns
+- Validate changes against live traffic
+
+### Hybrid Mode
+
+Combine isolation with selective production integration:
+
+```yaml
+sandbox:
+  events:
+    mode: hybrid
+    sources:
+      - type: isolated
+        weight: 70
+      - type: mirror
+        source: production
+        weight: 30
+        sampling_rate: 0.5
+```
+
+## Environment Management
+
+### Create Multiple Sandboxes
+
+Create sandboxes for different purposes:
+
+```bash
+# Development sandbox
+blazing sandbox create dev-sandbox --config dev.yaml
+
+# Staging sandbox
+blazing sandbox create staging-sandbox --config staging.yaml
+
+# Testing sandbox
+blazing sandbox create test-sandbox --config test.yaml
+```
+
+### List Sandboxes
+
+```bash
+blazing sandbox list
+```
+
+Output:
+```
+NAME              STATUS    CREATED          WORKFLOWS
+dev-sandbox       running   2 hours ago      3
+staging-sandbox   running   1 day ago        5
+test-sandbox      stopped   1 week ago       2
+```
+
+### Switch Between Sandboxes
+
+```bash
+# Set default sandbox
+blazing sandbox use dev-sandbox
+
+# Run command in specific sandbox
+blazing sandbox run workflow --sandbox staging-sandbox
+```
+
+## Data Management
+
+### Reset Sandbox State
+
+Clear all state and start fresh:
+
+```bash
+blazing sandbox reset my-first-sandbox
+```
+
+### Export Sandbox Data
+
+Export workflow executions for analysis:
+
+```bash
+blazing sandbox export my-first-sandbox \
+  --format json \
+  --output sandbox-data.json
+```
+
+### Import Test Data
+
+Load test data into sandbox:
+
+```bash
+blazing sandbox import my-first-sandbox \
+  --file test-data.json
+```
+
+## Integration with CI/CD
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/test-workflows.yml
+name: Test Workflows
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Blazing CLI
+        run: npm install -g @blazing/cli
+
+      - name: Authenticate
+        run: blazing login --token ${{ secrets.BLAZING_TOKEN }}
+
+      - name: Create test sandbox
+        run: blazing sandbox create ci-${{ github.run_id }}
+
+      - name: Deploy workflows
+        run: blazing sandbox deploy --sandbox ci-${{ github.run_id }} .
+
+      - name: Run tests
+        run: pytest tests/
+
+      - name: Cleanup sandbox
+        if: always()
+        run: blazing sandbox delete ci-${{ github.run_id }}
+```
+
+## Best Practices
+
+### 1. Use Descriptive Names
+
+```bash
+# Good
+blazing sandbox create feature-user-auth
+blazing sandbox create bugfix-payment-retry
+
+# Bad
+blazing sandbox create test1
+blazing sandbox create sandbox2
+```
+
+### 2. Set Resource Limits
+
+```yaml
+sandbox:
+  resources:
+    max_executions: 1000
+    max_duration: 1h
+    max_memory: 512MB
+```
+
+### 3. Auto-Cleanup
+
+```yaml
+sandbox:
+  cleanup:
+    enabled: true
+    after: 24h  # Delete sandbox after 24 hours of inactivity
+```
+
+### 4. Use Version Control
+
+```bash
+# Save sandbox configuration
+blazing sandbox export-config my-sandbox > sandbox.yaml
+
+# Commit to git
+git add sandbox.yaml
+git commit -m "Add sandbox configuration"
+```
+
+## Next Steps
+
+- [Learn about sandbox features](/docs/flow-sandbox-features)
+- [Explore advanced examples](/docs/flow-sandbox-examples)
+- [Integrate with CI/CD](/docs/flow-ci-cd-integration)
+- [Review best practices](/docs/flow-sandbox-best-practices)
+
+## Troubleshooting
+
+### Sandbox won't start
+
+Check resource quotas:
+
+```bash
+blazing sandbox quota
+```
+
+### Workflows fail in sandbox but work in production
+
+Compare configurations:
+
+```bash
+blazing sandbox diff my-sandbox production
+```
+
+### Slow execution in sandbox
+
+Increase parallelism:
+
+```yaml
+sandbox:
+  execution:
+    parallelism: 20  # Increase from default
+```
+
+## Getting Help
+
+- Join our [Discord community](https://discord.gg/blazing)
+- Check the [Flow Sandbox documentation](/docs/flow-sandbox-introduction)
+- Contact support at support@blazing.run

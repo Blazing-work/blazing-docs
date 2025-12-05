@@ -1,0 +1,367 @@
+---
+title: Flow Deployment
+label: Deployment Guide
+description: Deploy and manage Blazing Flow workflows in production
+position: 0
+---
+
+Deploy Blazing Flow workflows to production with confidence using best practices for deployment, versioning, and rollback strategies.
+
+## Deployment Methods
+
+### CLI Deployment
+
+Deploy workflows using the Blazing CLI:
+
+```bash
+# Deploy workflow
+blazing flow deploy workflow.py \
+  --name production-workflow \
+  --environment production
+
+# Deploy with configuration
+blazing flow deploy workflow.py \
+  --config flow.yaml \
+  --environment production
+
+# Deploy specific version
+blazing flow deploy workflow.py \
+  --version 2.1.0
+```
+
+### CI/CD Deployment
+
+#### GitHub Actions
+
+```yaml
+# .github/workflows/deploy-flow.yml
+name: Deploy Flow Workflow
+
+on:
+  push:
+    branches: [main]
+    paths: ['workflows/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Blazing CLI
+        run: npm install -g @blazing/cli
+
+      - name: Authenticate
+        run: blazing login --token ${{ secrets.BLAZING_TOKEN }}
+
+      - name: Deploy to staging
+        run: blazing flow deploy workflows/main.py --environment staging
+
+      - name: Run tests
+        run: blazing flow test workflows/main.py --environment staging
+
+      - name: Deploy to production
+        if: success()
+        run: blazing flow deploy workflows/main.py --environment production
+```
+
+### Infrastructure as Code
+
+Deploy with Terraform:
+
+```hcl
+# main.tf
+resource "blazing_flow_workflow" "production" {
+  name        = "production-workflow"
+  source      = "./workflow.py"
+  config      = file("./flow.yaml")
+  environment = "production"
+
+  execution {
+    timeout     = "1h"
+    max_retries = 5
+  }
+
+  resources {
+    cpu    = 4
+    memory = "8GB"
+  }
+}
+```
+
+## Versioning
+
+### Semantic Versioning
+
+Use semantic versioning for workflows:
+
+```python
+# workflow.py
+from blazing import Flow
+
+flow = Flow(
+    name="data-pipeline",
+    version="2.1.0"  # Major.Minor.Patch
+)
+
+# 2.1.0 -> 2.1.1: Bug fix
+# 2.1.0 -> 2.2.0: New feature (backward compatible)
+# 2.1.0 -> 3.0.0: Breaking change
+```
+
+### Version Management
+
+```bash
+# List versions
+blazing flow versions production-workflow
+
+# Deploy specific version
+blazing flow deploy workflow.py --version 2.1.0
+
+# Rollback to previous version
+blazing flow rollback production-workflow --to-version 2.0.0
+```
+
+## Deployment Strategies
+
+### Blue-Green Deployment
+
+Deploy new version alongside old version:
+
+```yaml
+# flow.yaml
+deployment:
+  strategy: blue-green
+
+  # New version (green)
+  green:
+    version: "2.1.0"
+    traffic: 0  # Start with no traffic
+
+  # Old version (blue)
+  blue:
+    version: "2.0.0"
+    traffic: 100
+
+  # Gradual traffic shift
+  traffic_shift:
+    - step: 1
+      green_traffic: 10
+      duration: 10m
+
+    - step: 2
+      green_traffic: 50
+      duration: 20m
+
+    - step: 3
+      green_traffic: 100
+      duration: 10m
+```
+
+### Canary Deployment
+
+Gradually roll out to subset of users:
+
+```yaml
+deployment:
+  strategy: canary
+
+  # Canary configuration
+  canary:
+    version: "2.1.0"
+
+    # Traffic percentage
+    stages:
+      - percentage: 5
+        duration: 30m
+        success_criteria:
+          error_rate: < 0.01
+          latency_p99: < 500ms
+
+      - percentage: 25
+        duration: 1h
+        success_criteria:
+          error_rate: < 0.01
+
+      - percentage: 100
+        success_criteria:
+          error_rate: < 0.01
+
+    # Automatic rollback
+    rollback:
+      on_failure: true
+      threshold:
+        error_rate: 0.05  # Rollback if >5% errors
+```
+
+## Production Best Practices
+
+### Health Checks
+
+Implement health checks:
+
+```python
+from blazing import Flow, health
+
+flow = Flow(name="production-workflow")
+
+@flow.health_check
+async def check_health():
+    """Health check endpoint"""
+    # Check database connectivity
+    await db.ping()
+
+    # Check external services
+    await external_api.health()
+
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat()
+    }
+```
+
+### Graceful Shutdown
+
+Handle shutdown gracefully:
+
+```python
+from blazing import Flow
+
+flow = Flow(name="production-workflow")
+
+@flow.on_shutdown
+async def shutdown_handler():
+    """Cleanup on shutdown"""
+    # Finish in-flight tasks
+    await flow.wait_for_tasks()
+
+    # Close connections
+    await db.close()
+    await cache.close()
+
+    # Save state
+    await save_checkpoint()
+```
+
+### Resource Management
+
+Set appropriate resource limits:
+
+```yaml
+resources:
+  # CPU and memory
+  cpu: 4
+  memory: 8GB
+
+  # Autoscaling
+  autoscaling:
+    enabled: true
+    min_instances: 2
+    max_instances: 10
+    target_cpu: 70%
+    target_memory: 80%
+```
+
+## Monitoring Deployment
+
+### Deployment Metrics
+
+Track deployment health:
+
+```bash
+# View deployment status
+blazing flow deployment status production-workflow
+
+# Monitor metrics during deployment
+blazing flow metrics production-workflow \
+  --live \
+  --filter deployment
+
+# View deployment logs
+blazing flow logs production-workflow \
+  --since 10m \
+  --follow
+```
+
+### Rollback Procedures
+
+Automated rollback on failures:
+
+```yaml
+deployment:
+  rollback:
+    # Automatic rollback
+    automatic:
+      enabled: true
+
+      # Rollback triggers
+      triggers:
+        - error_rate > 0.05
+        - latency_p99 > 1000ms
+        - health_check_failures > 3
+
+    # Manual rollback
+    manual:
+      retain_versions: 5  # Keep last 5 versions
+```
+
+## Multi-Environment Deployment
+
+### Environment Configuration
+
+```yaml
+# environments/production.yaml
+environment: production
+
+resources:
+  cpu: 4
+  memory: 8GB
+
+concurrency:
+  max_concurrent: 100
+
+state:
+  storage: postgres
+  connection: postgresql://prod-db/flow
+
+monitoring:
+  metrics:
+    enabled: true
+    exporters: [prometheus, datadog]
+```
+
+```yaml
+# environments/staging.yaml
+environment: staging
+
+resources:
+  cpu: 2
+  memory: 4GB
+
+concurrency:
+  max_concurrent: 20
+
+state:
+  storage: postgres
+  connection: postgresql://staging-db/flow
+```
+
+### Deploy to Multiple Environments
+
+```bash
+# Deploy to staging
+blazing flow deploy workflow.py \
+  --config environments/staging.yaml
+
+# Promote to production
+blazing flow promote workflow.py \
+  --from staging \
+  --to production
+```
+
+## Next Steps
+
+- [Configure monitoring](/docs/flow-monitoring)
+- [Review best practices](/docs/flow-best-practices)
+- [Explore tutorials](/docs/flow-tutorials)

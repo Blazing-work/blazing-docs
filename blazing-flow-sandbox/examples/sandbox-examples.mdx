@@ -1,0 +1,594 @@
+---
+title: Sandbox Examples
+label: Examples
+description: Practical examples of using Flow Sandbox
+position: 0
+---
+
+Explore practical examples of using Flow Sandbox for development, testing, and debugging workflows.
+
+## Example 1: Testing Payment Processing
+
+Test a payment processing workflow with different scenarios.
+
+### Workflow
+
+```python
+# payment_workflow.py
+from blazing import Flow
+import stripe
+
+flow = Flow(name="payment-processing")
+
+@flow.task
+async def create_charge(order_id: str, amount: int):
+    """Create Stripe charge"""
+    charge = stripe.Charge.create(
+        amount=amount,
+        currency="usd",
+        source="tok_visa",
+        description=f"Order {order_id}"
+    )
+    return charge
+
+@flow.task
+async def update_order(order_id: str, charge_id: str):
+    """Update order with charge ID"""
+    await db.orders.update(
+        order_id,
+        status="paid",
+        charge_id=charge_id
+    )
+
+@flow.task
+async def send_confirmation(order_id: str):
+    """Send confirmation email"""
+    await email.send(
+        to=get_customer_email(order_id),
+        template="order_confirmation",
+        data={"order_id": order_id}
+    )
+```
+
+### Sandbox Configuration
+
+```yaml
+# sandbox.yaml
+sandbox:
+  name: payment-testing
+
+  # Mock Stripe API
+  mocks:
+    - endpoint: "https://api.stripe.com/*"
+      responses:
+        # Successful charge
+        - path: "/v1/charges"
+          method: POST
+          status: 200
+          body:
+            id: "ch_mock123"
+            status: "succeeded"
+          probability: 0.8
+
+        # Card declined
+        - path: "/v1/charges"
+          method: POST
+          status: 402
+          body:
+            error:
+              type: "card_error"
+              code: "card_declined"
+          probability: 0.1
+
+        # Network error
+        - path: "/v1/charges"
+          method: POST
+          status: 500
+          probability: 0.1
+```
+
+### Test Suite
+
+```python
+# test_payment.py
+import pytest
+from blazing.testing import SandboxClient
+
+@pytest.fixture
+async def sandbox():
+    client = SandboxClient("payment-testing")
+    await client.deploy("payment_workflow.py")
+    yield client
+    await client.cleanup()
+
+async def test_successful_payment(sandbox):
+    """Test successful payment flow"""
+
+    result = await sandbox.run(
+        "payment-processing",
+        input={
+            "order_id": "order-123",
+            "amount": 5000
+        }
+    )
+
+    assert result['status'] == 'completed'
+    assert result['output']['charge_id'].startswith('ch_')
+
+async def test_card_declined(sandbox):
+    """Test card declined scenario"""
+
+    # Force card decline with mock
+    sandbox.mock_response(
+        "https://api.stripe.com/v1/charges",
+        status=402,
+        body={"error": {"code": "card_declined"}}
+    )
+
+    result = await sandbox.run(
+        "payment-processing",
+        input={"order_id": "order-456", "amount": 5000}
+    )
+
+    # Should handle error gracefully
+    assert result['status'] == 'failed'
+    assert 'card_declined' in str(result['error'])
+
+async def test_retry_logic(sandbox):
+    """Test payment retry on temporary failures"""
+
+    # First attempt fails, second succeeds
+    sandbox.mock_responses(
+        "https://api.stripe.com/v1/charges",
+        [
+            {"status": 500},  # First attempt fails
+            {"status": 200, "body": {"id": "ch_retry", "status": "succeeded"}}  # Retry succeeds
+        ]
+    )
+
+    result = await sandbox.run(
+        "payment-processing",
+        input={"order_id": "order-789", "amount": 5000}
+    )
+
+    # Should retry and succeed
+    assert result['status'] == 'completed'
+    assert result['retry_count'] == 1
+```
+
+## Example 2: Debugging a Production Issue
+
+Reproduce and fix a production bug using sandbox replay.
+
+### Capture Production Events
+
+```bash
+# Capture events from production issue
+blazing events capture \
+  --source production \
+  --filter "order_id=order-12345" \
+  --time "2024-01-15T10:00:00Z" to "2024-01-15T11:00:00Z" \
+  --output production-issue.json
+```
+
+### Replay in Sandbox
+
+```bash
+# Create debug sandbox
+blazing sandbox create debug-order-12345
+
+# Deploy current code
+blazing sandbox deploy workflow.py --sandbox debug-order-12345
+
+# Replay the events
+blazing sandbox replay production-issue.json \
+  --sandbox debug-order-12345 \
+  --debug
+```
+
+### Debug Session
+
+```bash
+# Start debugging
+blazing sandbox debug \
+  --sandbox debug-order-12345 \
+  --execution <execution-id>
+
+# Debug commands
+> breakpoint process_payment
+> run
+
+# Execution stops at breakpoint
+> state
+{
+  "order_id": "order-12345",
+  "amount": 5000,
+  "customer_id": "cust-789"
+}
+
+> step
+# Executes process_payment task
+
+> state
+{
+  "order_id": "order-12345",
+  "charge_id": null,  # <- Issue: charge_id is null!
+  "error": "Amount cannot be negative"
+}
+
+# Found the bug: amount is being calculated incorrectly
+```
+
+### Fix and Verify
+
+```python
+# Fixed workflow
+@flow.task
+async def calculate_amount(order):
+    # Bug was here: missing abs()
+    subtotal = sum(item.price * item.quantity for item in order.items)
+    tax = subtotal * 0.1
+    total = abs(subtotal + tax)  # Fixed: ensure positive
+    return int(total * 100)  # Convert to cents
+```
+
+```bash
+# Deploy fix
+blazing sandbox deploy workflow.py --sandbox debug-order-12345
+
+# Replay again to verify
+blazing sandbox replay production-issue.json \
+  --sandbox debug-order-12345
+
+# Success! Issue resolved.
+```
+
+## Example 3: Load Testing
+
+Test workflow performance under load.
+
+### Load Test Configuration
+
+```yaml
+# loadtest.yaml
+sandbox:
+  name: load-test
+
+  # Scale resources
+  resources:
+    cpu: 8
+    memory: 16GB
+    parallelism: 100
+
+  # Load test settings
+  load_test:
+    duration: 10m
+    ramp_up: 2m
+
+    # Workload patterns
+    patterns:
+      - type: constant
+        rate: 100  # 100 req/s
+        duration: 5m
+
+      - type: spike
+        rate: 500  # Spike to 500 req/s
+        duration: 1m
+
+      - type: gradual
+        start_rate: 100
+        end_rate: 1000
+        duration: 4m
+```
+
+### Run Load Test
+
+```bash
+# Start load test
+blazing sandbox loadtest test-workflow \
+  --sandbox load-test \
+  --config loadtest.yaml
+```
+
+### Analyze Results
+
+```
+Load Test Results
+=================
+
+Duration: 10m 0s
+Total Requests: 150,000
+
+Success Rate: 99.2%
+  Successful: 148,800
+  Failed: 1,200
+
+Latency:
+  p50: 45ms
+  p95: 123ms
+  p99: 287ms
+  max: 1,205ms
+
+Throughput:
+  Average: 250 req/s
+  Peak: 487 req/s
+
+Bottlenecks Identified:
+  1. Task 'validate_data': High latency under load
+  2. Database connections: Pool exhaustion at >300 req/s
+  3. External API: Rate limiting at 400 req/s
+```
+
+## Example 4: Chaos Engineering
+
+Test resilience with chaos experiments.
+
+### Chaos Configuration
+
+```yaml
+# chaos.yaml
+sandbox:
+  name: chaos-testing
+
+  chaos:
+    enabled: true
+
+    experiments:
+      # Experiment 1: Network latency
+      - name: "High Latency"
+        duration: 5m
+        failure:
+          type: network_latency
+          targets:
+            - service: external-api
+          latency: 2s-5s
+
+      # Experiment 2: Service unavailable
+      - name: "Service Down"
+        duration: 3m
+        failure:
+          type: service_unavailable
+          targets:
+            - service: payment-api
+          rate: 0.5  # 50% failure rate
+
+      # Experiment 3: Resource exhaustion
+      - name: "Memory Pressure"
+        duration: 5m
+        failure:
+          type: memory_exhaustion
+          threshold: 95%
+```
+
+### Run Chaos Experiments
+
+```bash
+# Run chaos test
+blazing sandbox chaos test-workflow \
+  --sandbox chaos-testing \
+  --config chaos.yaml \
+  --iterations 1000
+```
+
+### Results
+
+```
+Chaos Test Results
+==================
+
+Experiment: High Latency
+  Success Rate: 98.5%
+  Average Retries: 1.2
+  Timeout Rate: 1.5%
+  ✓ Workflow handled latency well
+
+Experiment: Service Down
+  Success Rate: 94.2%
+  Fallback Triggered: 50%
+  Failed: 5.8%
+  ⚠ Some failures without fallback
+
+Experiment: Memory Pressure
+  Success Rate: 91.3%
+  OOM Errors: 8.7%
+  ✗ Needs better memory management
+
+Recommendations:
+  1. Implement fallback for payment-api
+  2. Add memory limits to prevent OOM
+  3. Consider circuit breaker pattern
+```
+
+## Example 5: A/B Testing Workflows
+
+Compare two workflow versions.
+
+### Setup A/B Test
+
+```yaml
+# ab-test.yaml
+sandbox:
+  name: ab-testing
+
+  ab_testing:
+    enabled: true
+
+    variants:
+      # Control group
+      - name: current
+        workflow: workflow-v1.py
+        traffic: 50
+
+      # Experiment group
+      - name: optimized
+        workflow: workflow-v2.py
+        traffic: 50
+
+    metrics:
+      - name: success_rate
+        goal: maximize
+      - name: latency
+        goal: minimize
+      - name: cost
+        goal: minimize
+
+    duration: 1h
+```
+
+### Run A/B Test
+
+```bash
+# Start A/B test
+blazing sandbox ab-test \
+  --sandbox ab-testing \
+  --config ab-test.yaml \
+  --requests 10000
+```
+
+### Results
+
+```
+A/B Test Results
+================
+
+Variant: current (baseline)
+  Success Rate: 97.2%
+  Avg Latency: 245ms
+  Cost per 1k: $0.52
+
+Variant: optimized
+  Success Rate: 98.8% (+1.6% ✓)
+  Avg Latency: 189ms (-23% ✓)
+  Cost per 1k: $0.41 (-21% ✓)
+
+Statistical Significance: 99.9%
+
+Recommendation: Deploy 'optimized' variant to production
+```
+
+## Example 6: Integration Testing
+
+Test workflow with real external services in sandbox mode.
+
+### Configuration
+
+```yaml
+# integration-test.yaml
+sandbox:
+  name: integration-testing
+
+  integrations:
+    # Use Stripe test mode
+    - service: stripe
+      mode: test
+      api_key: "${STRIPE_TEST_KEY}"
+
+    # Use real AWS but isolated account
+    - service: aws
+      mode: sandbox
+      account: "sandbox-account"
+      region: us-east-1
+
+    # Mock other services
+    - service: sendgrid
+      mode: mock
+```
+
+### Integration Tests
+
+```python
+# test_integrations.py
+import pytest
+from blazing.testing import SandboxClient
+
+@pytest.fixture
+async def sandbox():
+    client = SandboxClient("integration-testing")
+    await client.deploy("workflow.py")
+    yield client
+    await client.cleanup()
+
+async def test_stripe_integration(sandbox):
+    """Test real Stripe integration in test mode"""
+
+    result = await sandbox.run(
+        "payment-workflow",
+        input={"amount": 1000, "token": "tok_visa"}
+    )
+
+    assert result['status'] == 'completed'
+
+    # Verify charge was created in Stripe test mode
+    charge = stripe.Charge.retrieve(result['output']['charge_id'])
+    assert charge.amount == 1000
+    assert charge.paid is True
+
+async def test_s3_upload(sandbox):
+    """Test S3 upload to sandbox bucket"""
+
+    result = await sandbox.run(
+        "upload-workflow",
+        input={"file": "test-file.txt", "content": "test data"}
+    )
+
+    # Verify file in sandbox S3 bucket
+    s3 = boto3.client('s3')
+    obj = s3.get_object(
+        Bucket='sandbox-uploads',
+        Key='test-file.txt'
+    )
+    assert obj['Body'].read() == b'test data'
+```
+
+## Example 7: Snapshot Testing
+
+Use snapshots for regression testing.
+
+### Create Baseline Snapshot
+
+```bash
+# Run workflow and create snapshot
+blazing sandbox run test-workflow \
+  --sandbox my-sandbox \
+  --snapshot baseline
+```
+
+### Make Changes and Compare
+
+```bash
+# Deploy updated workflow
+blazing sandbox deploy workflow-v2.py --sandbox my-sandbox
+
+# Run and compare to baseline
+blazing sandbox run test-workflow \
+  --sandbox my-sandbox \
+  --compare-snapshot baseline
+```
+
+### Snapshot Comparison
+
+```
+Snapshot Comparison
+===================
+
+Changed Tasks:
+  ✗ process_data:
+    Execution time: 123ms → 456ms (+270%)
+    Output schema changed:
+      - Added field: 'processed_at'
+      - Removed field: 'legacy_id'
+
+  ✓ send_notification:
+    No changes
+
+  ✓ log_metrics:
+    Execution time: 45ms → 32ms (-29%)
+
+Recommendation: Review process_data performance regression
+```
+
+## Next Steps
+
+- [Review best practices](/docs/flow-sandbox-best-practices)
+- [Integrate with CI/CD](/docs/flow-ci-cd)
+- [Explore advanced features](/docs/flow-sandbox-features)
