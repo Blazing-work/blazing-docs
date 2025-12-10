@@ -1,0 +1,509 @@
+---
+title: Service Bridge
+label: Services
+description: Connect sandboxed code to your infrastructure via services
+position: 4
+---
+
+# Service Bridge
+
+How sandboxed user code accesses your infrastructure through controlled service methods.
+
+## The Problem
+
+**Sandboxed code is isolated** - no network, no filesystem, no database access.
+
+**But users need capabilities:**
+- Fetch data from databases
+- Call external APIs
+- Access file storage
+- Use business logic
+
+**The solution:** Services = approved methods that execute on trusted workers with real credentials.
+
+## How It Works
+
+```
+┌──────────────────────┐
+│ User Code (Sandbox)  │  1. await services['API'].fetch()
+│ Pyodide WASM Worker  │
+└──────────┬───────────┘
+           │ 2. JS bridge creates high-priority operation
+           ↓
+┌──────────────────────┐
+│ Foreman              │  3. Routes to trusted worker pool
+└──────────┬───────────┘
+           │ 4. Finds BLOCKING or NON_BLOCKING worker
+           ↓
+┌──────────────────────┐
+│ Trusted Worker       │  5. Executes method with real credentials
+│ Has Connectors       │
+└──────────┬───────────┘
+           │ 6. Returns result
+           ↓
+┌──────────────────────┐
+│ User Code (Sandbox)  │  7. Receives result
+└──────────────────────┘
+```
+
+## Basic Service
+
+```python
+from blazing.base import BaseService
+
+@app.service
+class MathAPI(BaseService):
+    async def add(self, x: int, y: int) -> int:
+        """User code can call this."""
+        return x + y
+
+    async def factorial(self, n: int) -> int:
+        """User code can call this too."""
+        result = 1
+        for i in range(1, n + 1):
+            result *= i
+        return result
+
+    def _helper(self, x: int) -> int:
+        """User code CANNOT call this (private)."""
+        return x * 2
+```
+
+### Usage in Sandboxed Code
+
+```python
+@app.step
+async def calculate(x: int, y: int, services=None):
+    # Runs in WASM sandbox
+    # Can call service methods
+    result = await services['MathAPI'].add(x, y)
+    factorial = await services['MathAPI'].factorial(result)
+
+    # ❌ Cannot call private methods
+    # helper = await services['MathAPI']._helper(x)  # Not exposed
+
+    return factorial
+```
+
+## Database Service
+
+```python
+from blazing.base import BaseService
+from sqlalchemy import create_engine, text
+
+@app.service
+class DatabaseAPI(BaseService):
+    def __init__(self, connectors):
+        # Get database connector (has real credentials)
+        self._db = connectors.get('postgres')
+
+    async def fetch_user(self, user_id: int) -> dict:
+        """Fetch user by ID - user code can call this."""
+        # ✅ Parameterized query (safe from SQL injection)
+        query = text("SELECT id, name, email FROM users WHERE id = :id")
+        result = await self._db.execute(query, {"id": user_id})
+        row = result.fetchone()
+
+        if not row:
+            return None
+
+        return {
+            "id": row.id,
+            "name": row.name,
+            "email": row.email
+        }
+
+    async def update_score(self, user_id: int, score: int):
+        """Update user score."""
+        # Validate inputs
+        if not (0 <= score <= 100):
+            raise ValueError("Score must be 0-100")
+
+        query = text("UPDATE users SET score = :score WHERE id = :user_id")
+        await self._db.execute(query, {"score": score, "user_id": user_id})
+
+    async def _get_connection(self):
+        """Private - user code cannot call."""
+        return self._db
+```
+
+### Usage
+
+```python
+@app.step
+async def process_user(user_id: int, services=None):
+    # Runs in sandbox
+    # Fetch user via service (executes on trusted worker)
+    user = await services['DatabaseAPI'].fetch_user(user_id)
+
+    if not user:
+        return {"error": "User not found"}
+
+    # Process in sandbox (pure Python)
+    score = len(user['name']) * 10
+
+    # Save via service
+    await services['DatabaseAPI'].update_score(user_id, score)
+
+    return {"user_id": user_id, "score": score}
+```
+
+## REST API Service
+
+```python
+import httpx
+from blazing.base import BaseService
+
+@app.service
+class ExternalAPI(BaseService):
+    def __init__(self, connectors):
+        # API credentials stored securely
+        self._api_key = connectors.get('api_key')
+        self._base_url = "https://api.example.com"
+
+    async def fetch_weather(self, city: str) -> dict:
+        """Fetch weather for a city."""
+        # Validate input
+        if not city or len(city) > 100:
+            raise ValueError("Invalid city name")
+
+        # Make HTTP request (user code cannot do this)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self._base_url}/weather",
+                params={"city": city},
+                headers={"Authorization": f"Bearer {self._api_key}"}
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def send_notification(self, user_id: int, message: str):
+        """Send notification via external API."""
+        # Validate message length
+        if len(message) > 500:
+            raise ValueError("Message too long (max 500 chars)")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{self._base_url}/notifications",
+                json={"user_id": user_id, "message": message},
+                headers={"Authorization": f"Bearer {self._api_key}"}
+            )
+            response.raise_for_status()
+```
+
+## File Storage Service
+
+```python
+import boto3
+from blazing.base import BaseService
+
+@app.service
+class StorageAPI(BaseService):
+    def __init__(self, connectors):
+        # S3 credentials
+        self._s3 = connectors.get('s3')
+
+    async def read_file(self, bucket: str, key: str) -> str:
+        """Read file from S3."""
+        # Validate inputs
+        if not self._is_allowed_bucket(bucket):
+            raise ValueError(f"Access to bucket {bucket} denied")
+
+        obj = self._s3.get_object(Bucket=bucket, Key=key)
+        return obj['Body'].read().decode('utf-8')
+
+    async def write_file(self, bucket: str, key: str, content: str):
+        """Write file to S3."""
+        if not self._is_allowed_bucket(bucket):
+            raise ValueError(f"Access to bucket {bucket} denied")
+
+        # Size limit
+        if len(content) > 10 * 1024 * 1024:  # 10MB
+            raise ValueError("File too large (max 10MB)")
+
+        self._s3.put_object(Bucket=bucket, Key=key, Body=content.encode())
+
+    def _is_allowed_bucket(self, bucket: str) -> bool:
+        """Private - whitelist allowed buckets."""
+        allowed = ['user-uploads', 'processed-data']
+        return bucket in allowed
+```
+
+## Multi-Service Example
+
+```python
+from blazing.base import BaseService
+
+# Service 1: Database
+@app.service
+class DataAPI(BaseService):
+    def __init__(self, connectors):
+        self._db = connectors.get('postgres')
+
+    async def fetch_records(self, limit: int = 100) -> list:
+        query = text("SELECT * FROM records LIMIT :limit")
+        result = await self._db.execute(query, {"limit": limit})
+        return [dict(row) for row in result.fetchall()]
+
+# Service 2: Processing
+@app.service
+class ProcessingAPI(BaseService):
+    async def transform(self, data: dict) -> dict:
+        # Complex transformation logic
+        return {k.upper(): v for k, v in data.items()}
+
+# Service 3: Notifications
+@app.service
+class NotificationAPI(BaseService):
+    def __init__(self, connectors):
+        self._email = connectors.get('email')
+
+    async def send_email(self, to: str, subject: str, body: str):
+        await self._email.send(to=to, subject=subject, body=body)
+
+# User code uses all three
+@app.step
+async def process_and_notify(services=None):
+    # Fetch data
+    records = await services['DataAPI'].fetch_records(limit=10)
+
+    # Transform each record
+    transformed = []
+    for record in records:
+        t = await services['ProcessingAPI'].transform(record)
+        transformed.append(t)
+
+    # Send notification
+    await services['NotificationAPI'].send_email(
+        to="admin@example.com",
+        subject="Processing complete",
+        body=f"Processed {len(transformed)} records"
+    )
+
+    return transformed
+```
+
+## Connectors
+
+Services receive connectors in `__init__`:
+
+```python
+@app.service
+class MyAPI(BaseService):
+    def __init__(self, connectors):
+        # Get connectors
+        self._db = connectors.get('postgres')
+        self._redis = connectors.get('redis')
+        self._s3 = connectors.get('s3')
+        self._api_key = connectors.get('api_key')
+```
+
+### Configuring Connectors
+
+```python
+# In your Blazing Flow setup
+connectors = {
+    'postgres': create_engine('postgresql://...'),
+    'redis': redis.Redis(host='...'),
+    's3': boto3.client('s3'),
+    'api_key': os.getenv('API_KEY')
+}
+
+app = Blazing(
+    api_url="...",
+    api_token="...",
+    connectors=connectors  # Pass to services
+)
+```
+
+## Best Practices
+
+### 1. Validate All Inputs
+
+```python
+@app.service
+class SafeAPI(BaseService):
+    async def fetch_user(self, user_id: int) -> dict:
+        # ✅ Validate type and range
+        if not isinstance(user_id, int):
+            raise TypeError("user_id must be int")
+        if user_id < 1:
+            raise ValueError("user_id must be positive")
+
+        # Now safe to query
+        query = text("SELECT * FROM users WHERE id = :id")
+        result = await self._db.execute(query, {"id": user_id})
+        return dict(result.fetchone())
+```
+
+### 2. Use Parameterized Queries
+
+```python
+# ❌ BAD - SQL injection risk
+@app.service
+class UnsafeAPI(BaseService):
+    async def find_users(self, name: str) -> list:
+        # DON'T DO THIS!
+        query = f"SELECT * FROM users WHERE name = '{name}'"
+        # User could pass: "'; DROP TABLE users; --"
+
+# ✅ GOOD - Parameterized query
+@app.service
+class SafeAPI(BaseService):
+    async def find_users(self, name: str) -> list:
+        query = text("SELECT * FROM users WHERE name = :name")
+        result = await self._db.execute(query, {"name": name})
+        return [dict(row) for row in result.fetchall()]
+```
+
+### 3. Limit Data Returned
+
+```python
+@app.service
+class DataAPI(BaseService):
+    async def fetch_records(self, limit: int = 100) -> list:
+        # ✅ Enforce maximum limit
+        if limit > 1000:
+            raise ValueError("Limit cannot exceed 1000")
+
+        query = text("SELECT * FROM records LIMIT :limit")
+        result = await self._db.execute(query, {"limit": limit})
+        return [dict(row) for row in result.fetchall()]
+```
+
+### 4. Use Private Methods for Helpers
+
+```python
+@app.service
+class ProcessingAPI(BaseService):
+    async def process(self, data: dict) -> dict:
+        """Public - user can call."""
+        validated = self._validate(data)
+        return self._transform(validated)
+
+    def _validate(self, data: dict) -> dict:
+        """Private - user CANNOT call."""
+        # Validation logic
+        if 'required_field' not in data:
+            raise ValueError("Missing required_field")
+        return data
+
+    def _transform(self, data: dict) -> dict:
+        """Private - user CANNOT call."""
+        # Complex business logic
+        return {k.upper(): v for k, v in data.items()}
+```
+
+### 5. Log All Calls
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+@app.service
+class AuditedAPI(BaseService):
+    async def sensitive_operation(self, user_id: int, action: str):
+        # Log the call
+        logger.info(f"User {user_id} called sensitive_operation: {action}")
+
+        try:
+            result = await self._do_operation(user_id, action)
+            logger.info(f"Operation succeeded for user {user_id}")
+            return result
+        except Exception as e:
+            logger.error(f"Operation failed for user {user_id}: {e}")
+            raise
+```
+
+## Async vs Sync
+
+Services can have both async and sync methods:
+
+```python
+@app.service
+class MixedAPI(BaseService):
+    async def async_method(self, x: int) -> int:
+        """Async method - await this."""
+        await asyncio.sleep(0.1)
+        return x * 2
+
+    def sync_method(self, x: int) -> int:
+        """Sync method - no await needed."""
+        return x + 1
+```
+
+Usage:
+
+```python
+@app.step
+async def use_mixed(services=None):
+    # Async methods need await
+    result1 = await services['MixedAPI'].async_method(10)
+
+    # Sync methods also need await (bridge is async)
+    result2 = await services['MixedAPI'].sync_method(10)
+
+    return result1 + result2
+```
+
+## Error Handling
+
+Services can raise exceptions that bubble up to user code:
+
+```python
+@app.service
+class DataAPI(BaseService):
+    async def fetch_user(self, user_id: int) -> dict:
+        if user_id < 1:
+            raise ValueError("Invalid user_id")
+
+        result = await self._db.execute(...)
+        if not result:
+            raise KeyError(f"User {user_id} not found")
+
+        return dict(result.fetchone())
+```
+
+User code handles errors:
+
+```python
+@app.step
+async def safe_fetch(user_id: int, services=None):
+    try:
+        user = await services['DataAPI'].fetch_user(user_id)
+        return user
+    except ValueError as e:
+        return {"error": f"Invalid input: {e}"}
+    except KeyError as e:
+        return {"error": f"Not found: {e}"}
+    except Exception as e:
+        return {"error": f"Unexpected error: {e}"}
+```
+
+## Testing Services
+
+```python
+import pytest
+
+@pytest.mark.asyncio
+async def test_fetch_user():
+    # Mock connectors
+    mock_db = MockDatabase()
+    connectors = {'postgres': mock_db}
+
+    # Create service
+    api = DataAPI(connectors)
+
+    # Test method
+    user = await api.fetch_user(123)
+    assert user['id'] == 123
+    assert 'name' in user
+```
+
+## Next Steps
+
+- [Worker Types](/blazing-flow-sandbox/workers) - Understanding the 4 worker types
+- [Security Model](/blazing-flow-sandbox/security) - Security guarantees
+- [Examples](/blazing-flow-sandbox/examples) - Real-world patterns

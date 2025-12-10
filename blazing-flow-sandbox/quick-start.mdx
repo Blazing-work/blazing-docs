@@ -1,0 +1,235 @@
+---
+title: Quick Start
+label: Quick Start
+description: Run your first sandboxed step in 60 seconds
+position: 2
+---
+
+# Quick Start
+
+Run untrusted user code safely in 60 seconds.
+
+## Installation
+
+```bash
+pip install blazing
+```
+
+No additional dependencies needed - Blazing Flow Sandbox uses Pyodide (bundled).
+
+## Your First Sandboxed Step
+
+```python
+from blazing import Blazing
+
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+
+# Regular step (trusted - runs on native Python)
+@app.step
+async def add(x: int, y: int, services=None):
+    return x + y
+
+# Sandboxed step (untrusted - runs in WASM)
+@app.step
+async def multiply(x: int, y: int, services=None):
+    # This code runs in complete isolation
+    # NO network, NO filesystem access
+    return x * y
+
+# Workflow orchestrates both
+@app.workflow
+async def calculate(a: int, b: int, c: int, services=None):
+    sum_result = await add(a, b, services=services)
+    return await multiply(sum_result, c, services=services)
+
+# Publish and run
+await app.publish()
+result = await app.calculate(10, 20, 3)  # Returns 90
+```
+
+**That's it!** The `multiply` step runs in WASM isolation automatically.
+
+## How Blazing Flow Decides
+
+Blazing Flow automatically routes steps to the correct worker type:
+
+| Code Type | Worker Type | Isolation |
+|-----------|-------------|-----------|
+| **Trusted code** (you wrote it) | BLOCKING or NON_BLOCKING | Native Python |
+| **Untrusted code** (users wrote it) | BLOCKING_SANDBOXED or NON_BLOCKING_SANDBOXED | WASM |
+
+**You control this per-step** (coming soon - manual override).
+
+For now, all user-defined steps are sandboxed for maximum safety.
+
+## Adding Services (Controlled Access)
+
+User code in sandbox can't access network/filesystem directly, but CAN call approved service methods:
+
+```python
+from blazing.base import BaseService
+
+# YOUR CODE (trusted) - define what user code can access
+@app.service
+class MathAPI(BaseService):
+    async def factorial(self, n: int) -> int:
+        """User code can call this."""
+        result = 1
+        for i in range(1, n + 1):
+            result *= i
+        return result
+
+    async def _internal_helper(self, x: int) -> int:
+        """User code CANNOT call this (private method)."""
+        return x * 2
+
+# USER CODE (untrusted) - runs in sandbox
+@app.step
+async def calculate(x: int, services=None):
+    # Can call public service methods
+    result = await services['MathAPI'].factorial(x)
+
+    # CANNOT call private methods (not exposed)
+    # CANNOT make HTTP requests
+    # CANNOT read files
+
+    return result * 2
+
+# Orchestrator
+@app.workflow
+async def process(value: int, services=None):
+    return await calculate(value, services=services)
+```
+
+**User code → Calls service → Executes on trusted worker with real credentials**
+
+## With Database Access
+
+```python
+from blazing.base import BaseService
+from sqlalchemy import create_engine
+
+@app.service
+class DataAPI(BaseService):
+    def __init__(self, connectors):
+        # Real database connection (trusted)
+        self._db = connectors.get('postgres')
+
+    async def fetch_user(self, user_id: int) -> dict:
+        """Fetch user from database (user code can call this)."""
+        query = "SELECT * FROM users WHERE id = %s"
+        result = await self._db.execute(query, (user_id,))
+        return dict(result.fetchone())
+
+    async def save_result(self, user_id: int, score: int):
+        """Save result to database."""
+        query = "UPDATE users SET score = %s WHERE id = %s"
+        await self._db.execute(query, (score, user_id))
+
+# USER CODE (sandboxed)
+@app.step
+async def process_user(user_id: int, services=None):
+    # Fetch data via service (runs on trusted worker)
+    user = await services['DataAPI'].fetch_user(user_id)
+
+    # Process in sandbox
+    score = len(user['name']) * 10
+
+    # Save via service (runs on trusted worker)
+    await services['DataAPI'].save_result(user_id, score)
+
+    return score
+```
+
+**Result:**
+- User code runs in WASM sandbox (no direct DB access)
+- Service methods execute on trusted workers (with real DB credentials)
+- User can only call approved methods
+- Your database is protected
+
+## Testing Sandbox Isolation
+
+Try this to see the sandbox in action:
+
+```python
+@app.step
+async def try_to_escape(services=None):
+    # These all FAIL in sandbox:
+
+    # ❌ Network access
+    import httpx
+    # httpx not available in WASM
+
+    # ❌ File system
+    with open('/etc/passwd') as f:
+        # No filesystem in WASM
+        pass
+
+    # ❌ Process spawning
+    import subprocess
+    subprocess.run(['ls'])
+    # No subprocess in WASM
+
+    # ❌ Only allowed import
+    import math
+    return math.sqrt(16)  # ✅ This works (math is pure Python)
+```
+
+## Deployment
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  api:
+    image: blazing/api:latest
+    ports: ["8000:8000"]
+
+  foreman:
+    image: blazing/foreman:latest
+    environment:
+      - REDIS_URL=redis://redis:6379
+
+  # Regular executor (trusted code)
+  executor:
+    image: blazing/executor:latest
+    environment:
+      - WORKER_TYPES=BLOCKING,NON_BLOCKING
+
+  # Pyodide executor (sandboxed code)
+  pyodide-executor:
+    image: blazing/pyodide-executor:latest
+    environment:
+      - WORKER_TYPES=BLOCKING_SANDBOXED,NON_BLOCKING_SANDBOXED
+
+  redis:
+    image: redis:7-alpine
+```
+
+### Start Services
+
+```bash
+docker-compose up -d
+```
+
+Blazing Flow automatically:
+- Starts both executor types
+- Routes trusted code to regular executors
+- Routes sandboxed code to Pyodide executors
+- Bridges service calls between them
+
+## What Just Happened?
+
+1. **You defined a service** - Approved methods with real credentials
+2. **User wrote sandboxed code** - Runs in WASM, no network/filesystem
+3. **Blazing Flow bridges them** - User calls service → Executes on trusted worker
+4. **Complete isolation** - User code can't escape sandbox
+5. **Full functionality** - User gets powerful capabilities safely
+
+## Next Steps
+
+- [Security Model](/blazing-flow-sandbox/security) - How isolation works
+- [Service Bridge](/blazing-flow-sandbox/services) - Advanced service patterns
+- [Worker Types](/blazing-flow-sandbox/workers) - Understanding the 4 worker types
+- [Examples](/blazing-flow-sandbox/examples) - Real-world use cases

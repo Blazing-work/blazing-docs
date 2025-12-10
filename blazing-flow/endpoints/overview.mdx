@@ -1,0 +1,91 @@
+---
+title: Blazing Flow Endpoints
+label: Overview
+description: Turn workflows into production REST APIs with HTTP/WebSocket support
+position: 1
+---
+
+# Blazing Flow Endpoints
+
+**Turn your Blazing Flow workflows into production-ready REST APIs in 3 lines of code.**
+
+Blazing Flow Endpoints wraps your internal workflows with a public-facing FastAPI layer, giving you:
+
+- 🚀 Auto-generated HTTP/WebSocket endpoints
+- 🔒 Custom authentication
+- 📊 Job status tracking
+- ⚡ Async execution model
+- 📝 Auto-generated OpenAPI docs
+
+## What You Get
+
+```python
+@app.endpoint(path="/calculate")
+@app.workflow
+async def calculate(x: int, y: int, services=None):
+    return x + y
+```
+
+**Result:** A production-ready HTTP endpoint with:
+- Auto-generated request/response models (Pydantic)
+- Interactive API docs (Swagger UI)
+- Job management (create, status, cancel)
+- Optional WebSocket for real-time updates
+
+## Architecture
+
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│  External       │  HTTP   │  FastAPI Layer   │  gRPC   │  Blazing Flow   │
+│  Client         │ ──────> │  (Public)        │ ──────> │  Backend (VPC)  │
+│                 │         │  @app.endpoint   │         │                 │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
+```
+
+**Blazing Flow Endpoints = Public API wrapper around your private workflows**
+
+## Async Execution Model
+
+Blazing Flow Endpoints uses an **async execution pattern**:
+
+```
+POST /calculate     → Returns job_id immediately (non-blocking)
+GET /jobs/{job_id}  → Poll for status and results
+```
+
+**Why async?** Long-running workflows don't block HTTP connections. Clients get a job ID instantly and check status when ready.
+
+## Use Cases
+
+### ✅ Perfect For
+
+- **Internal tools** → Give teams REST APIs instead of Python SDKs
+- **Webhook handlers** → Process incoming webhooks as workflows
+- **Async jobs** → Long-running tasks that shouldn't block HTTP
+- **Multi-step workflows** → Orchestrate complex operations
+- **Real-time updates** → Stream progress via WebSocket
+
+### ❌ Not For
+
+- **Pure CRUD** → Use FastAPI directly (simpler)
+- **Synchronous only** → If you need instant responses, not async jobs
+- **File streaming** → Not optimized for large file uploads/downloads
+
+## Built-in Endpoints
+
+Every app gets these automatically:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/jobs/{job_id}` | GET | Check job status and results |
+| `/jobs/{job_id}/cancel` | POST | Cancel running job |
+| `/health` | GET | Health check |
+| `/docs` | GET | Interactive Swagger UI |
+| `/openapi.json` | GET | OpenAPI 3.0 schema |
+
+## Next Steps
+
+- [Quick Start](/blazing-flow/endpoints/quick-start) - Get started in 30 seconds
+- [Authentication](/blazing-flow/endpoints/authentication) - Add custom auth
+- [WebSocket](/blazing-flow/endpoints/websocket) - Real-time updates
+- [Deployment](/blazing-flow/endpoints/deployment) - Production deployment

@@ -1,0 +1,333 @@
+---
+title: Authentication
+label: Authentication
+description: Secure your endpoints with custom authentication
+position: 3
+---
+
+# Authentication
+
+Protect your Blazing Flow Endpoints with custom authentication logic.
+
+## Custom Authentication Handler
+
+```python
+from fastapi.security import HTTPAuthorizationCredentials
+
+async def verify_api_key(credentials: HTTPAuthorizationCredentials) -> bool:
+    """Verify API key from Authorization header."""
+    if not credentials:
+        return False
+
+    # Check against database, validate JWT, etc.
+    api_key = credentials.credentials
+    return api_key in VALID_API_KEYS  # Your validation logic
+
+@app.endpoint(path="/secure", auth_handler=verify_api_key)
+@app.workflow
+async def secure_workflow(data: str, services=None):
+    return data.upper()
+```
+
+### Client Usage
+
+```bash
+curl -X POST http://localhost:8080/secure \
+  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"data": "hello"}'
+```
+
+## JWT Authentication
+
+```python
+import jwt
+
+async def verify_jwt(credentials: HTTPAuthorizationCredentials) -> bool:
+    """Verify JWT token."""
+    if not credentials:
+        return False
+
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return payload.get("user_id") is not None
+    except jwt.InvalidTokenError:
+        return False
+
+@app.endpoint(path="/admin", auth_handler=verify_jwt)
+@app.workflow
+async def admin_action(action: str, services=None):
+    return f"Action {action} executed"
+```
+
+### Generate JWT Token
+
+```python
+import jwt
+from datetime import datetime, timedelta
+
+def create_jwt_token(user_id: int) -> str:
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=24)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+```
+
+## API Key from Database
+
+```python
+from sqlalchemy import select
+from database import async_session, APIKey
+
+async def verify_api_key_db(credentials: HTTPAuthorizationCredentials) -> bool:
+    """Verify API key against database."""
+    if not credentials:
+        return False
+
+    async with async_session() as session:
+        result = await session.execute(
+            select(APIKey).where(
+                APIKey.key == credentials.credentials,
+                APIKey.is_active == True
+            )
+        )
+        api_key = result.scalar_one_or_none()
+        return api_key is not None
+
+@app.endpoint(path="/data", auth_handler=verify_api_key_db)
+@app.workflow
+async def fetch_data(query: str, services=None):
+    # Your logic
+    pass
+```
+
+## Multiple Auth Handlers
+
+Different endpoints can have different authentication:
+
+```python
+@app.endpoint(path="/public")
+@app.workflow
+async def public_workflow(x: int, services=None):
+    return x  # No auth required
+
+@app.endpoint(path="/user", auth_handler=verify_api_key)
+@app.workflow
+async def user_workflow(x: int, services=None):
+    return x * 2  # API key required
+
+@app.endpoint(path="/admin", auth_handler=verify_jwt)
+@app.workflow
+async def admin_workflow(x: int, services=none):
+    return x * 10  # JWT required
+```
+
+## Role-Based Access Control (RBAC)
+
+```python
+from enum import Enum
+
+class Role(Enum):
+    USER = "user"
+    ADMIN = "admin"
+
+async def require_role(required_role: Role):
+    """Create auth handler that checks for specific role."""
+    async def auth_handler(credentials: HTTPAuthorizationCredentials) -> bool:
+        if not credentials:
+            return False
+
+        try:
+            payload = jwt.decode(
+                credentials.credentials,
+                SECRET_KEY,
+                algorithms=["HS256"]
+            )
+            user_role = payload.get("role")
+            return user_role == required_role.value
+        except:
+            return False
+
+    return auth_handler
+
+# Admin-only endpoint
+@app.endpoint(path="/admin/delete", auth_handler=await require_role(Role.ADMIN))
+@app.workflow
+async def delete_user(user_id: int, services=None):
+    # Your logic
+    return {"deleted": user_id}
+```
+
+## OAuth 2.0 Integration
+
+```python
+from authlib.integrations.starlette_client import OAuth
+
+oauth = OAuth()
+oauth.register(
+    name='google',
+    client_id='YOUR_CLIENT_ID',
+    client_secret='YOUR_CLIENT_SECRET',
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
+
+async def verify_oauth_token(credentials: HTTPAuthorizationCredentials) -> bool:
+    """Verify OAuth token."""
+    if not credentials:
+        return False
+
+    try:
+        # Verify token with OAuth provider
+        token_info = await oauth.google.parse_id_token(
+            None,
+            credentials.credentials
+        )
+        return token_info is not None
+    except:
+        return False
+
+@app.endpoint(path="/oauth", auth_handler=verify_oauth_token)
+@app.workflow
+async def oauth_workflow(data: str, services=None):
+    return data
+```
+
+## Error Handling
+
+Authentication failures return appropriate HTTP status codes:
+
+| Scenario | Status Code | Response |
+|----------|-------------|----------|
+| No credentials provided | 401 Unauthorized | `{"detail": "Not authenticated"}` |
+| Invalid credentials | 401 Unauthorized | `{"detail": "Invalid credentials"}` |
+| Expired token | 401 Unauthorized | `{"detail": "Token expired"}` |
+| Insufficient permissions | 403 Forbidden | `{"detail": "Insufficient permissions"}` |
+
+### Custom Error Messages
+
+```python
+from fastapi import HTTPException
+
+async def verify_with_custom_errors(credentials: HTTPAuthorizationCredentials) -> bool:
+    """Auth handler with custom error messages."""
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="API key required. Include 'Authorization: Bearer <key>' header."
+        )
+
+    if credentials.credentials not in VALID_API_KEYS:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid API key. Contact support@example.com for access."
+        )
+
+    return True
+```
+
+## Best Practices
+
+### 1. Never Hardcode Secrets
+
+```python
+import os
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+API_KEYS = os.getenv("VALID_API_KEYS", "").split(",")
+```
+
+### 2. Use HTTPS in Production
+
+```bash
+# Always use HTTPS in production
+uvicorn main:fastapi_app --ssl-keyfile key.pem --ssl-certfile cert.pem
+```
+
+### 3. Implement Rate Limiting
+
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+@app.endpoint(path="/calculate")
+@limiter.limit("10/minute")
+@app.workflow
+async def calculate(x: int, services=None):
+    return x * 2
+```
+
+### 4. Log Authentication Failures
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def verify_with_logging(credentials: HTTPAuthorizationCredentials) -> bool:
+    if not credentials:
+        logger.warning("Authentication attempt without credentials")
+        return False
+
+    api_key = credentials.credentials
+    if api_key not in VALID_API_KEYS:
+        logger.warning(f"Failed authentication attempt with key: {api_key[:8]}...")
+        return False
+
+    logger.info(f"Successful authentication with key: {api_key[:8]}...")
+    return True
+```
+
+### 5. Token Expiration
+
+```python
+from datetime import datetime, timedelta
+
+def create_token_with_expiry(user_id: int, expires_in_hours: int = 24) -> str:
+    """Create JWT token with expiration."""
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=expires_in_hours),
+        "iat": datetime.utcnow()
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+```
+
+## Testing Authentication
+
+### Test Without Auth
+
+```python
+import httpx
+
+async def test_no_auth():
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8080/secure",
+            json={"data": "test"}
+        )
+        assert response.status_code == 401
+```
+
+### Test With Valid Auth
+
+```python
+async def test_valid_auth():
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "http://localhost:8080/secure",
+            json={"data": "test"},
+            headers={"Authorization": "Bearer valid-key"}
+        )
+        assert response.status_code == 200
+```
+
+## Next Steps
+
+- [WebSocket Authentication](/blazing-flow/endpoints/websocket#authentication) - Secure WebSocket connections
+- [API Reference](/blazing-flow/endpoints/api-reference) - Full auth_handler documentation
+- [Security Best Practices](/blazing-flow/endpoints/security) - Production security checklist

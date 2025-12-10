@@ -1,0 +1,14 @@
+{
+  "title": "Blazing Flow Endpoints",
+  "description": "Turn workflows into production REST APIs with HTTP/WebSocket support",
+  "position": 6,
+  "pages": [
+    "overview",
+    "quick-start",
+    "authentication",
+    "websocket",
+    "api-reference",
+    "deployment",
+    "examples"
+  ]
+}

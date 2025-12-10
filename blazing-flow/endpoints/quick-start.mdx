@@ -1,0 +1,105 @@
+---
+title: Quick Start
+label: Quick Start
+description: Get your first endpoint running in 30 seconds
+position: 2
+---
+
+# Quick Start
+
+Get your first Blazing Flow Endpoint running in 30 seconds.
+
+## Installation
+
+```bash
+pip install blazing fastapi uvicorn
+```
+
+## Create Your First Endpoint
+
+Create a file `main.py`:
+
+```python
+from blazing import Blazing
+from blazing.web import create_asgi_app
+
+# Initialize Blazing Flow client
+app = Blazing(
+    api_url="http://localhost:8000",
+    api_token="your-api-token"
+)
+
+# Define a workflow and expose it as an endpoint
+@app.endpoint(path="/calculate")
+@app.workflow
+async def calculate(x: int, y: int, services=None):
+    """Add two numbers together."""
+    return x + y
+
+# Publish workflows to backend
+await app.publish()
+
+# Generate FastAPI app
+fastapi_app = await create_asgi_app(app)
+```
+
+## Run Your API
+
+```bash
+uvicorn main:fastapi_app --host 0.0.0.0 --port 8080
+```
+
+## Test Your Endpoint
+
+### Create a Job
+
+```bash
+curl -X POST http://localhost:8080/calculate \
+  -H "Content-Type: application/json" \
+  -d '{"x": 10, "y": 20}'
+```
+
+**Response:**
+```json
+{
+  "job_id": "abc123",
+  "status": "pending",
+  "created_at": "2025-12-09T10:00:00Z"
+}
+```
+
+### Check Job Status
+
+```bash
+curl http://localhost:8080/jobs/abc123
+```
+
+**Response:**
+```json
+{
+  "job_id": "abc123",
+  "status": "completed",
+  "result": 30
+}
+```
+
+## Interactive Documentation
+
+Visit `http://localhost:8080/docs` for auto-generated Swagger UI:
+
+- Test endpoints interactively
+- See request/response schemas
+- Try out authentication
+
+## What Just Happened?
+
+1. `@app.endpoint` decorator exposed your workflow as a POST endpoint
+2. Request model auto-generated from function signature (Pydantic)
+3. FastAPI app created with job management built-in
+4. OpenAPI docs auto-generated
+
+## Next Steps
+
+- [Add Authentication](/blazing-flow/endpoints/authentication) - Protect your endpoints
+- [Enable WebSocket](/blazing-flow/endpoints/websocket) - Real-time updates
+- [API Reference](/blazing-flow/endpoints/api-reference) - All parameters documented

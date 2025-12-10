@@ -1,0 +1,14 @@
+{
+  "title": "Blazing Flow Sandbox",
+  "description": "Execute untrusted user code safely with WASM isolation while maintaining access to your trusted infrastructure",
+  "position": 7,
+  "pages": [
+    "overview",
+    "quick-start",
+    "security",
+    "services",
+    "workers",
+    "deployment",
+    "examples"
+  ]
+}

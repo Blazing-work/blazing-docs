@@ -50,15 +50,15 @@ docker run --name blazing_redis -p 6380:6379 -d redis/redis-stack
 
 Let's create a simple data processing pipeline that demonstrates the core concepts of Blazing Flow.
 
-### Step 1: Define a Skillset
+### Step 1: Define a Service
 
-Skillsets encapsulate your business logic and can be reused across different stations:
+Services encapsulate your business logic and can be reused across different stations:
 
 ```python
-from blazing import BaseSkillset
+from blazing import BaseService
 
-class DataProcessor(BaseSkillset):
-    """A skillset for processing data"""
+class DataProcessor(BaseService):
+    """A service for processing data"""
 
     async def fetch_data(self, source_id: str):
         """Fetch data from a source"""
@@ -95,33 +95,33 @@ app = Blazing(
         'host': 'localhost',
         'port': 6380
     },
-    skillsets=[DataProcessor]
+    services=[DataProcessor]
 )
 ```
 
 ### Step 3: Define Stations
 
-Stations are individual processing steps in your pipeline:
+Steps are individual processing units in your pipeline:
 
 ```python
-@app.station
-async def fetch_station(source_id: str, skillsets):
-    """Station that fetches data"""
-    processor = skillsets['DataProcessor']
+@app.step
+async def fetch_station(source_id: str, services):
+    """Step that fetches data"""
+    processor = services['DataProcessor']
     data = await processor.fetch_data(source_id)
     return data
 
-@app.station
-async def transform_station(data: dict, skillsets):
-    """Station that transforms data"""
-    processor = skillsets['DataProcessor']
+@app.step
+async def transform_station(data: dict, services):
+    """Step that transforms data"""
+    processor = services['DataProcessor']
     result = await processor.transform_data(data)
     return result
 
-@app.station
-async def save_station(result: dict, skillsets):
-    """Station that saves the result"""
-    processor = skillsets['DataProcessor']
+@app.step
+async def save_station(result: dict, services):
+    """Step that saves the result"""
+    processor = services['DataProcessor']
     final = await processor.save_result(result)
     return final
 ```
@@ -131,7 +131,7 @@ async def save_station(result: dict, skillsets):
 Routes orchestrate stations into a complete workflow:
 
 ```python
-@app.route
+@app.workflow
 async def data_pipeline(source_id: str):
     """Complete data processing pipeline"""
     # Fetch data
@@ -174,9 +174,9 @@ Here's the complete code in one file:
 
 ```python
 import asyncio
-from blazing import Blazing, BaseSkillset
+from blazing import Blazing, BaseService
 
-class DataProcessor(BaseSkillset):
+class DataProcessor(BaseService):
     async def fetch_data(self, source_id: str):
         return {"id": source_id, "data": [1, 2, 3, 4, 5]}
 
@@ -193,25 +193,25 @@ class DataProcessor(BaseSkillset):
 
 app = Blazing(
     redis_config={'host': 'localhost', 'port': 6380},
-    skillsets=[DataProcessor]
+    services=[DataProcessor]
 )
 
-@app.station
-async def fetch_station(source_id: str, skillsets):
-    processor = skillsets['DataProcessor']
+@app.step
+async def fetch_station(source_id: str, services):
+    processor = services['DataProcessor']
     return await processor.fetch_data(source_id)
 
-@app.station
-async def transform_station(data: dict, skillsets):
-    processor = skillsets['DataProcessor']
+@app.step
+async def transform_station(data: dict, services):
+    processor = services['DataProcessor']
     return await processor.transform_data(data)
 
-@app.station
-async def save_station(result: dict, skillsets):
-    processor = skillsets['DataProcessor']
+@app.step
+async def save_station(result: dict, services):
+    processor = services['DataProcessor']
     return await processor.save_result(result)
 
-@app.route
+@app.workflow
 async def data_pipeline(source_id: str):
     data = await fetch_station(source_id)
     result = await transform_station(data)

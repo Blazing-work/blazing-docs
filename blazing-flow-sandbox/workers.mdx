@@ -1,0 +1,401 @@
+---
+title: Worker Types
+label: Worker Types
+description: Understanding the 4 worker types for trusted and sandboxed execution
+position: 5
+---
+
+# Worker Types
+
+Blazing Flow Sandbox uses **4 worker types** to separate trusted code (your infrastructure) from untrusted code (user-provided).
+
+## The 4 Worker Types
+
+```
+┌──────────────────┬──────────────────┬──────────────────────┐
+│                  │  BLOCKING (Sync) │  NON_BLOCKING (Async)│
+├──────────────────┼──────────────────┼──────────────────────┤
+│ TRUSTED          │  BLOCKING        │  NON_BLOCKING        │
+│ (Your code)      │                  │                      │
+│ Has connectors   │  Sync operations │  Async operations    │
+│ Real credentials │  Database calls  │  API calls           │
+│ Native Python    │  File I/O        │  Concurrent work     │
+├──────────────────┼──────────────────┼──────────────────────┤
+│ SANDBOXED        │  BLOCKING_       │  NON_BLOCKING_       │
+│ (User code)      │  SANDBOXED       │  SANDBOXED           │
+│ NO connectors    │                  │                      │
+│ NO credentials   │  Sync in WASM    │  Async in WASM       │
+│ WASM (Pyodide)   │  Pure Python     │  Service calls       │
+└──────────────────┴──────────────────┴──────────────────────┘
+```
+
+## BLOCKING (Trusted, Sync)
+
+**Purpose:** Synchronous operations with full system access.
+
+**Use For:**
+- Database queries (sync drivers)
+- File I/O operations
+- Blocking HTTP calls
+- Synchronous business logic
+
+**Characteristics:**
+- ✅ Full network access
+- ✅ Full filesystem access
+- ✅ All Python libraries
+- ✅ Connectors available
+- ⚠️ Blocks thread during execution
+
+**Example:**
+```python
+from blazing.base import BaseService
+
+@app.service
+class DatabaseService(BaseService):
+    def __init__(self, connectors):
+        self._db = connectors.get('postgres')
+
+    async def fetch_user(self, user_id: int) -> dict:
+        # Runs on BLOCKING worker
+        # Sync database call
+        result = self._db.execute(f"SELECT * FROM users WHERE id = {user_id}")
+        return dict(result.fetchone())
+```
+
+---
+
+## NON_BLOCKING (Trusted, Async)
+
+**Purpose:** Asynchronous operations with full system access.
+
+**Use For:**
+- Async HTTP requests (httpx, aiohttp)
+- Async database queries (asyncpg, databases)
+- Concurrent API calls
+- Async business logic
+
+**Characteristics:**
+- ✅ Full network access
+- ✅ Full filesystem access
+- ✅ All async Python libraries
+- ✅ Connectors available
+- ✅ Non-blocking (uses async/await)
+
+**Example:**
+```python
+import httpx
+from blazing.base import BaseService
+
+@app.service
+class ExternalAPI(BaseService):
+    def __init__(self, connectors):
+        self._api_key = connectors.get('api_key')
+
+    async def fetch_weather(self, city: str) -> dict:
+        # Runs on NON_BLOCKING worker
+        # Async HTTP call
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"https://api.weather.com/v1/{city}",
+                headers={"Authorization": f"Bearer {self._api_key}"}
+            )
+            return response.json()
+```
+
+---
+
+## BLOCKING_SANDBOXED (Untrusted, Sync in WASM)
+
+**Purpose:** Synchronous user code in complete isolation.
+
+**Use For:**
+- User-provided transformations (sync)
+- Data processing logic
+- Pure Python calculations
+- Synchronous business rules
+
+**Characteristics:**
+- ❌ NO network access
+- ❌ NO filesystem access
+- ❌ NO subprocess spawning
+- ✅ Pure Python only
+- ✅ Can call service methods
+- ✅ Memory isolated (WASM)
+
+**Example:**
+```python
+@app.step
+async def transform_data(data: list, services=None):
+    # Runs in WASM sandbox (BLOCKING_SANDBOXED)
+    # Pure Python transformation
+    result = [x * 2 for x in data if x > 0]
+
+    # Can call service methods (executes on trusted worker)
+    await services['DatabaseService'].save_results(result)
+
+    return result
+```
+
+**What's Blocked:**
+```python
+@app.step
+async def malicious_code(services=None):
+    # ❌ FAILS - httpx not available in WASM
+    import httpx
+
+    # ❌ FAILS - no filesystem
+    with open('/etc/passwd') as f:
+        pass
+
+    # ❌ FAILS - no subprocess
+    import subprocess
+    subprocess.run(['ls'])
+```
+
+---
+
+## NON_BLOCKING_SANDBOXED (Untrusted, Async in WASM)
+
+**Purpose:** Asynchronous user code in complete isolation.
+
+**Use For:**
+- User-provided async logic
+- Concurrent service calls
+- Multi-step workflows
+- Async data processing
+
+**Characteristics:**
+- ❌ NO network access
+- ❌ NO filesystem access
+- ❌ NO subprocess spawning
+- ✅ Pure Python only
+- ✅ Async/await supported
+- ✅ Can call service methods concurrently
+- ✅ Memory isolated (WASM)
+
+**Example:**
+```python
+@app.step
+async def process_users(user_ids: list, services=None):
+    # Runs in WASM sandbox (NON_BLOCKING_SANDBOXED)
+
+    # Concurrent service calls (executed on trusted workers)
+    tasks = [
+        services['DatabaseService'].fetch_user(user_id)
+        for user_id in user_ids
+    ]
+    users = await asyncio.gather(*tasks)
+
+    # Process in sandbox
+    results = []
+    for user in users:
+        score = len(user['name']) * 10
+        results.append({'user_id': user['id'], 'score': score})
+
+    return results
+```
+
+---
+
+## How Blazing Flow Decides
+
+Blazing Flow automatically routes operations to the correct worker type:
+
+### Routing Rules
+
+| Code Type | Worker Type |
+|-----------|-------------|
+| **Services** (your code with connectors) | BLOCKING or NON_BLOCKING |
+| **Steps** (user code in sandbox) | BLOCKING_SANDBOXED or NON_BLOCKING_SANDBOXED |
+| **Routes** (orchestrators) | Same as steps (sandboxed by default) |
+
+### Async vs Sync Detection
+
+```python
+# Sync function → BLOCKING or BLOCKING_SANDBOXED
+def calculate(x: int, y: int):
+    return x + y
+
+# Async function → NON_BLOCKING or NON_BLOCKING_SANDBOXED
+async def calculate(x: int, y: int):
+    return x + y
+```
+
+---
+
+## Worker Pools
+
+Blazing Flow maintains **4 independent worker pools**:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      FOREMAN (Coordinator)                   │
+│  • Monitors queue depths for all 4 worker types              │
+│  • Enforces "pilot light" minimums                           │
+│  • Scales each pool independently                            │
+└─────────────────────────────────────────────────────────────┘
+           │                              │
+           ↓                              ↓
+┌──────────────────────┐      ┌──────────────────────┐
+│  TRUSTED WORKERS     │      │  SANDBOXED WORKERS   │
+│                      │      │                      │
+│  BLOCKING            │      │  BLOCKING_SANDBOXED  │
+│  NON_BLOCKING        │      │  NON_BLOCKING_       │
+│                      │      │  SANDBOXED           │
+│  • Full access       │      │  • Pyodide WASM      │
+│  • Real connectors   │      │  • No network        │
+│  • Native Python     │      │  • No filesystem     │
+└──────────────────────┘      └──────────────────────┘
+```
+
+### Pilot Light Mechanism
+
+Blazing Flow ensures minimum workers are available when work exists:
+
+```python
+# Constants (runtime.py)
+PILOT_LIGHT_MIN_P = 1           # Minimum blocking workers
+PILOT_LIGHT_MIN_A = 1           # Minimum async workers
+PILOT_LIGHT_ASYNC_SLOTS = 3     # Minimum A·C for async work
+```
+
+**Example:**
+- If sandboxed queue has operations → spawn minimum 1 NON_BLOCKING_SANDBOXED worker
+- If trusted queue has operations → spawn minimum 1 NON_BLOCKING worker
+- Scales up/down based on queue depth
+
+---
+
+## Queue Architecture
+
+Each worker type polls its own queues:
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  Redis Queues (per worker type)                            │
+├────────────────────────────────────────────────────────────┤
+│                                                             │
+│  BLOCKING:                                                  │
+│  └── blazing:{app_id}:Station:{pk}:BlockingQueue           │
+│                                                             │
+│  NON_BLOCKING:                                              │
+│  └── blazing:{app_id}:Station:{pk}:AVAILABLE               │
+│                                                             │
+│  BLOCKING_SANDBOXED:                                        │
+│  └── blazing:{app_id}:Station:{pk}:BlockingQueueSandboxed  │
+│                                                             │
+│  NON_BLOCKING_SANDBOXED:                                    │
+│  └── blazing:{app_id}:Station:{pk}:AVAILABLESandboxed      │
+│                                                             │
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Performance Comparison
+
+| Metric | Trusted Workers | Sandboxed Workers |
+|--------|----------------|-------------------|
+| **Startup Time** | ~10ms | ~500ms (first run, cached after) |
+| **Execution Speed** | 1x | ~2x slower (WASM overhead) |
+| **Memory Overhead** | Minimal | ~50MB per worker |
+| **Network Access** | ✅ Full | ❌ None |
+| **Filesystem Access** | ✅ Full | ❌ None |
+| **Security** | Trusted code only | Complete isolation |
+
+**Best Practice:** Use trusted workers for YOUR code, sandboxed workers only for USER code.
+
+---
+
+## Configuration
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  # Regular executor (trusted workers)
+  executor:
+    image: blazing/executor:latest
+    environment:
+      - WORKER_TYPES=BLOCKING,NON_BLOCKING
+      - REDIS_URL=redis://redis:6379
+
+  # Pyodide executor (sandboxed workers)
+  pyodide-executor:
+    image: blazing/pyodide-executor:latest
+    environment:
+      - WORKER_TYPES=BLOCKING_SANDBOXED,NON_BLOCKING_SANDBOXED
+      - REDIS_URL=redis://redis:6379
+```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `WORKER_TYPES` | Comma-separated worker types | `NON_BLOCKING` |
+| `PILOT_LIGHT_MIN_P` | Minimum blocking workers | `1` |
+| `PILOT_LIGHT_MIN_A` | Minimum async workers | `1` |
+| `PILOT_LIGHT_ASYNC_SLOTS` | Minimum async slots | `3` |
+
+---
+
+## Use Cases by Worker Type
+
+### BLOCKING (Trusted)
+- ✅ Legacy sync database drivers
+- ✅ File uploads/downloads
+- ✅ Image processing (PIL)
+- ✅ PDF generation
+
+### NON_BLOCKING (Trusted)
+- ✅ REST API calls (httpx)
+- ✅ Async database queries (asyncpg)
+- ✅ WebSocket connections
+- ✅ Concurrent operations
+
+### BLOCKING_SANDBOXED
+- ✅ User-provided data transformations
+- ✅ Custom calculations
+- ✅ Business rule evaluation
+- ✅ Sync data validation
+
+### NON_BLOCKING_SANDBOXED
+- ✅ User-provided workflows
+- ✅ Multi-step orchestration
+- ✅ Async data processing
+- ✅ Concurrent service calls
+
+---
+
+## Security Boundaries
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   TRUST BOUNDARIES                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  BLOCKING / NON_BLOCKING                                     │
+│  • Full system access                                        │
+│  • Real credentials                                          │
+│  • YOUR CODE ONLY                                            │
+│                                                              │
+│  ══════════════════════════════════════════════════════     │
+│                                                              │
+│  BLOCKING_SANDBOXED / NON_BLOCKING_SANDBOXED                 │
+│  • NO network                                                │
+│  • NO filesystem                                             │
+│  • NO credentials                                            │
+│  • USER CODE (untrusted)                                     │
+│  • Can ONLY call approved service methods                    │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Next Steps
+
+- [Security Model](/blazing-flow-sandbox/security) - Understanding isolation guarantees
+- [Service Bridge](/blazing-flow-sandbox/services) - Connect sandbox to infrastructure
+- [Deployment](/blazing-flow-sandbox/deployment) - Production configuration

@@ -1,0 +1,479 @@
+---
+title: More Examples
+label: More Examples
+description: 40+ additional real-world Blazing Flow Endpoints examples
+position: 8
+---
+
+# Extended Blazing Flow Endpoints Examples
+
+40+ additional production-ready examples for common use cases.
+
+## E-Commerce & Payments
+
+### 1. Payment Processing
+```python
+@app.endpoint(path="/process-payment")
+@app.workflow
+async def process_payment(amount: float, currency: str, card_token: str, services=None):
+    """Process payment through payment gateway."""
+    result = await services['PaymentGateway'].charge(amount, currency, card_token)
+    return {"transaction_id": result['id'], "status": result['status']}
+```
+
+### 2. Order Status Check
+```python
+@app.endpoint(path="/orders/{order_id}/status")
+@app.workflow
+async def get_order_status(order_id: str, services=None):
+    """Check order status."""
+    order = await services['OrderService'].get_order(order_id)
+    return {"order_id": order_id, "status": order['status'], "items": order['items']}
+```
+
+### 3. Product Search
+```python
+@app.endpoint(path="/products/search")
+@app.workflow
+async def search_products(query: str, limit: int = 10, services=None):
+    """Search products by keyword."""
+    results = await services['SearchService'].search(query, limit)
+    return {"query": query, "results": results, "count": len(results)}
+```
+
+### 4. Cart Management
+```python
+@app.endpoint(path="/cart/add")
+@app.workflow
+async def add_to_cart(user_id: str, product_id: str, quantity: int, services=None):
+    """Add item to shopping cart."""
+    cart = await services['CartService'].add_item(user_id, product_id, quantity)
+    return {"cart_id": cart['id'], "total_items": cart['item_count']}
+```
+
+### 5. Price Calculator
+```python
+@app.endpoint(path="/calculate-price")
+@app.workflow
+async def calculate_price(items: list, discount_code: str = None, services=None):
+    """Calculate total price with discounts."""
+    subtotal = sum(item['price'] * item['qty'] for item in items)
+    discount = await services['DiscountService'].calculate(discount_code) if discount_code else 0
+    return {"subtotal": subtotal, "discount": discount, "total": subtotal - discount}
+```
+
+## User Management
+
+### 6. User Registration
+```python
+@app.endpoint(path="/auth/register")
+@app.workflow
+async def register_user(email: str, password: str, name: str, services=None):
+    """Register new user account."""
+    user = await services['UserService'].create_user(email, password, name)
+    token = await services['AuthService'].generate_token(user['id'])
+    return {"user_id": user['id'], "token": token}
+```
+
+### 7. Password Reset
+```python
+@app.endpoint(path="/auth/reset-password")
+@app.workflow
+async def reset_password(email: str, services=None):
+    """Send password reset email."""
+    reset_token = await services['AuthService'].create_reset_token(email)
+    await services['EmailService'].send_reset_email(email, reset_token)
+    return {"message": "Reset email sent", "email": email}
+```
+
+### 8. Profile Update
+```python
+@app.endpoint(path="/users/profile")
+@app.workflow
+async def update_profile(user_id: str, name: str = None, bio: str = None, services=None):
+    """Update user profile."""
+    updates = {k: v for k, v in {'name': name, 'bio': bio}.items() if v}
+    user = await services['UserService'].update(user_id, updates)
+    return {"user_id": user_id, "updated_fields": list(updates.keys())}
+```
+
+### 9. User Search
+```python
+@app.endpoint(path="/users/search")
+@app.workflow
+async def search_users(query: str, role: str = None, services=None):
+    """Search users by name or email."""
+    users = await services['UserService'].search(query, role)
+    return {"results": users, "count": len(users)}
+```
+
+### 10. Account Deletion
+```python
+@app.endpoint(path="/users/{user_id}/delete")
+@app.workflow
+async def delete_account(user_id: str, confirm: bool, services=None):
+    """Delete user account (requires confirmation)."""
+    if not confirm:
+        raise ValueError("Confirmation required")
+    await services['UserService'].delete(user_id)
+    return {"message": "Account deleted", "user_id": user_id}
+```
+
+## Data Processing
+
+### 11. CSV Upload & Processing
+```python
+@app.endpoint(path="/data/process-csv")
+@app.workflow
+async def process_csv(file_url: str, services=None):
+    """Download and process CSV file."""
+    data = await services['FileService'].download_csv(file_url)
+    processed = await services['DataProcessor'].transform(data)
+    return {"rows_processed": len(processed), "summary": processed[:5]}
+```
+
+### 12. Batch Data Validation
+```python
+@app.endpoint(path="/validate/batch")
+@app.workflow
+async def validate_batch(records: list, schema: str, services=None):
+    """Validate batch of records against schema."""
+    results = await services['Validator'].validate_all(records, schema)
+    valid_count = sum(1 for r in results if r['valid'])
+    return {"total": len(records), "valid": valid_count, "errors": [r for r in results if not r['valid']]}
+```
+
+### 13. Report Generation
+```python
+@app.endpoint(path="/reports/generate")
+@app.workflow
+async def generate_report(report_type: str, start_date: str, end_date: str, services=None):
+    """Generate analytics report."""
+    data = await services['Analytics'].get_data(report_type, start_date, end_date)
+    report_url = await services['ReportGenerator'].create_pdf(data)
+    return {"report_url": report_url, "type": report_type, "period": f"{start_date} to {end_date}"}
+```
+
+### 14. Data Export
+```python
+@app.endpoint(path="/export/data")
+@app.workflow
+async def export_data(format: str, filters: dict, services=None):
+    """Export data in specified format (CSV, JSON, Excel)."""
+    data = await services['DataService'].query(filters)
+    file_url = await services['ExportService'].export(data, format)
+    return {"file_url": file_url, "format": format, "records": len(data)}
+```
+
+### 15. Data Sync
+```python
+@app.endpoint(path="/sync/external")
+@app.workflow
+async def sync_external_data(source: str, last_sync_id: str = None, services=None):
+    """Sync data from external source."""
+    new_records = await services['SyncService'].fetch_updates(source, last_sync_id)
+    await services['Database'].bulk_insert(new_records)
+    return {"synced": len(new_records), "source": source, "last_id": new_records[-1]['id'] if new_records else None}
+```
+
+## Notifications
+
+### 16. Send Email
+```python
+@app.endpoint(path="/notifications/email")
+@app.workflow
+async def send_email(to: str, subject: str, body: str, services=None):
+    """Send email notification."""
+    message_id = await services['EmailService'].send(to, subject, body)
+    return {"message_id": message_id, "to": to, "status": "sent"}
+```
+
+### 17. SMS Notification
+```python
+@app.endpoint(path="/notifications/sms")
+@app.workflow
+async def send_sms(phone: str, message: str, services=None):
+    """Send SMS notification."""
+    sid = await services['SMSService'].send(phone, message)
+    return {"sid": sid, "phone": phone, "status": "sent"}
+```
+
+### 18. Push Notification
+```python
+@app.endpoint(path="/notifications/push")
+@app.workflow
+async def send_push(user_ids: list, title: str, body: str, services=None):
+    """Send push notifications to multiple users."""
+    results = await services['PushService'].send_bulk(user_ids, title, body)
+    return {"sent": results['success'], "failed": results['failed']}
+```
+
+### 19. Notification Preferences
+```python
+@app.endpoint(path="/notifications/preferences")
+@app.workflow
+async def update_preferences(user_id: str, email: bool, sms: bool, push: bool, services=None):
+    """Update user notification preferences."""
+    prefs = await services['UserService'].update_preferences(user_id, {
+        'email': email, 'sms': sms, 'push': push
+    })
+    return {"user_id": user_id, "preferences": prefs}
+```
+
+### 20. Notification History
+```python
+@app.endpoint(path="/notifications/history/{user_id}")
+@app.workflow
+async def get_notification_history(user_id: str, limit: int = 50, services=None):
+    """Get notification history for user."""
+    history = await services['NotificationService'].get_history(user_id, limit)
+    return {"user_id": user_id, "notifications": history, "count": len(history)}
+```
+
+## Analytics & Metrics
+
+### 21. Track Event
+```python
+@app.endpoint(path="/analytics/track")
+@app.workflow
+async def track_event(event_name: str, user_id: str, properties: dict, services=None):
+    """Track analytics event."""
+    await services['Analytics'].track(event_name, user_id, properties)
+    return {"event": event_name, "user_id": user_id, "tracked": True}
+```
+
+### 22. Page View
+```python
+@app.endpoint(path="/analytics/pageview")
+@app.workflow
+async def track_pageview(user_id: str, page: str, referrer: str = None, services=None):
+    """Track page view."""
+    await services['Analytics'].pageview(user_id, page, referrer)
+    return {"page": page, "user_id": user_id}
+```
+
+### 23. Conversion Tracking
+```python
+@app.endpoint(path="/analytics/conversion")
+@app.workflow
+async def track_conversion(user_id: str, conversion_type: str, value: float, services=None):
+    """Track conversion event."""
+    await services['Analytics'].conversion(user_id, conversion_type, value)
+    return {"conversion_type": conversion_type, "value": value, "user_id": user_id}
+```
+
+### 24. Dashboard Metrics
+```python
+@app.endpoint(path="/metrics/dashboard")
+@app.workflow
+async def get_dashboard_metrics(time_range: str, services=None):
+    """Get dashboard metrics summary."""
+    metrics = await services['MetricsService'].get_summary(time_range)
+    return {
+        "active_users": metrics['active_users'],
+        "revenue": metrics['revenue'],
+        "conversions": metrics['conversions'],
+        "period": time_range
+    }
+```
+
+### 25. A/B Test Results
+```python
+@app.endpoint(path="/experiments/{experiment_id}/results")
+@app.workflow
+async def get_experiment_results(experiment_id: str, services=None):
+    """Get A/B test experiment results."""
+    results = await services['ExperimentService'].get_results(experiment_id)
+    return {
+        "experiment_id": experiment_id,
+        "variants": results['variants'],
+        "winner": results['winner'],
+        "confidence": results['confidence']
+    }
+```
+
+## File Management
+
+### 26. File Upload
+```python
+@app.endpoint(path="/files/upload")
+@app.workflow
+async def upload_file(filename: str, content_type: str, size_bytes: int, services=None):
+    """Generate signed upload URL."""
+    upload_url = await services['StorageService'].create_upload_url(filename, content_type)
+    return {"upload_url": upload_url, "filename": filename, "expires_in": 3600}
+```
+
+### 27. File Download
+```python
+@app.endpoint(path="/files/{file_id}/download")
+@app.workflow
+async def get_download_url(file_id: str, expires_in: int = 3600, services=None):
+    """Generate signed download URL."""
+    file_info = await services['StorageService'].get_file(file_id)
+    download_url = await services['StorageService'].create_download_url(file_id, expires_in)
+    return {"download_url": download_url, "filename": file_info['name'], "expires_in": expires_in}
+```
+
+### 28. File Delete
+```python
+@app.endpoint(path="/files/{file_id}")
+@app.workflow
+async def delete_file(file_id: str, user_id: str, services=None):
+    """Delete file from storage."""
+    file_info = await services['StorageService'].get_file(file_id)
+    if file_info['owner_id'] != user_id:
+        raise ValueError("Not authorized")
+    await services['StorageService'].delete(file_id)
+    return {"file_id": file_id, "deleted": True}
+```
+
+### 29. Image Resize
+```python
+@app.endpoint(path="/images/resize")
+@app.workflow
+async def resize_image(image_url: str, width: int, height: int, services=None):
+    """Resize image to specified dimensions."""
+    resized_url = await services['ImageService'].resize(image_url, width, height)
+    return {"original_url": image_url, "resized_url": resized_url, "dimensions": f"{width}x{height}"}
+```
+
+### 30. File Metadata
+```python
+@app.endpoint(path="/files/{file_id}/metadata")
+@app.workflow
+async def get_file_metadata(file_id: str, services=None):
+    """Get file metadata."""
+    metadata = await services['StorageService'].get_metadata(file_id)
+    return {
+        "file_id": file_id,
+        "name": metadata['name'],
+        "size": metadata['size'],
+        "type": metadata['content_type'],
+        "uploaded_at": metadata['created_at']
+    }
+```
+
+## Webhooks
+
+### 31. Stripe Webhook
+```python
+@app.endpoint(path="/webhooks/stripe", method="POST")
+@app.workflow
+async def handle_stripe_webhook(event_type: str, data: dict, services=None):
+    """Handle Stripe webhook events."""
+    if event_type == "payment_intent.succeeded":
+        await services['OrderService'].mark_paid(data['payment_intent']['id'])
+    return {"received": True, "event_type": event_type}
+```
+
+### 32. GitHub Webhook
+```python
+@app.endpoint(path="/webhooks/github", method="POST")
+@app.workflow
+async def handle_github_webhook(action: str, repository: dict, services=None):
+    """Handle GitHub webhook events."""
+    if action == "opened":
+        await services['NotificationService'].notify_team(
+            f"New PR in {repository['name']}"
+        )
+    return {"action": action, "repository": repository['name']}
+```
+
+### 33. Twilio Webhook
+```python
+@app.endpoint(path="/webhooks/twilio", method="POST")
+@app.workflow
+async def handle_twilio_webhook(from_number: str, body: str, services=None):
+    """Handle incoming SMS messages."""
+    response = await services['ChatbotService'].process_message(body)
+    await services['SMSService'].reply(from_number, response)
+    return {"from": from_number, "response_sent": True}
+```
+
+### 34. Slack Webhook
+```python
+@app.endpoint(path="/webhooks/slack", method="POST")
+@app.workflow
+async def handle_slack_command(command: str, text: str, user_id: str, services=None):
+    """Handle Slack slash commands."""
+    if command == "/stats":
+        stats = await services['MetricsService'].get_current_stats()
+        return {"text": f"Active users: {stats['active_users']}, Revenue: ${stats['revenue']}"}
+    return {"text": "Unknown command"}
+```
+
+### 35. Custom Webhook
+```python
+@app.endpoint(path="/webhooks/custom", method="POST")
+@app.workflow
+async def handle_custom_webhook(event: str, payload: dict, signature: str, services=None):
+    """Handle custom webhook with signature verification."""
+    if not await services['WebhookService'].verify_signature(payload, signature):
+        raise ValueError("Invalid signature")
+    await services['EventProcessor'].process(event, payload)
+    return {"received": True, "event": event}
+```
+
+## Search & Discovery
+
+### 36. Elasticsearch Query
+```python
+@app.endpoint(path="/search/advanced")
+@app.workflow
+async def advanced_search(query: str, filters: dict, page: int = 1, services=None):
+    """Advanced search with filters."""
+    results = await services['SearchService'].search(query, filters, page)
+    return {
+        "query": query,
+        "results": results['hits'],
+        "total": results['total'],
+        "page": page
+    }
+```
+
+### 37. Autocomplete
+```python
+@app.endpoint(path="/search/autocomplete")
+@app.workflow
+async def autocomplete(prefix: str, limit: int = 10, services=None):
+    """Autocomplete search suggestions."""
+    suggestions = await services['SearchService'].autocomplete(prefix, limit)
+    return {"prefix": prefix, "suggestions": suggestions}
+```
+
+### 38. Related Items
+```python
+@app.endpoint(path="/recommendations/{item_id}")
+@app.workflow
+async def get_related_items(item_id: str, limit: int = 5, services=none):
+    """Get related items/recommendations."""
+    related = await services['RecommendationService'].get_related(item_id, limit)
+    return {"item_id": item_id, "related": related, "count": len(related)}
+```
+
+### 39. Trending Items
+```python
+@app.endpoint(path="/discover/trending")
+@app.workflow
+async def get_trending(category: str = None, period: str = "24h", services=None):
+    """Get trending items."""
+    trending = await services['DiscoveryService'].get_trending(category, period)
+    return {"category": category, "period": period, "items": trending}
+```
+
+### 40. Personalized Feed
+```python
+@app.endpoint(path="/feed/{user_id}")
+@app.workflow
+async def get_personalized_feed(user_id: str, page: int = 1, services=None):
+    """Get personalized content feed for user."""
+    feed = await services['FeedService'].generate(user_id, page)
+    return {"user_id": user_id, "items": feed, "page": page}
+```
+
+## Next Steps
+
+- [Main Examples](/blazing-flow/endpoints/examples) - Core examples
+- [API Reference](/blazing-flow/endpoints/api-reference) - Complete API documentation
+- [Deployment](/blazing-flow/endpoints/deployment) - Production deployment

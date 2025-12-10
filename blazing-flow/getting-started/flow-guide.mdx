@@ -65,19 +65,19 @@ from blazing import Blazing
 app = Blazing(redis_config={'host': 'localhost', 'port': 6380})
 
 # Define processing steps
-@app.station
+@app.step
 async def fetch_data(source_id: str):
     # Fetch from API or database
     return {"id": source_id, "data": [1, 2, 3]}
 
-@app.station
+@app.step
 async def transform_data(data: dict):
     # Transform the data
     total = sum(data["data"])
     return {"id": data["id"], "result": total}
 
 # Orchestrate the pipeline
-@app.route
+@app.workflow
 async def data_pipeline(source_id: str):
     data = await fetch_data(source_id)
     result = await transform_data(data)
@@ -101,38 +101,38 @@ async def main():
 
 ### Routes
 
-Routes are the entry points to your pipelines. They orchestrate the flow of data through multiple stations.
+Workflows are the entry points to your pipelines. They orchestrate the flow of data through multiple stations.
 
 ```python
-@app.route
-async def process_order(order_id: str, skillsets=None):
+@app.workflow
+async def process_order(order_id: str, services=None):
     # Orchestrate multiple steps
-    order = await fetch_order(order_id, skillsets=skillsets)
-    validated = await validate_order(order, skillsets=skillsets)
-    payment = await process_payment(validated, skillsets=skillsets)
+    order = await fetch_order(order_id, services=services)
+    validated = await validate_order(order, services=services)
+    payment = await process_payment(validated, services=services)
     return payment
 ```
 
 ### Stations
 
-Stations are individual processing steps. They can optionally receive skillsets to access shared business logic.
+Steps are individual processing units. They can optionally receive services to access shared business logic.
 
 ```python
-@app.station
-async def fetch_order(order_id: str, skillsets=None):
-    # Use skillsets if you need shared business logic
-    if skillsets:
-        return await skillsets['OrderService'].fetch(order_id)
+@app.step
+async def fetch_order(order_id: str, services=None):
+    # Use services if you need shared business logic
+    if services:
+        return await services['OrderService'].fetch(order_id)
     # Or implement logic directly
     return {"id": order_id, "status": "pending"}
 ```
 
-### Skillsets
+### Services
 
-Skillsets encapsulate your business logic and can be shared across stations.
+Services encapsulate your business logic and can be shared across stations.
 
 ```python
-class OrderService(BaseSkillset):
+class OrderService(BaseService):
     async def fetch(self, order_id: str):
         # Your business logic here
         return {"id": order_id, "status": "pending"}
@@ -174,8 +174,8 @@ Best for I/O-bound operations:
 - Network operations
 
 ```python
-@app.station
-async def call_api(url: str, skillsets=None):
+@app.step
+async def call_api(url: str, services=None):
     # Runs on async worker (event loop)
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
@@ -192,8 +192,8 @@ Best for CPU-intensive operations:
 - Heavy computations
 
 ```python
-@app.station
-def process_image(image_data: bytes, skillsets=None):
+@app.step
+def process_image(image_data: bytes, services=None):
     # Automatically runs on blocking worker (note: not async)
     return heavy_image_processing(image_data)
 ```
@@ -240,11 +240,11 @@ This enables:
 Blazing Flow provides multiple levels of error handling:
 
 ```python
-@app.station
-async def risky_operation(data: dict, skillsets=None):
+@app.step
+async def risky_operation(data: dict, services=None):
     try:
-        if skillsets:
-            result = await skillsets['Service'].risky_call(data)
+        if services:
+            result = await services['Service'].risky_call(data)
             return result
     except Exception as e:
         # Log the error

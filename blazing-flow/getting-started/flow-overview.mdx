@@ -27,7 +27,7 @@ position: 1
 
 ## Serverless, Persistent: The Full Stack
 
-Lambda gives you serverless. Blazing Flow gives you serverless **and** persistence. The route/station/skillset architecture unlocks capabilities that traditional serverless cannot provide:
+Lambda gives you serverless. Blazing Flow gives you serverless **and** persistence. The workflow/step/service architecture unlocks capabilities that traditional serverless cannot provide:
 
 ### ⚡ Full Python
 
@@ -36,7 +36,7 @@ Lambda gives you serverless. Blazing Flow gives you serverless **and** persisten
 **Blazing Flow**: Write real Python. If statements, loops, dynamic branching. Unlimited complexity.
 
 ```python
-@app.route
+@app.workflow
 async def pipeline(user_id: str):
     user = await fetch_user(user_id)
 
@@ -59,7 +59,7 @@ async def pipeline(user_id: str):
 **Blazing Flow**: Connections pooled. State cached. Warmup once, reuse forever. 5ms per task.
 
 ```python
-class DatabaseSkillset(BaseSkillset):
+class DatabaseService(BaseService):
     def __init__(self, connector_instances):
         # Created ONCE - persists across thousands of tasks
         self.db_pool = connector_instances['postgres']
@@ -74,21 +74,21 @@ class DatabaseSkillset(BaseSkillset):
 
 **Lambda/Cloud Run**: All code has full access. User code can steal credentials, access databases, leak secrets.
 
-**Blazing Flow**: Sandboxed stations run isolated. Skillset calls automatically execute in trusted environment. Credentials never leak - architecture prevents it.
+**Blazing Flow**: Sandboxed stations run isolated. Service calls automatically execute in trusted environment. Credentials never leak - architecture prevents it.
 
 ```python
-@app.station(sandboxed=True)
-async def user_code(x: int, y: int, skillsets=None):
+@app.step(sandboxed=True)
+async def user_code(x: int, y: int, services=None):
     # Runs isolated - no credential access
 
-    # Skillset call → executes in TRUSTED environment
-    result = await skillsets['Database'].query(f"SELECT {x} + {y}")
+    # Service call → executes in TRUSTED environment
+    result = await services['Database'].query(f"SELECT {x} + {y}")
     # Credentials never enter sandbox
 
     return result
 ```
 
-**Architecture**: `Sandboxed code → Skillset call → Trusted execution → Safe result`
+**Architecture**: `Sandboxed code → Service call → Trusted execution → Safe result`
 
 ### 📈 Full Scalability
 
@@ -167,20 +167,20 @@ from blazing import Blazing
 # Create your app
 app = Blazing(redis_config={'host': 'localhost', 'port': 6380})
 
-# Define processing steps with @station
-@app.station
+# Define processing steps with @step
+@app.step
 async def fetch_data(source_id: str):
     # Fetch from database or API
     return {"id": source_id, "data": [1, 2, 3]}
 
-@app.station
+@app.step
 async def transform_data(raw_data: dict):
     # Transform the data
     total = sum(raw_data["data"])
     return {"id": raw_data["id"], "result": total}
 
 # Define the pipeline with @route
-@app.route
+@app.workflow
 async def data_pipeline(source_id: str):
     # Orchestrate the workflow
     data = await fetch_data(source_id)
@@ -204,7 +204,7 @@ async def main():
 ## Key Features
 
 ### 📝 Declarative Pipelines
-Define workflows using simple decorators - `@route` for pipelines, `@station` for steps.
+Define workflows using simple decorators - `@workflow` for pipelines, `@step` for steps.
 
 ### 🔄 Automatic Recovery
 Pipelines resume automatically after interruptions. No lost work, no manual intervention.
