@@ -91,9 +91,19 @@ async def main():
     # Start the app (makes routes available to workers)
     await app.start()
 
-    # Submit a task
-    unit = await app.create_route_task("data_pipeline", source_id="123")
-    result = await unit.result()
+    # Execute workflow - three equivalent ways:
+
+    # 1. One-liner with wait_result() - SIMPLEST! ⭐
+    result = await app.data_pipeline(source_id="123").wait_result()
+
+    # 2. Using RemoteRun handle (more explicit)
+    run = await app.data_pipeline(source_id="123")
+    result = await run.result()
+
+    # 3. Using run() method (by name)
+    run = await app.run("data_pipeline", source_id="123")
+    result = await run.result()
+
     print(result)  # {"id": "123", "result": 6}
 ```
 
@@ -233,6 +243,83 @@ This enables:
 - Audit trails for compliance
 - Performance analysis
 - Debugging with breadcrumbs
+
+## Synchronous API
+
+> **Note**: The sync API (`SyncBlazing`) is designed for **learning and prototyping**. For production workloads, we **strongly recommend using the async `Blazing` class** which provides better performance, proper resource management, and full support for concurrent operations.
+
+Blazing Flow provides a synchronous API for users who are learning or want a simpler getting-started experience.
+
+### Option 1: SyncBlazing Class (For Learning/Prototyping)
+
+The simplest sync experience - no async/await anywhere:
+
+```python
+from blazing import SyncBlazing
+
+# Create a sync app
+app = SyncBlazing()
+
+@app.step
+async def double(x: int, services=None):
+    return x * 2
+
+@app.step
+async def add_ten(x: int, services=None):
+    return x + 10
+
+@app.workflow
+async def process_number(x: int, services=None):
+    doubled = await double(x, services=services)
+    result = await add_ten(doubled, services=services)
+    return result
+
+# Everything is sync - no await, no asyncio.run()!
+app.publish()
+result = app.process_number(5)  # Returns result directly!
+print(result)  # 20
+
+# Or use run() by name
+result = app.run("process_number", 5)
+print(result)  # 20
+```
+
+### Option 2: Sync Helper Methods
+
+If you have existing async code but need sync execution in some places:
+
+```python
+from blazing import Blazing
+
+app = Blazing()
+
+@app.step
+async def double(x: int, services=None):
+    return x * 2
+
+@app.workflow
+async def process_number(x: int, services=None):
+    return await double(x, services=services)
+
+# Use sync helpers on async Blazing
+app.publish_sync()                              # Sync publish
+result = app.process_number(5).wait_result_sync()  # Sync wait
+# Or: result = app.run_sync("process_number", 5)
+
+print(result)  # 10
+```
+
+### When to Use Each API
+
+| Use Case | API | Notes |
+|----------|-----|-------|
+| **Production workloads** | `Blazing` (async) | ⭐ Recommended - best performance |
+| FastAPI / async frameworks | `Blazing` (async) | Native async integration |
+| Learning Blazing Flow | `SyncBlazing` | Simpler to understand |
+| Prototyping | `SyncBlazing` | Quick iteration |
+| Jupyter notebooks | `SyncBlazing` | No asyncio hassle |
+| Django / Flask (learning) | `SyncBlazing` | Then migrate to async |
+| Django / Flask (production) | `Blazing` with sync helpers | Async inside sync views |
 
 ## Error Handling
 

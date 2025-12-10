@@ -145,8 +145,19 @@ async def main():
     # Publish your app to Blazing SaaS
     await app.publish()
 
-    # Execute the pipeline
-    result = await app.data_pipeline("source_123")
+    # Execute the pipeline - three equivalent ways:
+
+    # 1. One-liner with wait_result() - SIMPLEST! ⭐
+    result = await app.data_pipeline("source_123").wait_result()
+
+    # 2. Using RemoteRun handle (more explicit)
+    run = await app.data_pipeline("source_123")
+    result = await run.result()
+
+    # 3. Using run() method (by name)
+    run = await app.run("data_pipeline", "source_123")
+    result = await run.result()
+
     print(f"Pipeline result: {result}")
 
 if __name__ == "__main__":
@@ -209,7 +220,9 @@ async def data_pipeline(source_id: str, services=None):
 # Run it
 async def main():
     await app.publish()
-    result = await app.data_pipeline("source_123")
+
+    # Execute pipeline (using simplest one-liner syntax)
+    result = await app.data_pipeline("source_123").wait_result()
     print(f"Pipeline result: {result}")
 
 if __name__ == "__main__":
@@ -230,6 +243,48 @@ You should see output like:
 Saved result: {'id': 'source_123', 'sum': 15, 'count': 5}
 Pipeline result: {'id': 'source_123', 'sum': 15, 'count': 5}
 ```
+
+## Learning Without Async? Try SyncBlazing
+
+> **Note**: `SyncBlazing` is designed for **learning and prototyping only**. For production, we strongly recommend the async `Blazing` class for better performance.
+
+If you're learning Blazing Flow and don't want to deal with async/await yet, use `SyncBlazing`:
+
+```python
+from blazing import SyncBlazing
+from blazing.base import BaseService
+
+# Create sync app
+app = SyncBlazing()
+
+@app.service
+class DataProcessor(BaseService):
+    async def fetch_data(self, source_id: str):
+        return {"id": source_id, "data": [1, 2, 3, 4, 5]}
+
+    async def transform_data(self, data: dict):
+        return {"id": data["id"], "sum": sum(data["data"]), "count": len(data["data"])}
+
+@app.step
+async def fetch_step(source_id: str, services=None):
+    return await services['DataProcessor'].fetch_data(source_id)
+
+@app.step
+async def transform_step(data: dict, services=None):
+    return await services['DataProcessor'].transform_data(data)
+
+@app.workflow
+async def data_pipeline(source_id: str, services=None):
+    data = await fetch_step(source_id, services=services)
+    return await transform_step(data, services=services)
+
+# No async/await, no asyncio.run() - just regular Python!
+app.publish()
+result = app.data_pipeline("source_123")  # Returns result directly
+print(f"Result: {result}")
+```
+
+See the [Synchronous API guide](/blazing-flow/getting-started/flow-guide#synchronous-api) for more details.
 
 ## Next Steps
 
