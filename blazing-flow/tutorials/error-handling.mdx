@@ -9,16 +9,16 @@ Learn how to handle errors, validate inputs, and ensure your batch pipelines are
 
 ## Common Error Scenarios
 
-### 1. Invalid Route Name
+### 1. Invalid Workflow Name
 
 ```python
 from blazing import Blazing
 
 app = Blazing()
 
-# Try to use a route that doesn't exist
-unit = await app.create_route_task(
-    "nonexistent_route_12345",
+# Try to use a workflow that doesn't exist
+unit = await app.create_workflow_task(
+    "nonexistent_workflow_12345",
     symbol="AAPL"
 )
 
@@ -27,15 +27,15 @@ try:
     result = await unit.result()
 except Exception as e:
     if "not registered" in str(e).lower():
-        print("✗ Route not found")
+        print("✗ Workflow not found")
 ```
 
 ### 2. Missing Required Parameters
 
 ```python
 # Missing 'symbol' parameter
-unit = await app.create_route_task(
-    "fetch_timeseries_route",
+unit = await app.create_workflow_task(
+    "fetch_timeseries",
     points=100,
     delay=0
     # symbol is missing!
@@ -50,8 +50,8 @@ unit = await app.create_route_task(
 ```python
 # Invalid type for 'points' (should be int)
 try:
-    unit = await app.create_route_task(
-        "fetch_timeseries_route",
+    unit = await app.create_workflow_task(
+        "fetch_timeseries",
         symbol="AAPL",
         points="not_a_number",  # Wrong type!
         delay=0
@@ -72,7 +72,7 @@ import asyncio
 app = Blazing()
 
 try:
-    unit = await app.create_route_task(
+    unit = await app.create_workflow_task(
         "risky_operation",
         data=large_dataset
     )
@@ -99,8 +99,8 @@ async def fetch_with_fallback(symbol: str):
     app = Blazing()
 
     try:
-        unit = await app.create_route_task(
-            "fetch_timeseries_route",
+        unit = await app.create_workflow_task(
+            "fetch_timeseries",
             symbol=symbol,
             points=100
         )
@@ -130,8 +130,8 @@ await app.wait([])
 
 ```python
 # Test with very large datasets
-unit = await app.create_route_task(
-    "fetch_timeseries_route",
+unit = await app.create_workflow_task(
+    "fetch_timeseries",
     symbol="HUGE",
     points=50000  # 50k data points
 )
@@ -149,13 +149,13 @@ print(f"✓ Large payload handled: {result['count']:,} points")
 # Safe: Multiple tasks can share the same app instance
 app = Blazing()
 
-unit1 = await app.create_route_task(
-    "fetch_timeseries_route",
+unit1 = await app.create_workflow_task(
+    "fetch_timeseries",
     symbol="TEST1",
     points=10
 )
-unit2 = await app.create_route_task(
-    "fetch_timeseries_route",
+unit2 = await app.create_workflow_task(
+    "fetch_timeseries",
     symbol="TEST2",
     points=10
 )
@@ -183,7 +183,7 @@ async def process_batch():
     try:
         # Your processing logic
         units = [
-            await app.create_route_task(...)
+            await app.create_workflow_task(...)
             for _ in range(100)
         ]
         results = await app.gather(units)
@@ -214,7 +214,7 @@ await app.close()
 
 # Attempting to use closed app
 try:
-    unit = await app.create_route_task("quick_lookup_route", symbol="TEST")
+    unit = await app.create_workflow_task("quick_lookup", symbol="TEST")
 except Exception as e:
     print(f"Expected error: {type(e).__name__}")
 ```
@@ -227,7 +227,7 @@ except Exception as e:
 import asyncio
 
 async def execute_with_retry(
-    route: str,
+    workflow: str,
     params: dict,
     max_retries: int = 3
 ):
@@ -236,7 +236,7 @@ async def execute_with_retry(
 
     for attempt in range(max_retries):
         try:
-            unit = await app.create_route_task(route, **params)
+            unit = await app.create_workflow_task(workflow, **params)
             result = await asyncio.wait_for(
                 unit.result(),
                 timeout=30
@@ -263,8 +263,8 @@ async def process_with_partial_failures(symbols: list[str]):
 
     tasks = []
     for symbol in symbols:
-        unit = await app.create_route_task(
-            "fetch_timeseries_route",
+        unit = await app.create_workflow_task(
+            "fetch_timeseries",
             symbol=symbol,
             points=100
         )

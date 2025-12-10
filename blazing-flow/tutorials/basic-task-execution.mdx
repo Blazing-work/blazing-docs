@@ -27,9 +27,9 @@ app = Blazing()
 ### 2. Create a Simple Task
 
 ```python
-# Create a task to fetch time series data
-unit = await app.create_route_task(
-    "fetch_timeseries_route",
+# Create a task to execute a workflow
+unit = await app.create_workflow_task(
+    "fetch_timeseries",
     symbol="AAPL",
     points=100,
     delay=0
@@ -60,8 +60,8 @@ async def main():
     app = Blazing()
 
     # Create task
-    unit = await app.create_route_task(
-        "fetch_timeseries_route",
+    unit = await app.create_workflow_task(
+        "fetch_timeseries",
         symbol="AAPL",
         points=100,
         delay=0
@@ -82,22 +82,22 @@ if __name__ == "__main__":
 
 ## Key Concepts
 
-### Routes
+### Workflows
 
-Routes are pre-configured task endpoints that define:
+Workflows are multi-step task orchestrations that define:
 - Task parameters
-- Execution logic
+- Execution logic with multiple steps
 - Return types
 
-Common routes:
-- `fetch_timeseries_route` - Fetch time series data
-- `quick_lookup_route` - Quick data lookups
-- Custom routes defined by your organization
+Common workflows:
+- `fetch_timeseries` - Fetch time series data
+- `quick_lookup` - Quick data lookups
+- Custom workflows defined by your organization
 
 ### Units
 
 A **unit** represents a single task execution:
-- Created by `create_route_task()`
+- Created by `create_workflow_task()`
 - Can be gathered for results
 - Executed asynchronously by workers
 

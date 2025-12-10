@@ -91,16 +91,16 @@ async def main():
     # Start the app (makes routes available to workers)
     await app.start()
 
-    # Execute workflow - three equivalent ways:
+    # Execute workflow - choose whichever style you prefer:
 
-    # 1. One-liner with wait_result() - SIMPLEST! ⭐
+    # Option 1: One-liner with wait_result()
     result = await app.data_pipeline(source_id="123").wait_result()
 
-    # 2. Using RemoteRun handle (more explicit)
+    # Option 2: Two-liner with RemoteRun handle (useful when you need the run object)
     run = await app.data_pipeline(source_id="123")
     result = await run.result()
 
-    # 3. Using run() method (by name)
+    # Option 3: By name (useful for dynamic workflow names)
     run = await app.run("data_pipeline", source_id="123")
     result = await run.result()
 
@@ -109,9 +109,9 @@ async def main():
 
 ## Core Concepts
 
-### Routes
+### Workflows
 
-Workflows are the entry points to your pipelines. They orchestrate the flow of data through multiple stations.
+Workflows are the entry points to your pipelines. They orchestrate the flow of data through multiple steps.
 
 ```python
 @app.workflow
@@ -123,7 +123,7 @@ async def process_order(order_id: str, services=None):
     return payment
 ```
 
-### Stations
+### Steps
 
 Steps are individual processing units. They can optionally receive services to access shared business logic.
 
@@ -139,7 +139,7 @@ async def fetch_order(order_id: str, services=None):
 
 ### Services
 
-Services encapsulate your business logic and can be shared across stations.
+Services encapsulate your business logic and can be shared across steps.
 
 ```python
 class OrderService(BaseService):
@@ -168,7 +168,7 @@ Blazing Flow uses a hierarchical architecture:
 ### Components
 
 - **Foreman**: Manages workers on each machine, optimizes worker mix
-- **Workers**: Execute tasks from routes and stations
+- **Workers**: Execute tasks from workflows and steps
   - **Async Workers**: Event-loop based, best for I/O operations
   - **Blocking Workers**: Thread-based, best for CPU-intensive tasks
 
@@ -234,8 +234,8 @@ app = Blazing(,
 
 All operations are durably recorded in Redis:
 
-- **Units**: Represent route executions
-- **Operations**: Represent station calls
+- **Units**: Represent workflow executions
+- **Operations**: Represent step calls
 - **Results**: Final outputs and intermediate data
 
 This enables:

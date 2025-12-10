@@ -15,7 +15,7 @@ Create and execute your first distributed task.
 
 **You'll learn:**
 - Initialize a Blazing app
-- Create tasks with `create_route_task()`
+- Create tasks with `create_workflow_task()`
 - Retrieve results with `gather()`
 - Proper resource cleanup
 
@@ -44,7 +44,7 @@ Execute multiple tasks concurrently for maximum throughput.
 Handle failures, edge cases, and ensure pipeline resilience.
 
 **You'll learn:**
-- Validate parameters and routes
+- Validate parameters and workflows
 - Handle timeouts and network failures
 - Implement retry logic with exponential backoff
 - Manage partial failures in batch operations
@@ -78,7 +78,7 @@ from blazing import Blazing
 app = Blazing()
 
 # 2. Create task
-unit = await app.create_route_task("route_name", param=value)
+unit = await app.create_workflow_task("workflow_name", param=value)
 
 # 3. Execute & gather results
 results = await app.gather([unit])
@@ -92,7 +92,7 @@ await app.close()
 ```python
 # Create all tasks first
 tasks = [
-    await app.create_route_task("route", id=i)
+    await app.create_workflow_task("workflow", id=i)
     for i in range(100)
 ]
 
@@ -106,7 +106,7 @@ results = await app.gather(tasks)
 import asyncio
 
 try:
-    unit = await app.create_route_task("route", param=value)
+    unit = await app.create_workflow_task("workflow", param=value)
     result = await asyncio.wait_for(
         unit.result(),
         timeout=30

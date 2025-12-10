@@ -74,7 +74,7 @@ class DatabaseService(BaseService):
 
 **Lambda/Cloud Run**: All code has full access. User code can steal credentials, access databases, leak secrets.
 
-**Blazing Flow**: Sandboxed stations run isolated. Service calls automatically execute in trusted environment. Credentials never leak - architecture prevents it.
+**Blazing Flow**: Sandboxed steps run isolated. Service calls automatically execute in trusted environment. Credentials never leak - architecture prevents it.
 
 ```python
 @app.step(sandboxed=True)
@@ -196,7 +196,7 @@ async def main():
     await app.start()
 
     # Submit a task
-    unit = await app.create_route_task("data_pipeline", source_id="123")
+    unit = await app.create_workflow_task("data_pipeline", source_id="123")
     result = await unit.result()
     print(result)  # {"id": "123", "result": 6}
 ```

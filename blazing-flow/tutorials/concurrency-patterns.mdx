@@ -131,8 +131,8 @@ apps = [Blazing(app_id=f"app-{i}") for i in range(5)]
 # Run tasks from all apps concurrently
 all_tasks = []
 for i, app in enumerate(apps):
-    unit = await app.create_route_task(
-        "fetch_timeseries_route",
+    unit = await app.create_workflow_task(
+        "fetch_timeseries",
         symbol=f"APP{i}-STOCK",
         points=100
     )
@@ -178,8 +178,8 @@ async def resilient_task_execution():
     app = Blazing()
 
     try:
-        unit = await app.create_route_task(
-            "fetch_timeseries_route",
+        unit = await app.create_workflow_task(
+            "fetch_timeseries",
             symbol="AAPL",
             points=1000
         )
@@ -303,7 +303,7 @@ async def fan_out_fan_in(data_chunks: list):
     # Fan-out: Create tasks for all chunks
     units = []
     for i, chunk in enumerate(data_chunks):
-        unit = await app.create_route_task(
+        unit = await app.create_workflow_task(
             "process_chunk",
             chunk_id=i,
             data=chunk
@@ -314,7 +314,7 @@ async def fan_out_fan_in(data_chunks: list):
     chunk_results = await app.gather(units)
 
     # Fan-in: Aggregate all results
-    aggregated = await app.create_route_task(
+    aggregated = await app.create_workflow_task(
         "aggregate_results",
         results=chunk_results
     )
@@ -337,21 +337,21 @@ async def multi_stage_pipeline(input_data: list):
 
     # Stage 1: Data extraction
     extract_units = [
-        await app.create_route_task("extract", item=item)
+        await app.create_workflow_task("extract", item=item)
         for item in input_data
     ]
     extracted = await app.gather(extract_units)
 
     # Stage 2: Data transformation
     transform_units = [
-        await app.create_route_task("transform", data=data)
+        await app.create_workflow_task("transform", data=data)
         for data in extracted
     ]
     transformed = await app.gather(transform_units)
 
     # Stage 3: Data loading
     load_units = [
-        await app.create_route_task("load", data=data)
+        await app.create_workflow_task("load", data=data)
         for data in transformed
     ]
     loaded = await app.gather(load_units)
@@ -385,7 +385,7 @@ async def multi_stage_pipeline(input_data: list):
 1. **Use NODE_ID** - Set unique `NODE_ID` for each API instance
 2. **Implement timeouts** - Always use timeouts for network operations
 3. **Handle retries** - Implement exponential backoff for transient failures
-4. **Monitor queue depth** - Track queue segments per station
+4. **Monitor queue depth** - Track queue segments per step
 5. **Graceful shutdown** - Wait for in-flight tasks before termination
 6. **Isolate apps** - Use separate `app_id` for different workloads
 

@@ -95,6 +95,11 @@ Shared infrastructure access (databases, APIs, caches). Use services when you ne
 
 > **Note on Async vs Sync**: All examples below use the recommended async `Blazing` class. If you're learning and prefer synchronous code, see the [Synchronous API guide](/blazing-flow/getting-started/flow-guide#synchronous-api) for `SyncBlazing` (for learning/prototyping only - async is recommended for production).
 
+> **Executing Workflows**: The examples show three equivalent ways to execute workflows. Choose whichever style you prefer:
+> - `await app.workflow_name(args).wait_result()` - One-liner
+> - `run = await app.workflow_name(args); result = await run.result()` - Two-liner with RemoteRun handle (useful when you need the run object)
+> - `run = await app.run("workflow_name", args); result = await run.result()` - By name (useful for dynamic workflow names)
+
 ## Getting Started
 
 ### 1. Simple Step

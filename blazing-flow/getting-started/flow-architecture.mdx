@@ -25,7 +25,7 @@ The Foreman manages workers on a single machine:
 
 ### Workers
 
-Workers execute tasks from routes and stations:
+Workers execute tasks from workflows and steps:
 
 #### Async Workers
 - Run on event loop (uvloop)
@@ -52,18 +52,18 @@ app = Blazing(,
 
 ## Data Flow
 
-### Route Execution Flow
+### Workflow Execution Flow
 
 ```
-1. Client → Queue Route Task
+1. Client → Queue Workflow Task
               ↓
 2. Worker → Dequeue Task
               ↓
-3. Worker → Execute Route
+3. Worker → Execute Workflow
               ↓
-4. Route → Call Stations
+4. Workflow → Call Steps
               ↓
-5. Stations → Use Services
+5. Steps → Use Services
               ↓
 6. Worker → Return Result
 ```
@@ -74,16 +74,16 @@ app = Blazing(,
 @app.workflow
 async def process_order(order_id: str):
     # Step 1: Fetch order details
-    order = await fetch_order_station(order_id)
+    order = await fetch_order(order_id)
 
     # Step 2: Validate inventory
-    validated = await validate_inventory_station(order)
+    validated = await validate_inventory(order)
 
     # Step 3: Process payment
-    payment = await process_payment_station(validated)
+    payment = await process_payment(validated)
 
     # Step 4: Ship order
-    shipment = await ship_order_station(payment)
+    shipment = await ship_order(payment)
 
     return shipment
 ```
@@ -92,8 +92,8 @@ When you call `process_order("12345")`:
 
 1. Task queued with `order_id="12345"`
 2. Available worker dequeues task
-3. Worker executes route, calling each station in sequence
-4. Each station may spawn its own tasks
+3. Worker executes workflow, calling each step in sequence
+4. Each step may spawn its own tasks
 5. Caller receives result or task ID for async tracking
 
 ## State Management
@@ -104,7 +104,7 @@ Blazing uses a Data Access Object (DAO) pattern for all state:
 
 - **ForemanDAO**: Foreman state and metrics
 - **ConnectorDAO**: Connection pool definitions
-- **StationDAO**: Station metadata
+- **StepDAO**: Step metadata
 - **UnitDAO**: Individual task state
 - **OperationDAO**: Execution history
 
@@ -113,18 +113,18 @@ Blazing uses a Data Access Object (DAO) pattern for all state:
 All operations are durably recorded:
 
 ```python
-# Each route execution creates a Unit
+# Each workflow execution creates a Unit
 unit = Unit(
-    route_name="process_order",
+    workflow_name="process_order",
     arguments={"order_id": "12345"},
     status="pending",
     created_at=datetime.utcnow()
 )
 
-# Each station call creates an Operation
+# Each step call creates an Operation
 operation = Operation(
     unit_id=unit.id,
-    station_name="fetch_order_station",
+    step_name="fetch_order",
     status="running",
     started_at=datetime.utcnow()
 )

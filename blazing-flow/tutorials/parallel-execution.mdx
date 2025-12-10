@@ -21,8 +21,8 @@ symbols = ["AAPL", "TSLA", "GOOGL", "MSFT", "AMZN"]
 tasks = []
 
 for symbol in symbols:
-    unit = await app.create_route_task(
-        "fetch_timeseries_route",
+    unit = await app.create_workflow_task(
+        "fetch_timeseries",
         symbol=symbol,
         points=50,
         delay=0
@@ -45,7 +45,7 @@ for i, result in enumerate(results):
 ```python
 # DON'T DO THIS - runs one at a time
 for symbol in symbols:
-    unit = await app.create_route_task(...)
+    unit = await app.create_workflow_task(...)
     result = await app.gather([unit])  # Waits before next iteration
 ```
 
@@ -54,7 +54,7 @@ for symbol in symbols:
 # DO THIS - creates all tasks first, then waits
 tasks = []
 for symbol in symbols:
-    tasks.append(await app.create_route_task(...))
+    tasks.append(await app.create_workflow_task(...))
 
 # All tasks execute concurrently
 results = await app.gather(tasks)
@@ -75,8 +75,8 @@ async def parallel_data_pipeline():
     # Create 100 parallel tasks
     tasks = []
     for i in range(100):
-        unit = await app.create_route_task(
-            "fetch_timeseries_route",
+        unit = await app.create_workflow_task(
+            "fetch_timeseries",
             symbol=f"STOCK{i}",
             points=1000,
             delay=0
@@ -107,8 +107,8 @@ start_time = time.time()
 # Create 4 tasks with 1-second delay each
 tasks = []
 for i in range(4):
-    unit = await app.create_route_task(
-        "fetch_timeseries_route",
+    unit = await app.create_workflow_task(
+        "fetch_timeseries",
         symbol=f"SYM{i}",
         points=10,
         delay=1  # 1 second delay per task
@@ -130,7 +130,7 @@ print(f"Parallel execution: {elapsed:.2f}s")
 ```python
 # Good: Create all tasks first
 tasks = [
-    await app.create_route_task("route", param=i)
+    await app.create_workflow_task("workflow", param=i)
     for i in range(100)
 ]
 results = await app.gather(tasks)
