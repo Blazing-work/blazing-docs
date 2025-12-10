@@ -99,7 +99,7 @@ Shared infrastructure access (databases, APIs, caches). Use services when you ne
 ```python
 from blazing import Blazing
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 @app.step
 async def hello(name: str, services=None):

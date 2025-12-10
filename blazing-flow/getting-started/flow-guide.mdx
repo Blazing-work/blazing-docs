@@ -62,7 +62,7 @@ Here's a simple data processing pipeline:
 from blazing import Blazing
 
 # Create the app
-app = Blazing(redis_config={'host': 'localhost', 'port': 6380})
+app = Blazing()
 
 # Define processing steps
 @app.step
@@ -210,8 +210,7 @@ The Foreman automatically adjusts the worker mix based on queue metrics:
 You can configure optimization:
 
 ```python
-app = Blazing(
-    redis_config={...},
+app = Blazing(,
     worker_config={
         'async_workers': 4,
         'blocking_workers': 2,

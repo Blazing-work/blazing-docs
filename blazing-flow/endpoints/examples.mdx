@@ -56,7 +56,7 @@ from blazing.web import create_asgi_app
 import uvicorn
 
 app = Blazing(
-    api_url="http://localhost:8000",
+    ,
     api_token="your-api-token"
 )
 
@@ -97,7 +97,7 @@ Expose a multi-step workflow that processes data through several stages.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # Internal steps (not exposed directly)
 @app.step
@@ -166,7 +166,7 @@ from blazing.web import create_asgi_app
 from fastapi.security import HTTPAuthorizationCredentials
 import jwt
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 SECRET_KEY = "your-jwt-secret"
 
@@ -249,7 +249,7 @@ from blazing import Blazing
 from blazing.web import create_asgi_app
 import asyncio
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 @app.step
 async def process_batch(batch_id: int, services=None):
@@ -359,7 +359,7 @@ from blazing import Blazing
 from blazing.web import create_asgi_app
 import asyncio
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 @app.step
 async def fetch_user(user_id: int, services=None):
@@ -427,7 +427,7 @@ Proper error handling with custom error responses.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 @app.step
 async def validate_input(amount: float, services=None):
@@ -504,7 +504,7 @@ Organize multiple endpoints with different paths and versions.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # V1 Endpoints
 @app.endpoint(path="/v1/users/create")

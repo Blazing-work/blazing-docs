@@ -161,7 +161,7 @@ Blazing Flow automatically manages 4 types of workers:
 from blazing import Blazing
 from blazing.base import BaseService
 
-app = Blazing(api_url="...", api_token="...")
+app = Blazing()  # Uses Blazing SaaS by default
 
 # YOUR CODE (trusted) - runs on regular workers
 @app.service

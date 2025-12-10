@@ -515,7 +515,7 @@ gunicorn main:fastapi_app \
 ```python
 # Configure connection pool for Blazing backend
 app = Blazing(
-    api_url="http://localhost:8000",
+    ,
     api_token="token",
     max_connections=100,  # Connection pool size
     timeout=30            # Request timeout

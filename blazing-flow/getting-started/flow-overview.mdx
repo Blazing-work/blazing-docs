@@ -165,7 +165,7 @@ async def user_code(x: int, y: int, services=None):
 from blazing import Blazing
 
 # Create your app
-app = Blazing(redis_config={'host': 'localhost', 'port': 6380})
+app = Blazing()
 
 # Define processing steps with @step
 @app.step

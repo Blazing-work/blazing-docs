@@ -146,7 +146,7 @@ The simplest sandbox example: let users write transformation logic while your in
 ```python
 from blazing import Blazing
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # USER CODE (untrusted - runs in WASM sandbox)
 @app.step
@@ -192,7 +192,7 @@ from blazing import Blazing
 from blazing.base import BaseService
 from sqlalchemy import create_engine, text
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # YOUR CODE (trusted - has real database access)
 @app.service
@@ -273,7 +273,7 @@ from blazing import Blazing
 from blazing.base import BaseService
 import httpx
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # YOUR CODE (trusted - has real API credentials)
 @app.service
@@ -369,7 +369,7 @@ Safely run different tenants' code in isolated sandboxes.
 from blazing import Blazing
 from blazing.base import BaseService
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # YOUR CODE (trusted - manages tenant data)
 @app.service
@@ -462,7 +462,7 @@ from blazing import Blazing
 from blazing.base import BaseService
 import asyncio
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # YOUR CODE (trusted - provides data access)
 @app.service
@@ -539,7 +539,7 @@ Examples of malicious code that fails in the sandbox.
 ```python
 from blazing import Blazing
 
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+app = Blazing(, api_token="your-token")
 
 # USER CODE (untrusted - attempts malicious actions)
 @app.step

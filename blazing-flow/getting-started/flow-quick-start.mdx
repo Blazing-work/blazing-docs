@@ -10,8 +10,9 @@ Get started with Blazing Flow and build your first asynchronous pipeline in just
 ## Prerequisites
 
 - Python 3.11 or higher
-- Redis or KeyDB server
 - Basic understanding of Python async/await
+
+**That's it!** Blazing Flow uses our managed SaaS infrastructure - no Redis, Docker, or infrastructure setup required.
 
 ## Installation
 
@@ -34,28 +35,16 @@ uv sync
 source .venv/bin/activate
 ```
 
-## Start Redis
-
-Blazing Flow requires a Redis server for state management. You can use Docker to quickly spin one up:
-
-```bash
-# Pull the Redis Stack image
-docker pull redis/redis-stack
-
-# Run Redis on port 6380
-docker run --name blazing_redis -p 6380:6379 -d redis/redis-stack
-```
-
 ## Your First Pipeline
 
 Let's create a simple data processing pipeline that demonstrates the core concepts of Blazing Flow.
 
 ### Step 1: Define a Service
 
-Services encapsulate your business logic and can be reused across different stations:
+Services encapsulate your business logic and can be reused across different steps:
 
 ```python
-from blazing import BaseService
+from blazing.base import BaseService
 
 class DataProcessor(BaseService):
     """A service for processing data"""
@@ -84,85 +73,81 @@ class DataProcessor(BaseService):
 
 ### Step 2: Create a Blazing Application
 
-Initialize your Blazing application with Redis configuration:
+Initialize your Blazing application - it uses our SaaS infrastructure by default:
 
 ```python
 from blazing import Blazing
 
-# Create the app
-app = Blazing(
-    redis_config={
-        'host': 'localhost',
-        'port': 6380
-    },
-    services=[DataProcessor]
-)
+# Create the app (uses Blazing SaaS by default)
+app = Blazing()
+
+# Register your service
+@app.service
+class DataProcessor(BaseService):
+    # ... your service implementation
 ```
 
-### Step 3: Define Stations
+### Step 3: Define Steps
 
 Steps are individual processing units in your pipeline:
 
 ```python
 @app.step
-async def fetch_station(source_id: str, services):
+async def fetch_step(source_id: str, services=None):
     """Step that fetches data"""
     processor = services['DataProcessor']
     data = await processor.fetch_data(source_id)
     return data
 
 @app.step
-async def transform_station(data: dict, services):
+async def transform_step(data: dict, services=None):
     """Step that transforms data"""
     processor = services['DataProcessor']
     result = await processor.transform_data(data)
     return result
 
 @app.step
-async def save_station(result: dict, services):
+async def save_step(result: dict, services=None):
     """Step that saves the result"""
     processor = services['DataProcessor']
     final = await processor.save_result(result)
     return final
 ```
 
-### Step 4: Define a Route
+### Step 4: Define a Workflow
 
-Routes orchestrate stations into a complete workflow:
+Workflows orchestrate steps into a complete pipeline:
 
 ```python
 @app.workflow
-async def data_pipeline(source_id: str):
+async def data_pipeline(source_id: str, services=None):
     """Complete data processing pipeline"""
     # Fetch data
-    data = await fetch_station(source_id)
+    data = await fetch_step(source_id, services=services)
 
     # Transform data
-    result = await transform_station(data)
+    result = await transform_step(data, services=services)
 
     # Save result
-    final = await save_station(result)
+    final = await save_step(result, services=services)
 
     return final
 ```
 
-### Step 5: Start the System
+### Step 5: Run Your Pipeline
 
-Put it all together and start your application:
+Put it all together and execute your workflow:
 
 ```python
 import asyncio
 
 async def main():
-    # Initialize and start the system
-    await app.start()
+    # Publish your app to Blazing SaaS
+    await app.publish()
 
     # Execute the pipeline
-    result = await data_pipeline("source_123")
+    result = await app.data_pipeline("source_123")
     print(f"Pipeline result: {result}")
-
-    # Stop the system
-    await app.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -174,8 +159,14 @@ Here's the complete code in one file:
 
 ```python
 import asyncio
-from blazing import Blazing, BaseService
+from blazing import Blazing
+from blazing.base import BaseService
 
+# Create app (uses Blazing SaaS by default)
+app = Blazing()
+
+# Define service
+@app.service
 class DataProcessor(BaseService):
     async def fetch_data(self, source_id: str):
         return {"id": source_id, "data": [1, 2, 3, 4, 5]}
@@ -191,38 +182,35 @@ class DataProcessor(BaseService):
         print(f"Saved result: {result}")
         return result
 
-app = Blazing(
-    redis_config={'host': 'localhost', 'port': 6380},
-    services=[DataProcessor]
-)
-
+# Define steps
 @app.step
-async def fetch_station(source_id: str, services):
+async def fetch_step(source_id: str, services=None):
     processor = services['DataProcessor']
     return await processor.fetch_data(source_id)
 
 @app.step
-async def transform_station(data: dict, services):
+async def transform_step(data: dict, services=None):
     processor = services['DataProcessor']
     return await processor.transform_data(data)
 
 @app.step
-async def save_station(result: dict, services):
+async def save_step(result: dict, services=None):
     processor = services['DataProcessor']
     return await processor.save_result(result)
 
+# Define workflow
 @app.workflow
-async def data_pipeline(source_id: str):
-    data = await fetch_station(source_id)
-    result = await transform_station(data)
-    final = await save_station(result)
+async def data_pipeline(source_id: str, services=None):
+    data = await fetch_step(source_id, services=services)
+    result = await transform_step(data, services=services)
+    final = await save_step(result, services=services)
     return final
 
+# Run it
 async def main():
-    await app.start()
-    result = await data_pipeline("source_123")
+    await app.publish()
+    result = await app.data_pipeline("source_123")
     print(f"Pipeline result: {result}")
-    await app.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -247,6 +235,9 @@ Pipeline result: {'id': 'source_123', 'sum': 15, 'count': 5}
 
 Now that you have a basic pipeline running, explore more advanced features:
 
+- **[Core Examples](/blazing-flow/core-examples)** - See more workflow patterns
+- **[Services & Connectors](/blazing-flow/services/overview)** - Connect to databases, APIs, and more
+- **[Worker Optimization](/blazing-flow/configuration/worker-configuration)** - Tune performance for your workloads
 
 ## Need Help?
 
