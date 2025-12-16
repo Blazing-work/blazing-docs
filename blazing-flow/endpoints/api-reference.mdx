@@ -30,7 +30,7 @@ Expose a Blazing Flow workflow as an HTTP/WebSocket endpoint.
 |-----------|------|----------|---------|-------------|
 | `path` | `str` | ✅ Yes | - | URL path for the endpoint (e.g., `"/calculate"`, `"/v1/users"`) |
 | `method` | `str` | No | `"POST"` | HTTP method: `"GET"`, `"POST"`, `"PUT"`, `"DELETE"` |
-| `auth_handler` | `Callable` | No | `None` | Async function for authentication (see [Authentication](/blazing-flow/endpoints/authentication)) |
+| `auth_handler` | `Callable` | No | `None` | Async function for authentication (see [Authentication](/docs/blazing-flow/endpoints/authentication)) |
 | `enable_websocket` | `bool` | No | `False` | Create WebSocket endpoint at `{path}/ws` |
 
 ### Returns
@@ -446,6 +446,6 @@ All errors follow this format:
 
 ## Next Steps
 
-- [Authentication](/blazing-flow/endpoints/authentication) - Implement auth handlers
-- [WebSocket](/blazing-flow/endpoints/websocket) - Real-time updates
-- [Deployment](/blazing-flow/endpoints/deployment) - Production deployment
+- [Authentication](/docs/blazing-flow/endpoints/authentication) - Implement auth handlers
+- [WebSocket](/docs/blazing-flow/endpoints/websocket) - Real-time updates
+- [Deployment](/docs/blazing-flow/endpoints/deployment) - Production deployment
