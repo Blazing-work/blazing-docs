@@ -49,9 +49,9 @@ The system checks JWT secrets against known weak patterns:
 ┌─────────────────────────────────────────────────────────────────┐
 │                 CUSTOMER_ID: acme-corp                          │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │           Docker Container: blazing-foreman-acme          │  │
+│  │           Docker Container: blazing-coordinator-acme          │  │
 │  │                                                           │  │
-│  │   Foreman (customer_id=acme-corp)                        │  │
+│  │   Coordinator (customer_id=acme-corp)                        │  │
 │  │     ├── AppWorkerPool (app_id=acme-prod)                 │  │
 │  │     ├── AppWorkerPool (app_id=acme-staging)              │  │
 │  │     └── AppWorkerPool (app_id=acme-dev)                  │  │
@@ -75,8 +75,8 @@ The system checks JWT secrets against known weak patterns:
 
 ### Deployment
 ```yaml
-# Customer-specific foreman
-foreman-acme:
+# Customer-specific coordinator
+coordinator-acme:
   environment:
     - CUSTOMER_ID=acme-corp
     - REDIS_URL=redis://redis:6379
@@ -193,12 +193,12 @@ All data listing endpoints filter results by customer ownership:
 
 | Endpoint | Filtering |
 |----------|-----------|
-| `GET /v1/data/skillsets` | ✅ Filtered by owned app_ids |
+| `GET /v1/data/services` | ✅ Filtered by owned app_ids |
 | `GET /v1/data/stations` | ✅ Filtered by owned app_ids |
 | `GET /v1/data/routes` | ✅ Filtered by owned app_ids |
 | `GET /v1/ui/stations` | ✅ Filtered by owned app_ids |
 | `GET /v1/ui/routes` | ✅ Filtered by owned app_ids |
-| `GET /v1/ui/skillsets` | ✅ Filtered by owned app_ids |
+| `GET /v1/ui/services` | ✅ Filtered by owned app_ids |
 
 ### Implementation Pattern
 ```python
@@ -219,12 +219,12 @@ for item in items:
 ### Trust Boundaries
 ```
 YOUR INFRASTRUCTURE (trusted)
-└── Coordinator / Foreman
+└── Coordinator / Coordinator
 
 ────────────────────────────────
 
 TENANT'S CODE (semi-trusted)
-└── Skillsets + Connectors
+└── Services + Connectors
     Runs on TRUSTED workers
 
 ────────────────────────────────

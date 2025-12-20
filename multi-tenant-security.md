@@ -16,19 +16,19 @@ Blazing implements **defense-in-depth** multi-tenant security with 5 independent
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  YOUR INFRASTRUCTURE (trusted, your source code)                    │
-│  └── Coordinator / Foreman                                          │
+│  └── Coordinator / Coordinator                                          │
 │                                                                      │
 │  ════════════════════════════════════════════════════════════════   │
 │                                                                      │
 │  TENANT'S CODE (semi-trusted - tenant built, you don't see it)      │
-│  └── Skillsets + Connectors (DB credentials, business logic)       │
+│  └── Services + Connectors (DB credentials, business logic)       │
 │      Runs on TRUSTED workers                                        │
 │                                                                      │
 │  ════════════════════════════════════════════════════════════════   │
 │                                                                      │
 │  USER'S CODE (untrusted - tenant's end users write this)            │
 │  └── Stations / Routes in sandboxes                                 │
-│      Can ONLY call skillset methods (controlled interface)          │
+│      Can ONLY call service methods (controlled interface)          │
 │      Runs on SANDBOXED workers                                       │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
@@ -449,7 +449,7 @@ await lifecycle.configure_worker_pool(
 ### For Tenant Users
 
 1. **Assume code runs in sandbox** - no raw database access
-2. **Use skillsets for external I/O** - they run on trusted workers
+2. **Use services for external I/O** - they run on trusted workers
 3. **Don't try to bypass security** - all attempts are logged
 
 ---
@@ -500,7 +500,7 @@ await lifecycle.configure_worker_pool(
 
 **Solution:** Use safe alternatives:
 - ❌ `import redis` → ✅ Use DAOs
-- ❌ `import pymongo` → ✅ Use skillsets with database connectors
+- ❌ `import pymongo` → ✅ Use services with database connectors
 - ❌ `import os` → ✅ Use built-in Python functions
 
 ---
@@ -524,7 +524,7 @@ await lifecycle.configure_worker_pool(
 **Solution:**
 1. Check Redis key patterns: `KEYS blazing:*:*:Operation:*`
 2. Verify app_id in operation keys matches worker's app_id
-3. Restart foreman if queue assignments are corrupted
+3. Restart coordinator if queue assignments are corrupted
 
 ---
 

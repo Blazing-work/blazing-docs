@@ -489,7 +489,7 @@ def do_get(self, context, ticket):
 |---------|--------|----------------|
 | Multi-tenant isolation | ✅ | `RedisIndirect\|app_id\|pk` format |
 | Cross-tenant validation | ✅ | PermissionError on mismatch |
-| ACL users | ✅ | admin, executor, foreman, api (4 roles) |
+| ACL users | ✅ | admin, executor, coordinator, api (4 roles) |
 | Password authentication | ✅ | 32-character random passwords |
 | Command restrictions | ✅ | Executor blocked from FLUSHDB, CONFIG, etc. |
 | Key pattern restrictions | ✅ | `~blazing:*:unit_definition:Storage:*` |

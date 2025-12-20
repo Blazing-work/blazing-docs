@@ -231,7 +231,7 @@ Result: Complete compromise of all tenant data
 | VULN-009 | importlib bypass | ❓ NOT TESTED | Test exists but needs work |
 | VULN-011 | JWT expiry validation | 📝 DOCUMENTED | Test shows no max expiry |
 | VULN-012 | Context manager no lock | 📝 DOCUMENTED | AppContextManager issue |
-| VULN-013 | Skillset hijacking | 📝 DOCUMENTED | Endpoint not implemented |
+| VULN-013 | Service hijacking | 📝 DOCUMENTED | Endpoint not implemented |
 | **NEW** | Lock race condition | 🔴 DISCOVERED | Concurrent locks all succeed |
 
 ---

@@ -160,7 +160,7 @@ async def test_enqueue_and_dequeue_non_blocking(mock_thread_local):
 | Helper methods | Unit tests | Serialization, key formatting |
 | DAO operations | **Fakeredis tests** | Enqueue, dequeue, save |
 | Queue operations | **Fakeredis tests** | CRDT patterns, multi-tenant |
-| Worker lifecycle | Integration/E2E | Worker spawning, foreman |
+| Worker lifecycle | Integration/E2E | Worker spawning, coordinator |
 | API endpoints | Integration/E2E | FastAPI routes with auth |
 | Constants | Unit tests | Worker capabilities, timeouts |
 
@@ -664,7 +664,7 @@ async def test_with_fixture(app_id_context):
 **Example:** `runtime.py` (2,928 lines, 14% coverage)
 
 **Why Low:**
-- 86% is worker lifecycle, foreman management, distributed operations
+- 86% is worker lifecycle, coordinator management, distributed operations
 - Requires full Docker/Redis/Worker infrastructure
 - Properly tested by integration/E2E tests
 
@@ -816,7 +816,7 @@ node_id = queue_key_str.split(':')[-1]
 ### 2. Coverage Percentages Can Be Misleading
 
 **Example:** runtime.py at 14% coverage is ACCEPTABLE because:
-- 86% of the code is infrastructure that requires workers/foreman
+- 86% of the code is infrastructure that requires workers/coordinator
 - The 14% that IS covered includes all the testable parts (constants, helpers)
 - Integration tests provide the real coverage for distributed operations
 

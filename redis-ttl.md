@@ -55,7 +55,7 @@ All TTL durations are configurable via environment variables (values in seconds)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TTL_EXECUTION_FOREMAN` | 86400 (1 day) | Foreman coordinator state |
+| `TTL_EXECUTION_COORDINATOR` | 86400 (1 day) | Coordinator coordinator state |
 | `TTL_EXECUTION_WORKER_PROCESS` | 86400 (1 day) | Worker process state |
 | `TTL_EXECUTION_WORKER_THREAD` | 86400 (1 day) | Worker thread state |
 | `TTL_EXECUTION_WORKER_ASYNC` | 86400 (1 day) | Async worker state |
@@ -71,10 +71,10 @@ All TTL durations are configurable via environment variables (values in seconds)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TTL_APP_SPECIFIC_SKILLSET` | 31536000 (1 year) | Skillset definitions |
+| `TTL_APP_SPECIFIC_SERVICE` | 31536000 (1 year) | Service definitions |
 | `TTL_APP_SPECIFIC_CONNECTOR` | 31536000 (1 year) | Connector configurations |
 | `TTL_APP_SPECIFIC_CUSTOMER_APP_MAPPING` | 15552000 (6 months) | Customer app mappings |
-| `TTL_APP_SPECIFIC_SKILLSET_INVOKE` | 86400 (1 day) | Skillset invocation records |
+| `TTL_APP_SPECIFIC_SERVICE_INVOKE` | 86400 (1 day) | Service invocation records |
 | `TTL_APP_SPECIFIC_DYNAMIC_CODE` | 604800 (1 week) | Dynamic code execution records |
 
 ### Queues
@@ -113,14 +113,14 @@ services:
 ```bash
 # Long-lived user definitions
 TTL_ROUTE_DEFINITION_ROUTE=31536000  # 1 year
-TTL_APP_SPECIFIC_SKILLSET=31536000   # 1 year
+TTL_APP_SPECIFIC_SERVICE=31536000   # 1 year
 
 # Medium-lived execution artifacts
 TTL_UNIT_DEFINITION_UNIT=15552000    # 6 months
 TTL_UNIT_DEFINITION_OPERATION=15552000  # 6 months
 
 # Short-lived runtime state
-TTL_EXECUTION_FOREMAN=86400          # 1 day
+TTL_EXECUTION_COORDINATOR=86400          # 1 day
 TTL_EXECUTION_WORKER_THREAD=86400    # 1 day
 
 # Queue cleanup

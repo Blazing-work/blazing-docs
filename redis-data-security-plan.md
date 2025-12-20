@@ -12,14 +12,14 @@
 - **Image:** redis/redis-stack:latest
 - **Purpose:** DAOs, queues, worker state, search indexes
 - **Port:** 6379 (+ 8002 for RedisInsight)
-- **Access:** API, Foreman, Executor (via blazing-network + executor-internal)
+- **Access:** API, Coordinator, Executor (via blazing-network + executor-internal)
 - **Storage:** Persistent volume (redis-data)
 
 ### Redis-Data (Large Payloads)
 - **Image:** redis:7-alpine
 - **Purpose:** StorageDAO (args/kwargs/results), large data caching
 - **Port:** 6380 → 6379 (internal)
-- **Access:** API, Foreman, Executor (via blazing-network + executor-internal)
+- **Access:** API, Coordinator, Executor (via blazing-network + executor-internal)
 - **Storage:** Persistent volume (redis-data-storage)
 
 ---
@@ -108,7 +108,7 @@ api:
   environment:
     - DATA_REDIS_PASSWORD=blazing-dev-data-password
 
-foreman:
+coordinator:
   environment:
     - DATA_REDIS_PASSWORD=blazing-dev-data-password
 
@@ -130,7 +130,7 @@ executor:
 # Default user (disabled)
 user default off
 
-# Admin user (foreman/API) - full access
+# Admin user (coordinator/API) - full access
 user admin on >${REDIS_DATA_ADMIN_PASSWORD:-admin-dev-password} ~* +@all
 
 # Executor user (restricted) - data access only

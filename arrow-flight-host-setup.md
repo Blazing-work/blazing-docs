@@ -16,7 +16,7 @@ This starts:
 - Redis (coordination)
 - Redis-data (storage)
 - API server
-- Foreman
+- Coordinator
 - Executor (configured to connect to host.docker.internal:8815)
 
 ### 2. Start Arrow Flight on Host
@@ -109,7 +109,7 @@ environment:
 │  │         Docker Containers                        │        │
 │  │                                                  │        │
 │  │  ┌──────────┐    ┌──────────┐    ┌─────────┐  │        │
-│  │  │ Executor │────│ Redis    │────│ Foreman │  │        │
+│  │  │ Executor │────│ Redis    │────│ Coordinator │  │        │
 │  │  │          │    │ :6379    │    │         │  │        │
 │  │  └──────────┘    └──────────┘    └─────────┘  │        │
 │  │       │                                         │        │

@@ -20,7 +20,7 @@ This guide walks through deploying the new Redis-data security hardening:
 - **Test coverage**: 17 tests (all passing)
 
 ### Phase 2: ACL + Password Authentication ✅
-- **ACL users**: admin, executor, foreman, api (4 roles)
+- **ACL users**: admin, executor, coordinator, api (4 roles)
 - **Command restrictions**:
   - Executor: GET, SET, DEL, HGET, HSET, HDEL, HGETALL, HEXISTS, EXPIRE, TTL, PING, EXISTS
   - Blocked: FLUSHDB, CONFIG, SHUTDOWN, ACL, SCRIPT, KEYS (for executor)
@@ -41,7 +41,7 @@ cd /Users/jonathanborduas/code/blazing
 # This creates .env.redis-passwords with 4 passwords:
 # - REDIS_ADMIN_PASSWORD (full access)
 # - REDIS_DATA_EXECUTOR_PASSWORD (executor user)
-# - REDIS_DATA_FOREMAN_PASSWORD (foreman user)
+# - REDIS_DATA_COORDINATOR_PASSWORD (coordinator user)
 # - REDIS_DATA_API_PASSWORD (api user)
 ```
 
@@ -86,7 +86,7 @@ docker logs blazing-redis-data
 ```
 Redis Data Entrypoint - Applying ACL configuration...
 ✓ ACL configuration prepared with passwords
-✓ Users configured: admin, executor, foreman, api
+✓ Users configured: admin, executor, coordinator, api
 ✓ Server initialized
 ```
 
@@ -94,7 +94,7 @@ Redis Data Entrypoint - Applying ACL configuration...
 
 ```bash
 # Restart all services that connect to redis-data
-docker-compose restart executor foreman api pyodide-executor arrow-flight
+docker-compose restart executor coordinator api pyodide-executor arrow-flight
 
 # Check health
 docker-compose ps
@@ -105,7 +105,7 @@ docker-compose ps
 NAME                 STATUS
 blazing-redis-data   Up (healthy)
 blazing-executor     Up (healthy)
-blazing-foreman      Up (healthy)
+blazing-coordinator      Up (healthy)
 blazing-api          Up (healthy)
 ```
 
@@ -155,20 +155,20 @@ docker exec blazing-redis-data redis-cli \
 
 ### 2. **executor** - Code Execution Containers
 - **Access**: GET, SET, DEL, HGET, HSET, HDEL, HGETALL, HEXISTS, EXPIRE, TTL, PING, EXISTS
-- **Keys**: `~blazing:*:unit_definition:Storage:*`, `~blazing:*:route_definition:Skillset:*`
+- **Keys**: `~blazing:*:unit_definition:Storage:*`, `~blazing:*:route_definition:Service:*`
 - **Usage**: Docker executor, Pyodide executor
 - **Credentials**: `REDIS_DATA_EXECUTOR_PASSWORD`
 
 **Blocked commands**: FLUSHDB, CONFIG, SHUTDOWN, ACL, SCRIPT, KEYS
 
-### 3. **foreman** - Background Workers
+### 3. **coordinator** - Background Workers
 - **Access**: All executor permissions + KEYS, SCAN, DBSIZE, INFO
 - **Keys**: `~blazing:*` (all patterns)
-- **Usage**: Foreman workers, statistics aggregation
-- **Credentials**: `REDIS_DATA_FOREMAN_PASSWORD`
+- **Usage**: Coordinator workers, statistics aggregation
+- **Credentials**: `REDIS_DATA_COORDINATOR_PASSWORD`
 
 ### 4. **api** - FastAPI Endpoints
-- **Access**: Same as foreman
+- **Access**: Same as coordinator
 - **Keys**: `~blazing:*`
 - **Usage**: REST API endpoints
 - **Credentials**: `REDIS_DATA_API_PASSWORD`
@@ -240,7 +240,7 @@ docker exec blazing-redis-data redis-cli \
 ### ⚠️ Multi-Tenant Isolation
 - ACL allows cross-app_id key access at **Redis level** (e.g., `~blazing:*:...`)
 - **Application layer** enforces app_id validation (redis_client.py:271)
-- This design allows foreman to access all tenants for statistics/monitoring
+- This design allows coordinator to access all tenants for statistics/monitoring
 - Executor is restricted by validation in `fetch_from_address()`
 
 ### ⚠️ Data Loss Risk
@@ -268,7 +268,7 @@ echo $REDIS_DATA_EXECUTOR_PASSWORD
 source .env.redis-passwords
 
 # Restart services
-docker-compose restart executor foreman api
+docker-compose restart executor coordinator api
 ```
 
 ### Issue: ACL Permission Denied

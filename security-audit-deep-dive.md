@@ -590,46 +590,46 @@ def __enter__(self):
 
 ---
 
-### VULN-013: Skillset Invocation Doesn't Validate app_id
+### VULN-013: Service Invocation Doesn't Validate app_id
 
-**Location:** [src/blazing_service/server.py:961+](../src/blazing_service/server.py#L961) (skillset invoke endpoint)
+**Location:** [src/blazing_service/server.py:961+](../src/blazing_service/server.py#L961) (service invoke endpoint)
 
 **Issue:**
 ```python
-@app.post("/v1/skillsets/{skillset_name}/invoke")
-async def invoke_skillset(
-    skillset_name: str,
+@app.post("/v1/services/{service_name}/invoke")
+async def invoke_service(
+    service_name: str,
     request: Request,
-    request_body: SkillsetInvokeRequest,
+    request_body: ServiceInvokeRequest,
 ):
     app_id = getattr(request.state, "app_id", "default")
     set_app_id(app_id)  # ⚠️ No lock, no validation
 
     # Create high-priority operation
-    # ⚠️ Doesn't verify skillset belongs to requesting tenant
+    # ⚠️ Doesn't verify service belongs to requesting tenant
 ```
 
 **Problem:**
-- Endpoint doesn't verify skillset belongs to requesting tenant
-- Attacker can invoke victim's skillsets (which have DB credentials)
+- Endpoint doesn't verify service belongs to requesting tenant
+- Attacker can invoke victim's services (which have DB credentials)
 
 **Exploit:**
 ```bash
-# Attacker discovers victim's skillset name
+# Attacker discovers victim's service name
 curl -H "Authorization: Bearer attacker-jwt" \
-  POST /v1/skillsets/VictimDatabaseSkillset/invoke \
+  POST /v1/services/VictimDatabaseService/invoke \
   -d '{"method": "get_customer_data", "args": []}'
-# ⚠️ Executes victim's skillset with victim's DB credentials
+# ⚠️ Executes victim's service with victim's DB credentials
 ```
 
-**Impact:** **Skillset hijacking** - access to victim's database connections
+**Impact:** **Service hijacking** - access to victim's database connections
 
 **Fix Required:**
 ```python
-# Verify skillset belongs to requesting tenant
-skillset_key = f"blazing:{app_id}:route_definition:Skillset:{skillset_name}"
-if not await redis.exists(skillset_key):
-    raise HTTPException(status_code=404, detail="Skillset not found")
+# Verify service belongs to requesting tenant
+service_key = f"blazing:{app_id}:route_definition:Service:{service_name}"
+if not await redis.exists(service_key):
+    raise HTTPException(status_code=404, detail="Service not found")
 ```
 
 ---
@@ -752,9 +752,9 @@ payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
 
 ---
 
-### MED-004: No Secrets Scanning in Skillsets
+### MED-004: No Secrets Scanning in Services
 
-**Issue:** Skillsets can contain hardcoded secrets
+**Issue:** Services can contain hardcoded secrets
 
 **Impact:** Secrets in logs/Redis
 
@@ -800,7 +800,7 @@ payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
 **Steps:**
 1. **VULN-007:** Use default JWT secret to forge tenant-b JWT
 2. **VULN-002:** Read tenant-b operation data via API
-3. **VULN-013:** Invoke tenant-b skillsets to access their databases
+3. **VULN-013:** Invoke tenant-b services to access their databases
 4. **VULN-006:** Inject Redis ACL patterns to gain wildcard access
 
 **Result:** Full access to tenant-b data and credentials
@@ -860,7 +860,7 @@ payload = jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
 8. **Fix VULN-008:** Add rate limiting to auth endpoint
 9. **Fix VULN-011:** Validate JWT exp claim (max 1 year)
 10. **Fix VULN-012:** Lock context in AppContextManager
-11. **Fix VULN-013:** Validate skillset ownership
+11. **Fix VULN-013:** Validate service ownership
 12. **Add security logging:** Audit all security events
 
 ### Medium-Term (P2 - Deploy Within 1 Month)

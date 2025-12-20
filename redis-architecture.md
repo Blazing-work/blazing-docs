@@ -23,22 +23,22 @@ Blazing uses a dual-Redis architecture with distinct roles and capabilities for 
 - **RedisBloom** - Probabilistic data structures
 
 **Used For:**
-- All DAO objects (`StationDAO`, `OperationDAO`, `UnitDAO`, `ForemanDAO`, `WorkerThreadDAO`, etc.)
+- All DAO objects (`StationDAO`, `OperationDAO`, `UnitDAO`, `CoordinatorDAO`, `WorkerThreadDAO`, etc.)
 - Queue management (blocking queues, non-blocking queues, statistics queues)
-- Search indexes for finding objects (e.g., `ForemanDAO.find()`, `StationDAO.find()`)
+- Search indexes for finding objects (e.g., `CoordinatorDAO.find()`, `StationDAO.find()`)
 - ACL user management with role-based permissions
 
 **Key Operations:**
 ```python
 # These require RediSearch indexes
 await StationDAO.find(StationDAO.name == "my_station").first()
-await ForemanDAO.find_next_available_name()
+await CoordinatorDAO.find_next_available_name()
 await WorkerThreadDAO.find(WorkerThreadDAO.worker_process_pk == pk).all()
 ```
 
 **ACL Users:**
 - `admin` - Full access for management operations
-- `foreman` - Full access for worker coordination
+- `coordinator` - Full access for worker coordination
 - `api` - Full access for API server
 - `executor` - Limited access (no `FT.SEARCH`, specific key patterns only)
 
@@ -75,11 +75,11 @@ await redis_data.hget(f"blazing:{app_id}:storage:{pk}", "data")
 | Component | Needs RediSearch | Why |
 |-----------|-----------------|-----|
 | API Server | Yes | Uses `.find()` for station/route lookups |
-| Foreman | Yes | Uses `.find()` for worker management |
+| Coordinator | Yes | Uses `.find()` for worker management |
 | Worker Processes | Yes | Uses `.find()` for operation lookups |
 | Health Check | No* | Simplified to avoid RediSearch dependency |
 
-*Note: `health_check()` was simplified to only check Redis connectivity, not foreman count, to avoid RediSearch dependency in minimal deployments.
+*Note: `health_check()` was simplified to only check Redis connectivity, not coordinator count, to avoid RediSearch dependency in minimal deployments.
 
 ### Where RediSearch is NOT Required
 
@@ -102,9 +102,9 @@ async def health_check():
         redis_client = thread_local_data.redis
         await redis_client.ping()
 
-        # Note: Foreman check disabled due to FT.SEARCH requiring RediSearch module
+        # Note: Coordinator check disabled due to FT.SEARCH requiring RediSearch module
         # To re-enable, uncomment below (only works with redis-stack-server):
-        # foremen = await ForemanDAO.find().all()
+        # foremen = await CoordinatorDAO.find().all()
         # foremen_count = len(foremen)
 
         return {
@@ -142,7 +142,7 @@ services:
     environment:
       - REDIS_ADMIN_PASSWORD=${REDIS_ADMIN_PASSWORD}
       - REDIS_EXECUTOR_PASSWORD=${REDIS_EXECUTOR_PASSWORD}
-      - REDIS_FOREMAN_PASSWORD=${REDIS_FOREMAN_PASSWORD}
+      - REDIS_COORDINATOR_PASSWORD=${REDIS_COORDINATOR_PASSWORD}
       - REDIS_API_PASSWORD=${REDIS_API_PASSWORD}
     entrypoint: ["/usr/local/bin/redis-entrypoint.sh"]
     volumes:
@@ -156,7 +156,7 @@ services:
     environment:
       - REDIS_DATA_ADMIN_PASSWORD=${REDIS_DATA_ADMIN_PASSWORD}
       - REDIS_DATA_EXECUTOR_PASSWORD=${REDIS_DATA_EXECUTOR_PASSWORD}
-      - REDIS_DATA_FOREMAN_PASSWORD=${REDIS_DATA_FOREMAN_PASSWORD}
+      - REDIS_DATA_COORDINATOR_PASSWORD=${REDIS_DATA_COORDINATOR_PASSWORD}
       - REDIS_DATA_API_PASSWORD=${REDIS_DATA_API_PASSWORD}
     entrypoint: ["/usr/local/bin/redis-data-entrypoint.sh"]
 ```
