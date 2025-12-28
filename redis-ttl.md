@@ -176,10 +176,10 @@ To check if TTL is being applied:
 
 ```bash
 # Check TTL on a specific key
-redis-cli TTL "blazing:my-app:route_definition:Station:01234567890"
+redis-cli TTL "blazing:my-app:workflow_definition:Station:01234567890"
 
 # Count keys with vs without TTL
-redis-cli --scan --pattern "blazing:*:route_definition:Station:*" | \
+redis-cli --scan --pattern "blazing:*:workflow_definition:Station:*" | \
   xargs -I {} redis-cli TTL {} | \
   awk '{if($1==-1) print "No TTL"; else print "Has TTL"}' | \
   sort | uniq -c

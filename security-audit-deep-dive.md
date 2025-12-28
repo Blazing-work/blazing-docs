@@ -627,7 +627,7 @@ curl -H "Authorization: Bearer attacker-jwt" \
 **Fix Required:**
 ```python
 # Verify service belongs to requesting tenant
-service_key = f"blazing:{app_id}:route_definition:Service:{service_name}"
+service_key = f"blazing:{app_id}:workflow_definition:Service:{service_name}"
 if not await redis.exists(service_key):
     raise HTTPException(status_code=404, detail="Service not found")
 ```

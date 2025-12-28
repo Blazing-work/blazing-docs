@@ -311,7 +311,7 @@ blazing:{app_id}:{model_prefix}:{pk}
 
 **Examples:**
 ```
-blazing:default:route_definition:Station:01ABC123
+blazing:default:workflow_definition:Station:01ABC123
 blazing:tenant-a:unit_definition:Operation:01DEF456
 blazing:tenant-b:execution:WorkerThread:01GHI789
 ```

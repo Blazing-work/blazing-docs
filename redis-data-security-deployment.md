@@ -155,7 +155,7 @@ docker exec blazing-redis-data redis-cli \
 
 ### 2. **executor** - Code Execution Containers
 - **Access**: GET, SET, DEL, HGET, HSET, HDEL, HGETALL, HEXISTS, EXPIRE, TTL, PING, EXISTS
-- **Keys**: `~blazing:*:unit_definition:Storage:*`, `~blazing:*:route_definition:Service:*`
+- **Keys**: `~blazing:*:unit_definition:Storage:*`, `~blazing:*:workflow_definition:Service:*`
 - **Usage**: Docker executor, Pyodide executor
 - **Credentials**: `REDIS_DATA_EXECUTOR_PASSWORD`
 

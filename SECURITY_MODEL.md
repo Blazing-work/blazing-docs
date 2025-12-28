@@ -109,7 +109,7 @@ Request → JWT Validation → set_app_id(lock=True) → DAO Operations
 ### Redis Key Namespacing
 All data is stored with app_id prefix:
 ```
-blazing:{app_id}:route_definition:Station:{pk}
+blazing:{app_id}:workflow_definition:Station:{pk}
 blazing:{app_id}:unit_definition:Operation:{pk}
 blazing:{app_id}:execution:WorkerThread:{pk}
 ```
