@@ -1,0 +1,106 @@
+---
+title: SDL Syntax Reference
+label: SDL Syntax Reference
+description: Interactive guide to Blazing Core's Service Definition Language. Click sections to highlight corresponding YAML.
+position: 0
+layout: split-yaml
+yamlFile: sdl-example.yaml
+yamlSections:
+  - id: header
+    title: Header & Comments
+    description: YAML files start with descriptive comments explaining the deployment purpose.
+    details:
+      - "Use # for single-line comments"
+      - Document the deployment intent at the top
+      - Comments are ignored during parsing
+    lineStart: 1
+    lineEnd: 3
+  - id: version
+    title: Version
+    description: Specifies the SDL schema version for compatibility.
+    details:
+      - 'Required field - must be "1" for current schema'
+      - Ensures forward compatibility as SDL evolves
+    lineStart: 5
+    lineEnd: 5
+  - id: policy
+    title: Global Policy
+    description: Defines default deployment policies that apply to all services unless overridden.
+    details:
+      - "providers: Cloud providers to use (gcp, akash, aws, azure)"
+      - "regions: Default geographic regions for deployment"
+      - "cost_optimization: balanced, performance, or cost"
+    lineStart: 7
+    lineEnd: 11
+  - id: services
+    title: Services
+    description: Container-based service definitions. Each service represents a deployable unit.
+    details:
+      - Services are the core building blocks
+      - Each service can have its own policy overrides
+      - Service names become DNS hostnames internally
+    lineStart: 13
+    lineEnd: 14
+  - id: cockroachdb
+    title: Database Service (CockroachDB)
+    description: Stateful database service with custom resources, replication, and persistence.
+    details:
+      - "image: Container image to deploy"
+      - "command: Override the default container command"
+      - "resources: CPU, memory, and storage allocation"
+      - "policy.replicas: Number of instances"
+      - "policy.anti_affinity: Spread across zones for HA"
+    lineStart: 15
+    lineEnd: 35
+  - id: api-gateway
+    title: API Gateway Service
+    description: Stateless service with load balancing and environment variables.
+    details:
+      - "load_balancing: round_robin, least_connections, or ip_hash"
+      - "environment: Runtime configuration via env vars"
+      - "depends_on: Service startup dependencies"
+      - "Variables use ${VAR_NAME} syntax"
+    lineStart: 37
+    lineEnd: 54
+  - id: worker
+    title: Worker Service with Autoscaling
+    description: Background worker with horizontal pod autoscaling based on CPU utilization.
+    details:
+      - "autoscaling.min/max: Replica bounds"
+      - "autoscaling.target_cpu: Scale trigger threshold"
+      - Scales automatically based on workload
+    lineStart: 56
+    lineEnd: 68
+  - id: volumes
+    title: Persistent Volumes
+    description: Durable storage that persists across container restarts and deployments.
+    details:
+      - "size: Storage capacity (supports Gi, Ti units)"
+      - "type: ssd or hdd"
+      - "policy.replication: Data redundancy factor"
+      - "policy.backup: Automated backup configuration"
+    lineStart: 70
+    lineEnd: 81
+  - id: network
+    title: Network Configuration
+    description: Ingress, TLS, and internal networking settings.
+    details:
+      - "ingress: External access configuration"
+      - "domains: Custom domain routing"
+      - "tls: Automatic certificate management"
+      - "internal: Private network settings"
+    lineStart: 83
+    lineEnd: 96
+  - id: secrets
+    title: Secrets Management
+    description: Secure handling of sensitive configuration values.
+    details:
+      - "source: vault (HashiCorp Vault) or env"
+      - "path: Vault secret path"
+      - "required: Fail deployment if missing"
+      - Never commit secrets to version control
+    lineStart: 98
+    lineEnd: 105
+---
+
+This is the SDL Syntax Reference page. The content above defines the interactive split-pane layout.

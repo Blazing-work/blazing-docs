@@ -1,652 +1,129 @@
 ---
 title: Configuration Reference
 label: Configuration Reference
-description: Complete reference for Blazing Gateway configuration
+description: Complete reference for Blazing Gateway configuration. Click sections to highlight corresponding YAML.
 position: 0
+yamlFile: gateway-config.yaml
+showYamlPane: true
+yamlSections:
+  - id: version
+    title: Header & Version
+    path: version
+    description: Configuration file header with version identifier.
+    details:
+      - "version: Schema version (currently 1)"
+  - id: gateway
+    title: Gateway Settings
+    path: gateway
+    description: Core gateway identification and high availability settings.
+    details:
+      - "name: Unique gateway identifier"
+      - "regions: Geographic deployment regions"
+      - "ha: High availability with min/max instances"
+  - id: sip
+    title: SIP Configuration
+    path: sip
+    description: Session Initiation Protocol server settings, authentication, and TLS.
+    subSections:
+      - id: sip-timers
+        title: SIP Timers
+        path: sip.timers
+        description: RFC 3261 timer configuration including T1 (RTT estimate), T2 (max retransmit interval), and T4 (max message network duration).
+      - id: sip-transports
+        title: Transport Protocols
+        path: sip.transports
+        description: Supported protocols including UDP, TCP, TLS, WebSocket (ws), and Secure WebSocket (wss).
+      - id: sip-authentication
+        title: Authentication
+        path: sip.authentication
+        description: Digest authentication (RFC 2617) or certificate-based auth. Supports local user database or external auth endpoint.
+      - id: sip-tls
+        title: TLS/Encryption
+        path: sip.tls
+        description: Certificate configuration, minimum TLS version, and cipher suite selection for secure signaling.
+  - id: media
+    title: Media Configuration
+    path: media
+    description: RTP/SRTP settings, codecs, transcoding, and NAT traversal.
+    subSections:
+      - id: media-codecs
+        title: Audio Codecs
+        path: media.codecs
+        description: Priority-ordered list of supported codecs including Opus (wideband), G.722, PCMU/PCMA (G.711), and G.729.
+      - id: media-srtp
+        title: SRTP Encryption
+        path: media.srtp
+        description: Secure RTP configuration with crypto suites like AES_CM_128_HMAC_SHA1_80 for encrypted media streams.
+      - id: media-processing
+        title: Media Processing
+        path: media.processing
+        description: Transcoding, call recording, conference mixing, and noise suppression capabilities.
+      - id: media-nat
+        title: NAT Traversal
+        path: media.nat_traversal
+        description: STUN/TURN server configuration and ICE support for reliable media delivery behind NAT.
+  - id: routing
+    title: Routing Configuration
+    path: routing
+    description: Call routing rules, load balancing, and failover policies.
+    subSections:
+      - id: routing-rules
+        title: Routing Rules
+        path: routing.rules
+        description: Pattern-based routing with prefix matching, exclusions, and multi-provider failover with weighted distribution.
+      - id: routing-load-balancing
+        title: Load Balancing
+        path: routing.load_balancing
+        description: Health check configuration with OPTIONS pings, thresholds, and weighted round-robin distribution.
+      - id: routing-failover
+        title: Failover Policy
+        path: routing.failover
+        description: Automatic failover triggers based on error rate, latency thresholds, and consecutive failures.
+  - id: security
+    title: Security Configuration
+    path: security
+    description: DDoS protection, access control, and fraud prevention.
+    subSections:
+      - id: security-ddos
+        title: DDoS Protection
+        path: security.ddos_protection
+        description: Rate limiting per IP, per user, and global limits to prevent denial of service attacks.
+      - id: security-access
+        title: Access Control
+        path: security.access_control
+        description: IP whitelist/blacklist with strict mode and auto-blacklisting for repeated offenders.
+      - id: security-fraud
+        title: Fraud Prevention
+        path: security.fraud_prevention
+        description: Cost limits, pattern detection for suspicious activity, and premium rate number blocking.
+  - id: monitoring
+    title: Monitoring Configuration
+    path: monitoring
+    description: Metrics, logging, and alerting settings.
+    subSections:
+      - id: monitoring-metrics
+        title: Metrics & Prometheus
+        path: monitoring.metrics
+        description: Prometheus endpoint configuration with custom metrics for call volume, duration, and MOS quality scores.
+      - id: monitoring-logging
+        title: Logging
+        path: monitoring.logging
+        description: Multi-destination logging (stdout, file, syslog, S3) with rotation policies and JSON formatting.
+      - id: monitoring-alerts
+        title: Alerting Rules
+        path: monitoring.alerts
+        description: Condition-based alerts with severity levels and multi-channel notifications (email, Slack, PagerDuty).
+  - id: integration
+    title: Integration Configuration
+    path: integration
+    description: Blazing Core integration and webhook endpoints.
+    subSections:
+      - id: integration-core
+        title: Core Services
+        path: integration.core
+        description: Connect to Blazing Core services with event subscriptions for call lifecycle events.
+      - id: integration-webhooks
+        title: Webhooks
+        path: integration.webhooks
+        description: External webhook endpoints with custom headers, event filtering, and exponential backoff retry.
 ---
-
-Complete reference for configuring Blazing Gateway, including SIP settings, routing rules, security policies, and integration options.
-
-## Configuration File Structure
-
-The `gateway.yaml` file defines all aspects of your gateway:
-
-```yaml
-version: 1
-
-gateway:
-  name: string
-  sip: {}
-  media: {}
-  routing: []
-  security: {}
-  monitoring: {}
-  integration: {}
-```
-
-## Gateway Settings
-
-### Basic Configuration
-
-```yaml
-gateway:
-  name: production-gateway  # Gateway identifier
-  description: "Production VoIP gateway for customer calls"
-
-  # Geographic regions for deployment
-  regions:
-    - us-east-1
-    - us-west-2
-    - eu-west-1
-    - ap-south-1
-
-  # High availability settings
-  ha:
-    enabled: true
-    min_instances: 2
-    max_instances: 10
-```
-
-## SIP Configuration
-
-### SIP Server Settings
-
-```yaml
-sip:
-  # SIP server ports
-  port: 5060           # UDP/TCP port
-  tls_port: 5061       # TLS port
-  ws_port: 8080        # WebSocket port
-  wss_port: 8443       # WebSocket Secure port
-
-  # SIP domain
-  domain: sip.example.com
-
-  # Transport protocols
-  transports:
-    - udp
-    - tcp
-    - tls
-    - ws
-    - wss
-
-  # SIP timers (RFC 3261)
-  timers:
-    t1: 500ms          # RTT estimate
-    t2: 4s             # Max retransmit interval
-    t4: 5s             # Max duration message remains in network
-```
-
-### Authentication
-
-```yaml
-sip:
-  authentication:
-    enabled: true
-    realm: "blazing.run"
-
-    # Authentication methods
-    methods:
-      - digest          # RFC 2617
-      - tls-cert        # Certificate-based
-
-    # User database
-    users:
-      - username: "user1"
-        password: "hashed-password"
-        display_name: "User One"
-
-      - username: "user2"
-        password: "hashed-password"
-        display_name: "User Two"
-
-    # External authentication
-    external_auth:
-      enabled: true
-      endpoint: "https://auth.example.com/sip-auth"
-      timeout: 2s
-```
-
-### TLS/Encryption
-
-```yaml
-sip:
-  tls:
-    enabled: true
-
-    # Certificate configuration
-    certificate:
-      cert_file: "/path/to/cert.pem"
-      key_file: "/path/to/key.pem"
-      ca_file: "/path/to/ca.pem"
-
-    # TLS version
-    min_version: "1.2"
-
-    # Cipher suites
-    ciphers:
-      - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-      - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
-```
-
-## Media Configuration
-
-### RTP/SRTP Settings
-
-```yaml
-media:
-  # RTP port range
-  rtp_port_range: 10000-20000
-
-  # Supported codecs (in preference order)
-  codecs:
-    - opus            # 48kHz wideband
-    - g722            # 16kHz wideband
-    - pcmu            # G.711 μ-law
-    - pcma            # G.711 A-law
-    - g729            # 8kbit/s compressed
-
-  # SRTP encryption
-  srtp:
-    enabled: true
-    crypto_suites:
-      - AES_CM_128_HMAC_SHA1_80
-      - AES_CM_128_HMAC_SHA1_32
-
-  # DTMF handling
-  dtmf:
-    methods:
-      - rfc2833       # RTP telephone events
-      - info          # SIP INFO
-      - inband        # Audio tone detection
-```
-
-### Media Processing
-
-```yaml
-media:
-  processing:
-    # Transcoding
-    transcoding:
-      enabled: true
-      max_channels: 100
-
-    # Recording
-    recording:
-      enabled: false
-      format: wav
-      storage: s3://my-bucket/recordings
-
-    # Mixing (for conferencing)
-    mixing:
-      enabled: true
-      max_participants: 50
-
-    # Noise suppression
-    noise_suppression:
-      enabled: true
-      level: moderate  # low, moderate, aggressive
-```
-
-### NAT Traversal
-
-```yaml
-media:
-  nat_traversal:
-    # STUN server
-    stun:
-      enabled: true
-      servers:
-        - "stun:stun.l.google.com:19302"
-
-    # TURN relay
-    turn:
-      enabled: true
-      servers:
-        - "turn:turn.example.com:3478"
-      credentials:
-        username: "turnuser"
-        password: "turnpass"
-
-    # ICE
-    ice:
-      enabled: true
-      lite: false
-```
-
-## Routing Configuration
-
-### Call Routing
-
-```yaml
-routing:
-  # Default routing strategy
-  strategy: least-cost  # least-cost, round-robin, priority
-
-  # Routing rules
-  rules:
-    # US calls
-    - name: "US Domestic"
-      match:
-        prefix: "+1"
-        exclude:
-          - "+1900"  # Premium rate
-      route:
-        - provider: "twilio"
-          trunk: "sip:trunk.twilio.com"
-          priority: 1
-          weight: 70
-        - provider: "bandwidth"
-          trunk: "sip:trunk.bandwidth.com"
-          priority: 1
-          weight: 30
-        - provider: "voxbone"
-          trunk: "sip:trunk.voxbone.com"
-          priority: 2  # Failover
-      cost_per_minute: 0.01
-
-    # UK calls
-    - name: "UK Domestic"
-      match:
-        prefix: "+44"
-      route:
-        - provider: "uk-carrier"
-          trunk: "sip:trunk.uk-carrier.com"
-          priority: 1
-      cost_per_minute: 0.02
-
-    # International calls
-    - name: "International"
-      match:
-        prefix: "+"
-      route:
-        - provider: "global-carrier"
-          trunk: "sip:trunk.global.com"
-          priority: 1
-      cost_per_minute: 0.15
-```
-
-### Load Balancing
-
-```yaml
-routing:
-  load_balancing:
-    # Load balancing algorithm
-    algorithm: weighted-round-robin  # round-robin, least-connections, ip-hash
-
-    # Health checks
-    health_checks:
-      enabled: true
-      interval: 30s
-      timeout: 5s
-      unhealthy_threshold: 3
-      healthy_threshold: 2
-
-      # SIP OPTIONS ping
-      method: options
-      uri: "sip:healthcheck@trunk.example.com"
-```
-
-### Failover
-
-```yaml
-routing:
-  failover:
-    enabled: true
-
-    # Automatic failover conditions
-    triggers:
-      - error_rate_threshold: 0.1  # 10% error rate
-      - latency_threshold: 500ms
-      - consecutive_failures: 3
-
-    # Failback settings
-    failback:
-      enabled: true
-      delay: 5m  # Wait 5 minutes before failing back
-```
-
-## Security Configuration
-
-### DDoS Protection
-
-```yaml
-security:
-  ddos_protection:
-    enabled: true
-
-    # Rate limiting
-    rate_limits:
-      # Per IP limits
-      per_ip:
-        requests_per_second: 10
-        burst: 20
-
-      # Per user limits
-      per_user:
-        calls_per_minute: 30
-        concurrent_calls: 5
-
-      # Global limits
-      global:
-        calls_per_second: 1000
-```
-
-### Access Control
-
-```yaml
-security:
-  access_control:
-    # IP whitelist
-    whitelist:
-      enabled: true
-      ips:
-        - 192.0.2.0/24
-        - 198.51.100.0/24
-
-      # Whitelist mode
-      mode: strict  # strict, permissive
-
-    # IP blacklist
-    blacklist:
-      enabled: true
-      ips:
-        - 203.0.113.0/24
-
-      # Automatic blacklisting
-      auto_blacklist:
-        enabled: true
-        threshold: 10  # Failed auth attempts
-        duration: 1h
-```
-
-### Fraud Prevention
-
-```yaml
-security:
-  fraud_prevention:
-    enabled: true
-
-    # Cost thresholds
-    cost_limits:
-      per_call: 10.00      # Max $10 per call
-      per_hour: 100.00     # Max $100 per hour
-      per_day: 1000.00     # Max $1000 per day
-
-    # Pattern detection
-    pattern_detection:
-      enabled: true
-
-      # Unusual call patterns
-      alerts:
-        - rapid_sequential_calls: 10  # 10+ calls in quick succession
-        - long_duration: 2h           # Calls > 2 hours
-        - premium_rate: true          # Calls to premium numbers
-
-    # Number blacklist
-    number_blacklist:
-      - prefix: "+1900"  # Premium rate
-      - prefix: "+882"   # International premium
-```
-
-## Monitoring Configuration
-
-### Metrics
-
-```yaml
-monitoring:
-  metrics:
-    enabled: true
-
-    # Prometheus export
-    prometheus:
-      enabled: true
-      port: 9090
-      path: /metrics
-
-    # Custom metrics
-    custom_metrics:
-      - name: call_volume
-        type: counter
-      - name: call_duration
-        type: histogram
-      - name: call_quality_mos
-        type: gauge
-```
-
-### Logging
-
-```yaml
-monitoring:
-  logging:
-    # Log level
-    level: info  # debug, info, warn, error
-
-    # Log format
-    format: json  # json, text
-
-    # Log destinations
-    destinations:
-      - type: stdout
-      - type: file
-        path: /var/log/gateway.log
-        rotation:
-          max_size: 100MB
-          max_age: 30d
-          max_backups: 10
-      - type: syslog
-        address: "syslog.example.com:514"
-      - type: s3
-        bucket: "s3://logs-bucket"
-        prefix: "gateway-logs/"
-```
-
-### Alerts
-
-```yaml
-monitoring:
-  alerts:
-    enabled: true
-
-    # Alert rules
-    rules:
-      - name: high_error_rate
-        condition: error_rate > 0.05
-        duration: 5m
-        severity: critical
-
-      - name: high_latency
-        condition: p95_latency > 500ms
-        duration: 10m
-        severity: warning
-
-      - name: low_call_quality
-        condition: avg_mos < 3.5
-        duration: 5m
-        severity: warning
-
-    # Notification channels
-    notifications:
-      - type: email
-        addresses:
-          - ops@example.com
-      - type: slack
-        webhook: "https://hooks.slack.com/services/xxx"
-      - type: pagerduty
-        integration_key: "xxx"
-```
-
-## Integration Configuration
-
-### Blazing Core Integration
-
-```yaml
-integration:
-  core:
-    enabled: true
-
-    # Connected services
-    services:
-      - name: call-handler
-        endpoint: "https://call-handler.blazing.run"
-        events:
-          - call.started
-          - call.ended
-          - call.failed
-
-      - name: voicemail
-        endpoint: "https://voicemail.blazing.run"
-        events:
-          - call.no_answer
-```
-
-### Webhooks
-
-```yaml
-integration:
-  webhooks:
-    enabled: true
-
-    # Webhook endpoints
-    endpoints:
-      - url: "https://example.com/webhook"
-        events:
-          - call.started
-          - call.ended
-        headers:
-          Authorization: "Bearer token123"
-        retry:
-          max_attempts: 3
-          backoff: exponential
-```
-
-## Environment Variables
-
-Override configuration with environment variables:
-
-```bash
-# Gateway settings
-GATEWAY_NAME=production-gateway
-GATEWAY_REGIONS=us-east-1,eu-west-1
-
-# SIP settings
-SIP_DOMAIN=sip.example.com
-SIP_PORT=5060
-SIP_TLS_PORT=5061
-
-# Security
-SECURITY_DDOS_ENABLED=true
-SECURITY_RATE_LIMIT=1000
-
-# Authentication
-AUTH_ENDPOINT=https://auth.example.com
-AUTH_TIMEOUT=2s
-```
-
-## Configuration Validation
-
-Validate your configuration before deployment:
-
-```bash
-blazing gateway validate --config gateway.yaml
-```
-
-This will check:
-- YAML syntax
-- Required fields
-- Value ranges
-- Conflicting settings
-- Security best practices
-
-## Complete Example
-
-Here's a complete production-ready configuration:
-
-```yaml
-version: 1
-
-gateway:
-  name: production-gateway
-  description: "Production VoIP gateway"
-  regions:
-    - us-east-1
-    - eu-west-1
-  ha:
-    enabled: true
-    min_instances: 2
-    max_instances: 10
-
-sip:
-  port: 5060
-  tls_port: 5061
-  domain: sip.example.com
-  transports:
-    - udp
-    - tcp
-    - tls
-  authentication:
-    enabled: true
-    external_auth:
-      endpoint: "https://auth.example.com"
-  tls:
-    enabled: true
-    min_version: "1.2"
-
-media:
-  rtp_port_range: 10000-20000
-  codecs:
-    - opus
-    - g722
-    - pcmu
-  srtp:
-    enabled: true
-
-routing:
-  strategy: least-cost
-  rules:
-    - name: "US Domestic"
-      match:
-        prefix: "+1"
-      route:
-        - provider: "twilio"
-          trunk: "sip:trunk.twilio.com"
-          priority: 1
-
-security:
-  ddos_protection:
-    enabled: true
-  rate_limits:
-    per_ip:
-      requests_per_second: 10
-  fraud_prevention:
-    enabled: true
-    cost_limits:
-      per_day: 1000.00
-
-monitoring:
-  metrics:
-    enabled: true
-    prometheus:
-      enabled: true
-  logging:
-    level: info
-    format: json
-  alerts:
-    enabled: true
-    notifications:
-      - type: email
-        addresses:
-          - ops@example.com
-
-integration:
-  core:
-    enabled: true
-  webhooks:
-    enabled: true
-```
-
-## Next Steps
-
-- [Get started with a quick start guide](/docs/blazing-core/getting-started/quick-start)
-- [Explore use cases and examples](/docs/blazing-gateway/use-cases/use-cases-examples)
-- [Learn about Blazing Core deployment](/docs/blazing-core/deployment/deployment-lifecycle)

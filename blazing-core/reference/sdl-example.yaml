@@ -1,0 +1,104 @@
+# Blazing Core SDL - Multi-Cloud Deployment
+# Deploy stateful workloads with geographic control
+
+version: "1"
+
+# Global deployment policy
+policy:
+  providers: [gcp, akash]
+  regions: [us-east1, us-west1, eu-west1]
+  cost_optimization: balanced
+
+# Service definitions
+services:
+  # Primary database cluster
+  cockroachdb:
+    image: cockroachdb/cockroach:latest
+    command: start --insecure --join=cockroachdb
+    resources:
+      cpu: 4
+      memory: 8Gi
+      storage: 100Gi
+    policy:
+      replicas: 3
+      regions: [us-east1, eu-west1]
+      anti_affinity: zone
+    ports:
+      - 26257:26257
+      - 8080:8080
+    health_check:
+      path: /health
+      interval: 30s
+      timeout: 10s
+    volumes:
+      - cockroach_data:/cockroach/cockroach-data
+
+  # API Gateway
+  api-gateway:
+    image: blazing/gateway:latest
+    resources:
+      cpu: 2
+      memory: 4Gi
+    policy:
+      replicas: 2
+      regions: [us-east1, us-west1, eu-west1]
+      load_balancing: round_robin
+    ports:
+      - 443:443
+      - 80:80
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      API_KEY: ${API_KEY}
+    depends_on:
+      - cockroachdb
+
+  # Background worker
+  worker:
+    image: blazing/worker:latest
+    resources:
+      cpu: 1
+      memory: 2Gi
+    policy:
+      replicas: 5
+      autoscaling:
+        min: 2
+        max: 20
+        target_cpu: 70
+    environment:
+      QUEUE_URL: ${QUEUE_URL}
+
+# Persistent volumes
+volumes:
+  cockroach_data:
+    size: 100Gi
+    type: ssd
+    policy:
+      regions: [us-east1, eu-west1]
+      replication: 3
+      backup:
+        enabled: true
+        frequency: daily
+        retention: 30d
+
+# Network configuration
+network:
+  ingress:
+    enabled: true
+    domains:
+      - api.example.com
+      - www.example.com
+    tls:
+      enabled: true
+      provider: letsencrypt
+  internal:
+    subnet: 10.0.0.0/16
+    dns: internal
+
+# Secrets management
+secrets:
+  DATABASE_URL:
+    source: vault
+    path: secrets/db/connection
+  API_KEY:
+    source: env
+    required: true

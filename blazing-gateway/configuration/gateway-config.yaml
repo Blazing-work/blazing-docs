@@ -1,0 +1,281 @@
+# Blazing Gateway - Complete Configuration Reference
+# Production-ready VoIP gateway configuration
+
+version: 1
+
+gateway:
+  name: production-gateway
+  description: "Production VoIP gateway"
+  regions:
+    - us-east-1
+    - eu-west-1
+  ha:
+    enabled: true
+    min_instances: 2
+    max_instances: 10
+
+sip:
+  port: 5060
+  tls_port: 5061
+  ws_port: 8080
+  wss_port: 8443
+  domain: sip.example.com
+  transports:
+    - udp
+    - tcp
+    - tls
+    - ws
+    - wss
+  timers:
+    t1: 500ms
+    t2: 4s
+    t4: 5s
+  authentication:
+    enabled: true
+    realm: "blazing.run"
+    methods:
+      - digest
+      - tls-cert
+    external_auth:
+      enabled: true
+      endpoint: "https://auth.example.com/sip-auth"
+      timeout: 2s
+  tls:
+    enabled: true
+    certificate:
+      cert_file: "/path/to/cert.pem"
+      key_file: "/path/to/key.pem"
+      ca_file: "/path/to/ca.pem"
+    min_version: "1.2"
+    ciphers:
+      - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+      - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+
+media:
+  rtp_port_range: 10000-20000
+  codecs:
+    - opus
+    - g722
+    - pcmu
+    - pcma
+    - g729
+  srtp:
+    enabled: true
+    crypto_suites:
+      - AES_CM_128_HMAC_SHA1_80
+      - AES_CM_128_HMAC_SHA1_32
+  dtmf:
+    methods:
+      - rfc2833
+      - info
+      - inband
+  processing:
+    transcoding:
+      enabled: true
+      max_channels: 100
+    recording:
+      enabled: false
+      format: wav
+      storage: s3://my-bucket/recordings
+    mixing:
+      enabled: true
+      max_participants: 50
+    noise_suppression:
+      enabled: true
+      level: moderate
+  nat_traversal:
+    stun:
+      enabled: true
+      servers:
+        - "stun:stun.l.google.com:19302"
+    turn:
+      enabled: true
+      servers:
+        - "turn:turn.example.com:3478"
+      credentials:
+        username: "turnuser"
+        password: "turnpass"
+    ice:
+      enabled: true
+      lite: false
+
+routing:
+  strategy: least-cost
+  rules:
+    - name: "US Domestic"
+      match:
+        prefix: "+1"
+        exclude:
+          - "+1900"
+      route:
+        - provider: "twilio"
+          trunk: "sip:trunk.twilio.com"
+          priority: 1
+          weight: 70
+        - provider: "bandwidth"
+          trunk: "sip:trunk.bandwidth.com"
+          priority: 1
+          weight: 30
+        - provider: "voxbone"
+          trunk: "sip:trunk.voxbone.com"
+          priority: 2
+      cost_per_minute: 0.01
+    - name: "UK Domestic"
+      match:
+        prefix: "+44"
+      route:
+        - provider: "uk-carrier"
+          trunk: "sip:trunk.uk-carrier.com"
+          priority: 1
+      cost_per_minute: 0.02
+    - name: "International"
+      match:
+        prefix: "+"
+      route:
+        - provider: "global-carrier"
+          trunk: "sip:trunk.global.com"
+          priority: 1
+      cost_per_minute: 0.15
+  load_balancing:
+    algorithm: weighted-round-robin
+    health_checks:
+      enabled: true
+      interval: 30s
+      timeout: 5s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      method: options
+      uri: "sip:healthcheck@trunk.example.com"
+  failover:
+    enabled: true
+    triggers:
+      - error_rate_threshold: 0.1
+      - latency_threshold: 500ms
+      - consecutive_failures: 3
+    failback:
+      enabled: true
+      delay: 5m
+
+security:
+  ddos_protection:
+    enabled: true
+    rate_limits:
+      per_ip:
+        requests_per_second: 10
+        burst: 20
+      per_user:
+        calls_per_minute: 30
+        concurrent_calls: 5
+      global:
+        calls_per_second: 1000
+  access_control:
+    whitelist:
+      enabled: true
+      ips:
+        - 192.0.2.0/24
+        - 198.51.100.0/24
+      mode: strict
+    blacklist:
+      enabled: true
+      ips:
+        - 203.0.113.0/24
+      auto_blacklist:
+        enabled: true
+        threshold: 10
+        duration: 1h
+  fraud_prevention:
+    enabled: true
+    cost_limits:
+      per_call: 10.00
+      per_hour: 100.00
+      per_day: 1000.00
+    pattern_detection:
+      enabled: true
+      alerts:
+        - rapid_sequential_calls: 10
+        - long_duration: 2h
+        - premium_rate: true
+    number_blacklist:
+      - prefix: "+1900"
+      - prefix: "+882"
+
+monitoring:
+  metrics:
+    enabled: true
+    prometheus:
+      enabled: true
+      port: 9090
+      path: /metrics
+    custom_metrics:
+      - name: call_volume
+        type: counter
+      - name: call_duration
+        type: histogram
+      - name: call_quality_mos
+        type: gauge
+  logging:
+    level: info
+    format: json
+    destinations:
+      - type: stdout
+      - type: file
+        path: /var/log/gateway.log
+        rotation:
+          max_size: 100MB
+          max_age: 30d
+          max_backups: 10
+      - type: syslog
+        address: "syslog.example.com:514"
+      - type: s3
+        bucket: "s3://logs-bucket"
+        prefix: "gateway-logs/"
+  alerts:
+    enabled: true
+    rules:
+      - name: high_error_rate
+        condition: error_rate > 0.05
+        duration: 5m
+        severity: critical
+      - name: high_latency
+        condition: p95_latency > 500ms
+        duration: 10m
+        severity: warning
+      - name: low_call_quality
+        condition: avg_mos < 3.5
+        duration: 5m
+        severity: warning
+    notifications:
+      - type: email
+        addresses:
+          - ops@example.com
+      - type: slack
+        webhook: "https://hooks.slack.com/services/xxx"
+      - type: pagerduty
+        integration_key: "xxx"
+
+integration:
+  core:
+    enabled: true
+    services:
+      - name: call-handler
+        endpoint: "https://call-handler.blazing.run"
+        events:
+          - call.started
+          - call.ended
+          - call.failed
+      - name: voicemail
+        endpoint: "https://voicemail.blazing.run"
+        events:
+          - call.no_answer
+  webhooks:
+    enabled: true
+    endpoints:
+      - url: "https://example.com/webhook"
+        events:
+          - call.started
+          - call.ended
+        headers:
+          Authorization: "Bearer token123"
+        retry:
+          max_attempts: 3
+          backoff: exponential
