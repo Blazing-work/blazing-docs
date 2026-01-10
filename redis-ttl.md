@@ -1,61 +1,75 @@
 # Redis TTL Configuration
 
-All Redis keys in Blazing have Time-To-Live (TTL) expiration using a **sliding window** pattern:
+Blazing uses a **selective TTL policy** - only transient data has TTL expiration. Definitions (Workflows, Steps, Services, Connectors) live forever until explicitly deleted.
+
+## TTL Policy (Lexicon 2.0)
+
+| Data Type | TTL | Rationale |
+|-----------|-----|-----------|
+| **Definitions** | None | User-defined schemas - live forever until deleted |
+| - Workflows | ♾️ | User workflow definitions |
+| - Steps | ♾️ | User step definitions |
+| - Services | ♾️ | User service definitions |
+| - Connectors | ♾️ | Connector configurations |
+| **Transient Data** | 6 months | Execution artifacts - expire if unused |
+| - Runs | 6 months | Run execution records (was Units) |
+| - StepRuns | 6 months | Step execution records (was Operations) |
+| - Storage | 6 months | Large payload storage |
+| **Execution State** | 1 day | Worker/coordinator state - ephemeral |
+| - Coordinators | 1 day | Coordinator state |
+| - Worker processes | 1 day | Worker process state |
+| - Worker threads | 1 day | Worker thread state |
+| **Queues** | None | Items are processed and removed naturally |
+
+## Sliding Window Pattern
+
+For data types with TTL, Blazing uses a **sliding window** pattern:
 - Keys are created with an initial TTL
 - Every access (get/save/update) refreshes the TTL to full duration
 - Hot data (frequently accessed) stays indefinitely
 - Cold data (unused) expires automatically
 
-This prevents Redis memory from growing unbounded in long-running deployments while preserving actively-used data.
+This prevents Redis memory from growing unbounded while preserving actively-used data.
 
-## How It Works
-
-### Sliding Window Pattern
-
-When a DAO is saved or accessed, its TTL is automatically refreshed:
+### Example
 
 ```python
-# Save a station
-station = StationDAO(name="my-station", station_type="NON-BLOCKING", priority=1.0)
-await station.save()  # TTL set to 1 year
+# Create a run (Lexicon 2.0: was Unit)
+run = RunDAO()
+await run.save()  # TTL set to 6 months
 
-# Access the station after 6 months
-fetched = await StationDAO.get(station.pk)  # TTL refreshed to 1 year from now
+# Access the run after 3 months
+fetched = await RunDAO.get(run.pk)  # TTL refreshed to 6 months from now
 
-# If never accessed again, it will expire 1 year after the last access
+# If never accessed again, it will expire 6 months after the last access
 ```
-
-### Key Expiration
-
-- **Hot data**: Accessed frequently (e.g., daily) - stays indefinitely
-- **Warm data**: Accessed occasionally (e.g., monthly) - survives as long as accessed within TTL window
-- **Cold data**: Never accessed after creation - expires after configured TTL
 
 ## Environment Variables
 
 All TTL durations are configurable via environment variables (values in seconds):
 
-### Route Definitions (Long-Lived)
+### Definitions (No TTL)
+
+| Data Type | TTL | Notes |
+|-----------|-----|-------|
+| Workflows | None | Live forever until deleted |
+| Steps | None | Live forever until deleted |
+| Services | None | Live forever until deleted |
+| Connectors | None | Live forever until deleted |
+
+### Transient Data (Lexicon 2.0)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TTL_ROUTE_DEFINITION_ROUTE` | 31536000 (1 year) | Routes defined by users |
-| `TTL_ROUTE_DEFINITION_STATION` | 31536000 (1 year) | Stations defined by users |
-| `TTL_ROUTE_DEFINITION_STATION_STATUS` | 604800 (1 week) | Station status (changes frequently) |
+| `TTL_RUN_DEFINITION_RUN` | 15552000 (6 months) | Run execution records |
+| `TTL_RUN_DEFINITION_STEP_RUN` | 15552000 (6 months) | StepRun records |
+| `TTL_RUN_DEFINITION_STORAGE` | 15552000 (6 months) | Large payload storage |
 
-### Unit/Operation Data (Medium-Lived)
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TTL_UNIT_DEFINITION_UNIT` | 15552000 (6 months) | Unit execution records |
-| `TTL_UNIT_DEFINITION_OPERATION` | 15552000 (6 months) | Operation records |
-| `TTL_UNIT_DEFINITION_STORAGE` | 15552000 (6 months) | Large payload storage |
-
-### Execution State (Short-Lived)
+### Execution State
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TTL_EXECUTION_COORDINATOR` | 86400 (1 day) | Coordinator coordinator state |
+| `TTL_EXECUTION_COORDINATOR` | 86400 (1 day) | Coordinator state |
 | `TTL_EXECUTION_WORKER_PROCESS` | 86400 (1 day) | Worker process state |
 | `TTL_EXECUTION_WORKER_THREAD` | 86400 (1 day) | Worker thread state |
 | `TTL_EXECUTION_WORKER_ASYNC` | 86400 (1 day) | Async worker state |
@@ -71,24 +85,9 @@ All TTL durations are configurable via environment variables (values in seconds)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `TTL_APP_SPECIFIC_SERVICE` | 31536000 (1 year) | Service definitions |
-| `TTL_APP_SPECIFIC_CONNECTOR` | 31536000 (1 year) | Connector configurations |
 | `TTL_APP_SPECIFIC_CUSTOMER_APP_MAPPING` | 15552000 (6 months) | Customer app mappings |
 | `TTL_APP_SPECIFIC_SERVICE_INVOKE` | 86400 (1 day) | Service invocation records |
 | `TTL_APP_SPECIFIC_DYNAMIC_CODE` | 604800 (1 week) | Dynamic code execution records |
-
-### Queues
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TTL_QUEUE_OPERATION` | 3600 (1 hour) | Operation queues (CRDT segments) |
-| `TTL_QUEUE_STATISTICS` | 3600 (1 hour) | Statistics queues |
-
-### Default
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TTL_DEFAULT` | 15552000 (6 months) | Fallback for DAOs without specific TTL |
 
 ## Example Configuration
 
@@ -98,62 +97,49 @@ All TTL durations are configurable via environment variables (values in seconds)
 services:
   blazing-api:
     environment:
-      # Shorten station TTL to 30 days
-      TTL_ROUTE_DEFINITION_STATION: "2592000"  # 30 days
+      # Shorten run TTL to 30 days
+      TTL_RUN_DEFINITION_RUN: "2592000"  # 30 days
 
       # Worker state expires after 12 hours instead of 1 day
       TTL_EXECUTION_WORKER_THREAD: "43200"  # 12 hours
-
-      # Default for unspecified DAOs: 3 months
-      TTL_DEFAULT: "7776000"  # 3 months
 ```
 
 ### .env File
 
 ```bash
-# Long-lived user definitions
-TTL_ROUTE_DEFINITION_ROUTE=31536000  # 1 year
-TTL_APP_SPECIFIC_SERVICE=31536000   # 1 year
-
-# Medium-lived execution artifacts
-TTL_UNIT_DEFINITION_UNIT=15552000    # 6 months
-TTL_UNIT_DEFINITION_OPERATION=15552000  # 6 months
+# Transient execution artifacts (Lexicon 2.0)
+TTL_RUN_DEFINITION_RUN=15552000       # 6 months
+TTL_RUN_DEFINITION_STEP_RUN=15552000  # 6 months
+TTL_RUN_DEFINITION_STORAGE=15552000   # 6 months
 
 # Short-lived runtime state
-TTL_EXECUTION_COORDINATOR=86400          # 1 day
-TTL_EXECUTION_WORKER_THREAD=86400    # 1 day
-
-# Queue cleanup
-TTL_QUEUE_OPERATION=3600             # 1 hour
-TTL_QUEUE_STATISTICS=3600            # 1 hour
+TTL_EXECUTION_COORDINATOR=86400       # 1 day
+TTL_EXECUTION_WORKER_THREAD=86400     # 1 day
 ```
 
 ## Implementation Details
 
 ### Base DAO Classes
 
-All three base DAO classes support TTL:
-
-1. **AppAwareHashModel** - Most DAOs (Stations, Units, Workers, etc.)
-2. **AppAwareJsonModel** - JSON-based DAOs (Connectors, etc.)
-3. **DataRedisHashModel** - Large payload storage (StorageDAO)
-
-Each class has:
+DAOs with TTL support have:
 - `_get_ttl_seconds()` - Look up TTL from configuration
 - `_refresh_ttl(key)` - Set EXPIRE on a Redis key
 - Modified `.save()` - Sets TTL after saving
 - Modified `.get()` - Refreshes TTL on access
 
-### Queue Operations
+### Definitions (No TTL)
 
-All queue enqueue operations set TTL after LPUSH:
+Definition DAOs (WorkflowDAO, StepDAO, ServiceDAO, ConnectorDAO) do **not** have TTL set:
+- They live forever until explicitly deleted
+- User-defined schemas should persist indefinitely
+- No automatic cleanup needed
 
-- Non-blocking queues: `TTL_QUEUE_OPERATION` (1 hour)
-- Blocking queues: `TTL_QUEUE_OPERATION` (1 hour)
-- Sandboxed queues: `TTL_QUEUE_OPERATION` (1 hour)
-- Statistics queues: `TTL_QUEUE_STATISTICS` (1 hour)
+### Queues (No TTL)
 
-This prevents abandoned queue segments from accumulating.
+Queues do **not** have TTL:
+- Items are processed and removed naturally by workers
+- Queue registry entries are cleaned up when queues become empty
+- No TTL needed since queues are self-cleaning
 
 ## Migration Notes
 
@@ -176,23 +162,23 @@ To check if TTL is being applied:
 
 ```bash
 # Check TTL on a specific key
-redis-cli TTL "blazing:my-app:workflow_definition:Station:01234567890"
+redis-cli TTL "blazing:my-app:run_definition:Run:01234567890"
+
+# Check that definitions have no TTL
+redis-cli TTL "blazing:my-app:workflow_definition:Step:01234567890"
+# Should return -1 (no TTL)
 
 # Count keys with vs without TTL
-redis-cli --scan --pattern "blazing:*:workflow_definition:Station:*" | \
+redis-cli --scan --pattern "blazing:*:run_definition:Run:*" | \
   xargs -I {} redis-cli TTL {} | \
   awk '{if($1==-1) print "No TTL"; else print "Has TTL"}' | \
   sort | uniq -c
-
-# Output example:
-# 42 Has TTL
-#  3 No TTL  (old keys not yet accessed)
 ```
 
 ### TTL Values
 
 - `TTL > 0`: Key has TTL, value is seconds until expiration
-- `TTL = -1`: Key exists but has no TTL (old key not yet accessed)
+- `TTL = -1`: Key exists but has no TTL (definition, or old key not yet accessed)
 - `TTL = -2`: Key does not exist
 
 ## Performance Impact
@@ -201,11 +187,10 @@ TTL management has **minimal performance impact**:
 
 - `.save()`: One additional `EXPIRE` command per save (~0.1-0.5ms)
 - `.get()`: One additional `EXPIRE` command per get (~0.1-0.5ms)
-- Queue operations: One additional `EXPIRE` per enqueue (~0.1-0.5ms)
 
 Benefits:
-- Prevents Redis memory exhaustion
-- Automatic cleanup of cold data
+- Prevents Redis memory exhaustion for transient data
+- Automatic cleanup of cold execution artifacts
 - No manual maintenance required
 
 ## FAQ
@@ -214,47 +199,52 @@ Benefits:
 
 The sliding window pattern means **actively accessed data never expires**. Only cold (unused) data expires.
 
-### Can I disable TTL for specific DAOs?
+### Why don't definitions have TTL?
 
-Not currently supported. Set a very long TTL (e.g., 100 years) if needed:
+User-defined schemas (Workflows, Steps, Services, Connectors) should persist indefinitely:
+- They represent the user's application structure
+- Deleting them breaks applications
+- They should only be removed when the user explicitly deletes them
+
+### Why don't queues have TTL?
+
+Queues are self-cleaning:
+- Workers process items and remove them from queues
+- Empty queue segments are cleaned up automatically
+- TTL would risk losing unprocessed work
+
+### Can I add TTL to definitions?
+
+Set a very long TTL manually if needed:
 
 ```bash
-TTL_ROUTE_DEFINITION_STATION=3153600000  # 100 years
+# NOT RECOMMENDED - but possible
+redis-cli EXPIRE "blazing:my-app:workflow_definition:Step:01234" 31536000  # 1 year
 ```
-
-### What if I want fixed TTL instead of sliding window?
-
-The sliding window pattern is hardcoded for safety. To implement fixed TTL, you would need to:
-1. Remove `_refresh_ttl()` calls from `.get()` methods
-2. Keep `_refresh_ttl()` calls in `.save()` methods only
 
 ### How do I verify TTL is working?
 
 Run the test suite:
 
 ```bash
-uv run pytest tests/test_dao_ttl.py -v
+uv run pytest tests/test_z_dao_ttl.py -v
 ```
 
-Or check manually:
+## Lexicon 2.0 Migration
 
-```bash
-# Create a station via API
-curl -X POST http://localhost:8000/v1/registry/sync \
-  -H "Authorization: Bearer test-token" \
-  -H "Content-Type: application/json" \
-  -d '{"stations": [{"name": "test", "type": "NON-BLOCKING", "priority": 1.0, "func": "..."}]}'
+The TTL configuration uses Lexicon 2.0 terminology:
 
-# Check its TTL
-docker exec blazing-redis redis-cli --scan --pattern "*:Station:*" | \
-  head -1 | \
-  xargs docker exec blazing-redis redis-cli TTL
-
-# Should return a large number (close to 31536000 for 1 year)
-```
+| Old Name | New Name | Description |
+|----------|----------|-------------|
+| `TTL_UNIT_DEFINITION_UNIT` | `TTL_RUN_DEFINITION_RUN` | Run records |
+| `TTL_UNIT_DEFINITION_OPERATION` | `TTL_RUN_DEFINITION_STEP_RUN` | StepRun records |
+| `TTL_UNIT_DEFINITION_STORAGE` | `TTL_RUN_DEFINITION_STORAGE` | Storage records |
+| `TTL_ROUTE_DEFINITION_ROUTE` | Removed | Workflows have no TTL |
+| `TTL_ROUTE_DEFINITION_STATION` | Removed | Steps have no TTL |
+| `TTL_QUEUE_OPERATION` | Removed | Queues have no TTL |
 
 ## See Also
 
 - [Dual Redis Architecture](redis-architecture.md) - How Coordination and Data Redis instances work together
-- [CRDT Multi-Master Queues](crdt-multimaster-queues.md) - Queue TTL with CRDT-safe partitioning
-- [DAO Caching](optimization-caches.md) - Client-side caching vs Redis TTL
+- [CRDT Multi-Master Queues](crdt-multimaster-queues.md) - Queue architecture
+- [Lexicon v2.0](LEXICON.md) - Terminology mapping
