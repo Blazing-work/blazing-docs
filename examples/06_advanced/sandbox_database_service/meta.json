@@ -1,0 +1,18 @@
+{
+  "id": "sandbox_database_service",
+  "title": "Sandbox: Service Bridge with Database",
+  "description": "Let user code process data while keeping database credentials safe.",
+  "category": "Advanced",
+  "difficulty": "Advanced",
+  "time": "25 min",
+  "tags": [
+    "sandbox",
+    "service-bridge",
+    "database",
+    "security"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}

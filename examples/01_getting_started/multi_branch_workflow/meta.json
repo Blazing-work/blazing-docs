@@ -1,0 +1,18 @@
+{
+  "id": "multi_branch_workflow",
+  "title": "Multi-Branch Workflow",
+  "description": "Parallel execution with asyncio.gather for concurrent processing.",
+  "category": "Getting Started",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "workflow",
+    "parallel",
+    "asyncio",
+    "branching"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

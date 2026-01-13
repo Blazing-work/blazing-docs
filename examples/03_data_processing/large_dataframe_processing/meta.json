@@ -1,0 +1,18 @@
+{
+  "id": "large_dataframe_processing",
+  "title": "Large DataFrame Processing with Arrow Flight",
+  "description": "When processing DataFrames larger than 1MB, Blazing automatically uses Apache Arrow Flight for 3-5x faster data transfer. This example shows how to work with large datasets without any special configuration - the optimization happens automatically.",
+  "category": "Data Processing",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "dataframe",
+    "arrow-flight",
+    "big-data",
+    "performance"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

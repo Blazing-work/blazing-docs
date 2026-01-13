@@ -1,0 +1,18 @@
+{
+  "id": "sandbox_multi_tenant",
+  "title": "Sandbox: Multi-Tenant Data Processing",
+  "description": "Safely run different tenants' code in isolated sandboxes.",
+  "category": "Advanced",
+  "difficulty": "Expert",
+  "time": "35 min",
+  "tags": [
+    "sandbox",
+    "multi-tenant",
+    "isolation",
+    "security"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}

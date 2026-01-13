@@ -24,7 +24,7 @@ This starts:
 In a separate terminal:
 
 ```bash
-./run_arrow_flight.sh
+./scripts/run_arrow_flight.sh
 ```
 
 You should see:
@@ -62,7 +62,7 @@ print('✓ Connected from Docker')
 
 ### Environment Variables
 
-Arrow Flight configuration is in `run_arrow_flight.sh`:
+Arrow Flight configuration is in `scripts/run_arrow_flight.sh`:
 
 ```bash
 # Redis connection (for data storage)

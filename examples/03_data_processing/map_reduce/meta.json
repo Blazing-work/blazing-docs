@@ -1,0 +1,18 @@
+{
+  "id": "map_reduce",
+  "title": "Map-Reduce Pattern",
+  "description": "Distributed map-reduce for processing large datasets in chunks.",
+  "category": "Data Processing",
+  "difficulty": "Advanced",
+  "time": "30 min",
+  "tags": [
+    "map-reduce",
+    "distributed",
+    "big-data",
+    "parallel"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

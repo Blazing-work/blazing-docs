@@ -1,0 +1,17 @@
+{
+  "id": "validation_error_handling",
+  "title": "Validation & Error Handling",
+  "description": "Validate input data and handle errors gracefully in workflows.",
+  "category": "Data Processing",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "validation",
+    "error-handling",
+    "data-quality"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

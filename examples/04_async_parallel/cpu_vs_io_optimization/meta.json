@@ -1,0 +1,19 @@
+{
+  "id": "cpu_vs_io_optimization",
+  "title": "CPU vs I/O Optimization with Worker Types",
+  "description": "Blazing automatically optimizes execution by using different worker pools. Use `step_type='BLOCKING'` for CPU-intensive work and default (NON_BLOCKING) for I/O-bound operations. This prevents CPU tasks from blocking async I/O operations.",
+  "category": "Async & Parallel",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "performance",
+    "optimization",
+    "worker-types",
+    "cpu",
+    "io"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

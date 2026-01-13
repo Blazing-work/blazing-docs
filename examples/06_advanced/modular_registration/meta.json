@@ -1,0 +1,18 @@
+{
+  "id": "modular_registration",
+  "title": "Modular Registration Pattern",
+  "description": "This example demonstrates how to organize large Blazing applications using\nthe modular registration pattern. Instead of defining all steps and workflows\nin a single file, you can split them into domain-specific modules.\n\n**Pattern:**\n```python\n# In main.py:\napp = Blazing(...)\nregister_trading_module(app)\nregister_analytics_module(app)\nregister_reporting_module(app)\nawait app.publish()\n```\n\n**Benefits:**\n- Clean separation of concerns\n- Domain-driven design\n- Easy to test individual modules\n- Scalable codebase organization\n- Conditional feature registration",
+  "category": "Advanced",
+  "difficulty": "Advanced",
+  "time": "15 min",
+  "tags": [
+    "modular",
+    "architecture",
+    "organization",
+    "domain-driven"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

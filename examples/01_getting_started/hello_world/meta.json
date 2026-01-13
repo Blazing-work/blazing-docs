@@ -1,0 +1,16 @@
+{
+  "id": "hello_world",
+  "title": "Hello World",
+  "description": "This is the simplest possible Blazing Flow application. It demonstrates how to:\n- Create a basic Blazing app\n- Define a simple step and workflow\n- Publish to the execution engine\n- Execute and return a response",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "5 min",
+  "tags": [
+    "quickstart",
+    "python"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

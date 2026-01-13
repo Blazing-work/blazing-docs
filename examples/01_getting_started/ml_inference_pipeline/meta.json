@@ -1,0 +1,11 @@
+{
+  "id": "ml_inference_pipeline",
+  "title": "ML Inference Pipeline",
+  "description": "Deploy ML models with Core infrastructure, orchestrate inference with Flow, and run predictions in Flow Sandbox.",
+  "category": "Machine Learning",
+  "difficulty": "Advanced",
+  "time": "30 min",
+  "tags": ["ml", "inference", "pipeline", "multi-product"],
+  "products": ["blazing-core", "blazing-flow", "blazing-flow-sandbox"],
+  "primaryProduct": "blazing-flow"
+}

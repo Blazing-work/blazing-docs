@@ -1,0 +1,18 @@
+{
+  "id": "daily_reports",
+  "title": "Daily Report Generation",
+  "description": "Scheduled job to generate and distribute daily reports via email.",
+  "category": "Advanced",
+  "difficulty": "Intermediate",
+  "time": "25 min",
+  "tags": [
+    "scheduled",
+    "reports",
+    "automation",
+    "email"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "etl_pipeline",
+  "title": "ETL Pipeline",
+  "description": "Complete Extract-Transform-Load pipeline for data warehousing.",
+  "category": "Data Processing",
+  "difficulty": "Advanced",
+  "time": "30 min",
+  "tags": [
+    "etl",
+    "pipeline",
+    "data-warehouse",
+    "workflow"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

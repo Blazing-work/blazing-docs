@@ -1,0 +1,18 @@
+{
+  "id": "cleanup_expired_records",
+  "title": "Cleanup Expired Records",
+  "description": "Batch delete expired database records on a schedule.",
+  "category": "Advanced",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "cleanup",
+    "scheduled",
+    "batch",
+    "database"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

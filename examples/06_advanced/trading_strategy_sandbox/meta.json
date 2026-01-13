@@ -1,0 +1,20 @@
+{
+  "id": "trading_strategy_sandbox",
+  "title": "Trading Strategy Sandbox",
+  "description": "This example shows how to build a trading strategy platform with two sides:\n\n**YOUR SIDE (Platform Owner):**\n- Define services your users can access (MarketDataService)\n- Define a workflow that uses run_sandboxed() to execute user code\n- Register with Blazing and publish\n\n**YOUR USER'S SIDE (End Users):**\n- Write strategy functions using your services\n- Submit code as a string\n- Get results back safely\n\n**Security Model (5 Layers - ALL HANDLED BY run_sandboxed()):**\n1. AST validation - blocks dangerous imports/builtins\n2. Cryptographic signing - HMAC-SHA256 prevents tampering\n3. Signature verification - server validates before execution\n4. Bytecode validation - blocks dangerous opcodes\n5. Pyodide WASM sandbox - no network/filesystem access",
+  "category": "Advanced",
+  "difficulty": "Advanced",
+  "time": "20 min",
+  "tags": [
+    "trading",
+    "sandbox",
+    "pyodide",
+    "strategies",
+    "fintech",
+    "dynamic-code"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}

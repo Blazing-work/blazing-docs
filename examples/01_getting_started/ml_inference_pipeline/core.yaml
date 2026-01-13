@@ -1,0 +1,52 @@
+# Blazing Core - ML Inference Infrastructure
+# This YAML defines the infrastructure for ML model serving
+
+version: '1'
+
+services:
+  # Model Server - GPU-accelerated inference
+  model-server:
+    image: blazing/model-server:latest
+    resources:
+      gpu: 1
+      memory: 8Gi
+      cpu: 4
+    environment:
+      MODEL_PATH: ${MODEL_PATH}
+      BATCH_SIZE: ${BATCH_SIZE}
+    ports:
+      - 8080:8080
+    health_check:
+      path: /health
+      interval: 30s
+
+  # Redis for caching predictions
+  redis-cache:
+    image: redis:7-alpine
+    resources:
+      memory: 2Gi
+    ports:
+      - 6379:6379
+
+  # Model registry for versioning
+  model-registry:
+    image: blazing/model-registry:latest
+    environment:
+      STORAGE_BACKEND: gcs
+      GCS_BUCKET: ${GCS_BUCKET}
+    volumes:
+      - models:/app/models
+
+volumes:
+  models:
+    size: 100Gi
+    type: ssd
+
+# Deploy to GCP with GPU support
+deployment:
+  provider: gcp
+  region: us-central1
+  autoscaling:
+    min_replicas: 1
+    max_replicas: 10
+    target_gpu_utilization: 70

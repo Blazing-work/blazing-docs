@@ -1,0 +1,17 @@
+{
+  "id": "simple_step",
+  "title": "Simple Step",
+  "description": "The simplest possible Blazing Flow example - a single processing step.",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "5 min",
+  "tags": [
+    "step",
+    "basics",
+    "quickstart"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

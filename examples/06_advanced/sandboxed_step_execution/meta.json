@@ -1,0 +1,18 @@
+{
+  "id": "sandboxed_step_execution",
+  "title": "Sandboxed Step Execution",
+  "description": "The `sandboxed=True` parameter runs your step in a WebAssembly sandbox with complete isolation. Perfect for executing user-provided code in multi-tenant platforms - the code has zero access to your infrastructure, network, or filesystem.",
+  "category": "Advanced",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "sandbox",
+    "wasm",
+    "security",
+    "user-code"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}

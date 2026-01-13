@@ -1,0 +1,17 @@
+{
+  "id": "health_check_workflow",
+  "title": "Health Check Workflow",
+  "description": "Monitor system health across database, cache, and external APIs.",
+  "category": "Advanced",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "monitoring",
+    "health-check",
+    "observability"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

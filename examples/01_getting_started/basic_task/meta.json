@@ -1,0 +1,17 @@
+{
+  "id": "basic_task",
+  "title": "Basic Task Execution",
+  "description": "This example demonstrates how to create and execute distributed tasks using Blazing Flow.\nYou'll learn how to:\n- Initialize a Blazing Flow application\n- Define steps and workflows\n- Execute workflows with `app.run()` or direct invocation\n- Wait for results with `.wait_result()`\n- Proper resource cleanup",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": [
+    "tasks",
+    "async",
+    "distributed"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

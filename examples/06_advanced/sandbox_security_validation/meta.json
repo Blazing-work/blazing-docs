@@ -1,0 +1,18 @@
+{
+  "id": "sandbox_security_validation",
+  "title": "Sandbox: Security Validation",
+  "description": "Examples of malicious code that fails in the sandbox.",
+  "category": "Advanced",
+  "difficulty": "Advanced",
+  "time": "20 min",
+  "tags": [
+    "sandbox",
+    "security",
+    "validation",
+    "attacks"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}
