@@ -4,7 +4,7 @@
 
 The official documentation repository for [Blazing](https://blazing.work) - comprehensive guides, tutorials, and references for Blazing Core and Blazing Flow.
 
-**Live Documentation**: https://blazing.work/docs
+**Live Documentation**: <https://blazing.work/docs>
 
 ## About
 
@@ -64,20 +64,26 @@ We welcome contributions! Whether you're fixing a typo, improving clarity, or ad
 
 1. **Fork this repository**
 2. **Create a new branch**:
+
    ```bash
    git checkout -b docs/improve-getting-started
    ```
+
 3. **Make your changes** following our style guide
 4. **Test locally** (optional but recommended)
 5. **Commit your changes**:
+
    ```bash
    git add .
    git commit -m "docs: improve getting started guide clarity"
    ```
+
 6. **Push to your fork**:
+
    ```bash
    git push origin docs/improve-getting-started
    ```
+
 7. **Open a Pull Request** with a clear description of your changes
 
 ### Contribution Guidelines
@@ -88,6 +94,80 @@ We welcome contributions! Whether you're fixing a typo, improving clarity, or ad
 - **Test your changes**: If possible, test code examples before submitting
 - **Follow structure**: Keep the existing document structure and hierarchy
 - **Check formatting**: Ensure proper Markdown formatting and syntax
+
+## Product Naming Conventions
+
+Consistent naming is critical for brand recognition and user experience. Use the following conventions across all documentation, UI, and marketing materials.
+
+### Product Names
+
+| Product ID | Full Name (Standalone) | Short Name (Navigation/Hierarchy) |
+|------------|------------------------|-----------------------------------|
+| `blazing-core` | **Blazing Core** | Core |
+| `blazing-flow` | **Blazing Flow** | Flow |
+| `blazing-gateway` | **Blazing Core Gateway** | Gateway |
+| `blazing-flow-sandbox` | **Blazing Flow Sandbox** | Sandbox |
+
+### When to Use Full Names
+
+Use **full product names** when the product appears standalone or as the primary subject:
+
+- Product pages (`/products/gateway` shows "Blazing Core Gateway")
+- Documentation page titles and headers
+- Documentation index/hub cards
+- Landing page product showcases
+- Marketing materials and blog posts
+- First mention in any document
+
+**Examples:**
+- "Blazing Core Gateway is a global edge gateway..."
+- "Get started with Blazing Flow in 5 minutes"
+- "Blazing Flow Sandbox provides isolated testing..."
+
+### When to Use Short Names
+
+Use **short names** when the product appears in navigation or within a hierarchy where the parent context is clear:
+
+- Navigation dropdowns and menus
+- Sidebar navigation under parent product
+- Breadcrumbs (after the parent is shown)
+- Tab labels within a product section
+
+**Examples:**
+- Navigation: `Core > Gateway` (not `Blazing Core > Blazing Core Gateway`)
+- Docs header dropdown: Shows "Core", "Flow", "Gateway", "Sandbox"
+- Mobile menu hierarchy: Core → Gateway, Flow → Sandbox
+
+### Product Hierarchy
+
+```
+Blazing
+├── Blazing Core (Core)
+│   └── Blazing Core Gateway (Gateway)
+└── Blazing Flow (Flow)
+    └── Blazing Flow Sandbox (Sandbox)
+```
+
+### Code References
+
+In code, configuration, and technical contexts, use the product IDs:
+
+```yaml
+# compose.yaml
+product: blazing-core
+
+# meta.json
+{
+  "product": "blazing-gateway"
+}
+```
+
+### Avoid
+
+- ❌ "Blazing Gateway" (use "Blazing Core Gateway")
+- ❌ "Flow Sandbox" alone in standalone context (use "Blazing Flow Sandbox")
+- ❌ "Blazing Core" in navigation dropdowns (use "Core")
+- ❌ Mixing conventions within the same context
 
 ## Documentation Style Guide
 
@@ -107,6 +187,7 @@ We welcome contributions! Whether you're fixing a typo, improving clarity, or ad
 - **Follow best practices**: Show the right way to do things
 
 Example:
+
 ```python
 """
 Basic Task Example
@@ -139,6 +220,7 @@ print(result)  # Output: HELLO WORLD
 Each documentation directory should contain:
 
 1. **meta.json**: Category configuration
+
    ```json
    {
      "title": "Getting Started",
@@ -151,6 +233,7 @@ Each documentation directory should contain:
    ```
 
 2. **MDX files**: Documentation content with optional React components
+
    ```markdown
    ---
    title: "Quick Start"
@@ -169,24 +252,27 @@ Each documentation directory should contain:
 To preview your changes locally before submitting:
 
 1. **Clone the main website repository**:
+
    ```bash
    git clone https://github.com/Blazing-work/blazing-website
    cd blazing-website
    ```
 
 2. **Link your local docs**:
+
    ```bash
    # The website reads from the _docs directory
    # You can symlink your local blazing-docs to test
    ```
 
 3. **Run the development server**:
+
    ```bash
    npm install
    npm run dev
    ```
 
-4. **Visit**: http://localhost:3001/docs
+4. **Visit**: <http://localhost:3001/docs>
 
 ## License
 
@@ -210,11 +296,11 @@ See the [LICENSE](LICENSE) file for the full license text.
 
 ## Resources
 
-- **Website**: https://blazing.work
-- **Documentation**: https://blazing.work/docs
-- **GitHub**: https://github.com/Blazing-work
-- **Discord**: https://discord.gg/blazing
-- **Examples**: https://github.com/Blazing-work/blazing-examples
+- **Website**: <https://blazing.work>
+- **Documentation**: <https://blazing.work/docs>
+- **GitHub**: <https://github.com/Blazing-work>
+- **Discord**: <https://discord.gg/blazing>
+- **Examples**: <https://github.com/Blazing-work/blazing-examples>
 
 ---
 
