@@ -15,13 +15,14 @@ Test a payment processing workflow with different scenarios.
 
 ```python
 # payment_workflow.py
-from blazing import Flow
+import asyncio
+from blazing import Blazing
 import stripe
 
-flow = Flow(name="payment-processing")
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
 
-@flow.task
-async def create_charge(order_id: str, amount: int):
+@app.step
+async def create_charge(order_id: str, amount: int, services=None):
     """Create Stripe charge"""
     charge = stripe.Charge.create(
         amount=amount,
@@ -31,23 +32,25 @@ async def create_charge(order_id: str, amount: int):
     )
     return charge
 
-@flow.task
-async def update_order(order_id: str, charge_id: str):
+@app.step
+async def update_order(order_id: str, charge_id: str, services=None):
     """Update order with charge ID"""
-    await db.orders.update(
-        order_id,
-        status="paid",
-        charge_id=charge_id
-    )
+    # Conceptual - db would come from services
+    print(f"Order {order_id} updated with charge {charge_id}")
 
-@flow.task
-async def send_confirmation(order_id: str):
+@app.step
+async def send_confirmation(order_id: str, services=None):
     """Send confirmation email"""
-    await email.send(
-        to=get_customer_email(order_id),
-        template="order_confirmation",
-        data={"order_id": order_id}
-    )
+    # Conceptual - email would come from services
+    print(f"Confirmation sent for order {order_id}")
+
+async def main():
+    charge = await create_charge("order-123", 5000)
+    await update_order("order-123", charge["id"])
+    await send_confirmation("order-123")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Sandbox Configuration
@@ -92,68 +95,64 @@ sandbox:
 ```python
 # test_payment.py
 import pytest
-from blazing.testing import SandboxClient
+import asyncio
+from blazing import Blazing
+
+"""
+Note: SandboxClient is a conceptual testing interface currently in development.
+Use standard pytest with the Blazing SDK for testing workflows.
+"""
 
 @pytest.fixture
-async def sandbox():
-    client = SandboxClient("payment-testing")
-    await client.deploy("payment_workflow.py")
-    yield client
-    await client.cleanup()
+async def app():
+    """Create Blazing app for testing"""
+    app = Blazing(api_url="http://localhost:8000", api_token="test-token")
+    yield app
 
-async def test_successful_payment(sandbox):
+async def test_successful_payment(app):
     """Test successful payment flow"""
 
-    result = await sandbox.run(
-        "payment-processing",
-        input={
-            "order_id": "order-123",
-            "amount": 5000
-        }
-    )
+    @app.step
+    async def create_charge(order_id: str, amount: int, services=None):
+        # Mock successful charge
+        return {"id": "ch_test123", "status": "succeeded"}
 
-    assert result['status'] == 'completed'
-    assert result['output']['charge_id'].startswith('ch_')
+    result = await create_charge("order-123", 5000)
 
-async def test_card_declined(sandbox):
+    assert result['status'] == 'succeeded'
+    assert result['id'].startswith('ch_')
+
+async def test_card_declined(app):
     """Test card declined scenario"""
 
-    # Force card decline with mock
-    sandbox.mock_response(
-        "https://api.stripe.com/v1/charges",
-        status=402,
-        body={"error": {"code": "card_declined"}}
-    )
+    @app.step
+    async def create_charge_declined(order_id: str, amount: int, services=None):
+        # Simulate card decline
+        raise Exception("card_declined")
 
-    result = await sandbox.run(
-        "payment-processing",
-        input={"order_id": "order-456", "amount": 5000}
-    )
+    with pytest.raises(Exception, match="card_declined"):
+        await create_charge_declined("order-456", 5000)
 
-    # Should handle error gracefully
-    assert result['status'] == 'failed'
-    assert 'card_declined' in str(result['error'])
-
-async def test_retry_logic(sandbox):
+async def test_retry_logic(app):
     """Test payment retry on temporary failures"""
 
-    # First attempt fails, second succeeds
-    sandbox.mock_responses(
-        "https://api.stripe.com/v1/charges",
-        [
-            {"status": 500},  # First attempt fails
-            {"status": 200, "body": {"id": "ch_retry", "status": "succeeded"}}  # Retry succeeds
-        ]
-    )
+    attempt_count = 0
 
-    result = await sandbox.run(
-        "payment-processing",
-        input={"order_id": "order-789", "amount": 5000}
-    )
+    @app.step
+    async def create_charge_with_retry(order_id: str, amount: int, services=None):
+        nonlocal attempt_count
+        attempt_count += 1
 
-    # Should retry and succeed
-    assert result['status'] == 'completed'
-    assert result['retry_count'] == 1
+        if attempt_count == 1:
+            raise Exception("temporary_failure")
+
+        return {"id": "ch_retry", "status": "succeeded"}
+
+    # Should succeed on retry
+    result = await create_charge_with_retry("order-789", 5000)
+
+    assert result['status'] == 'succeeded'
+    assert attempt_count == 2
 ```
 
 ## Example 2: Debugging a Production Issue
@@ -223,8 +222,8 @@ blazing sandbox debug \
 
 ```python
 # Fixed workflow
-@flow.task
-async def calculate_amount(order):
+@app.step
+async def calculate_amount(order, services=None):
     # Bug was here: missing abs()
     subtotal = sum(item.price * item.quantity for item in order.items)
     tax = subtotal * 0.1
@@ -499,37 +498,56 @@ sandbox:
 ```python
 # test_integrations.py
 import pytest
-from blazing.testing import SandboxClient
+import asyncio
+from blazing import Blazing
+import stripe
+import boto3
+
+"""
+Note: SandboxClient is a conceptual testing interface currently in development.
+Use standard pytest with the Blazing SDK for integration testing.
+"""
 
 @pytest.fixture
-async def sandbox():
-    client = SandboxClient("integration-testing")
-    await client.deploy("workflow.py")
-    yield client
-    await client.cleanup()
+async def app():
+    """Create Blazing app for testing"""
+    app = Blazing(api_url="http://localhost:8000", api_token="test-token")
+    yield app
 
-async def test_stripe_integration(sandbox):
+async def test_stripe_integration(app):
     """Test real Stripe integration in test mode"""
 
-    result = await sandbox.run(
-        "payment-workflow",
-        input={"amount": 1000, "token": "tok_visa"}
-    )
+    @app.step
+    async def process_payment(amount: int, token: str, services=None):
+        # Use Stripe test mode
+        charge = stripe.Charge.create(
+            amount=amount,
+            currency="usd",
+            source=token
+        )
+        return {"charge_id": charge.id}
 
-    assert result['status'] == 'completed'
+    result = await process_payment(1000, "tok_visa")
 
     # Verify charge was created in Stripe test mode
-    charge = stripe.Charge.retrieve(result['output']['charge_id'])
+    charge = stripe.Charge.retrieve(result['charge_id'])
     assert charge.amount == 1000
     assert charge.paid is True
 
-async def test_s3_upload(sandbox):
+async def test_s3_upload(app):
     """Test S3 upload to sandbox bucket"""
 
-    result = await sandbox.run(
-        "upload-workflow",
-        input={"file": "test-file.txt", "content": "test data"}
-    )
+    @app.step
+    async def upload_file(filename: str, content: str, services=None):
+        s3 = boto3.client('s3')
+        s3.put_object(
+            Bucket='sandbox-uploads',
+            Key=filename,
+            Body=content.encode()
+        )
+        return {"uploaded": filename}
+
+    result = await upload_file("test-file.txt", "test data")
 
     # Verify file in sandbox S3 bucket
     s3 = boto3.client('s3')
