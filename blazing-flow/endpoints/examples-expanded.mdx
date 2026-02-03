@@ -446,7 +446,7 @@ async def autocomplete(prefix: str, limit: int = 10, services=None):
 ```python
 @app.endpoint(path="/recommendations/{item_id}")
 @app.workflow
-async def get_related_items(item_id: str, limit: int = 5, services=none):
+async def get_related_items(item_id: str, limit: int = 5, services=None):
     """Get related items/recommendations."""
     related = await services['RecommendationService'].get_related(item_id, limit)
     return {"item_id": item_id, "related": related, "count": len(related)}
