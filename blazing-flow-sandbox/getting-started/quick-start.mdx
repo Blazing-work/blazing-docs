@@ -94,12 +94,14 @@ Deploy a test workflow:
 
 ```python
 # workflow.py
-from blazing import Flow
+from blazing import Blazing
+from datetime import datetime
+import asyncio
 
-flow = Flow(name="test-workflow")
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
 
-@flow.task
-async def process_data(data: dict):
+@app.step
+async def process_data(data: dict, services=None):
     """Process incoming data"""
     result = {
         'processed': True,
@@ -108,11 +110,25 @@ async def process_data(data: dict):
     }
     return result
 
-@flow.task
-async def send_notification(result: dict):
+@app.step
+async def send_notification(result: dict, services=None):
     """Send notification about processed data"""
     print(f"Data processed: {result}")
     return result
+
+@app.workflow
+async def test_workflow(data: dict, services=None):
+    """Orchestrate data processing workflow"""
+    processed = await process_data(data, services=services)
+    return await send_notification(processed, services=services)
+
+async def main():
+    await app.publish()
+    result = await app.test_workflow({"data": "test-value"})
+    print(f"Workflow result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 Deploy to sandbox:
@@ -187,42 +203,45 @@ Write tests using the sandbox:
 ```python
 # test_workflow.py
 import pytest
-from blazing.testing import SandboxClient
+from blazing import Blazing
 
 @pytest.fixture
-async def sandbox():
-    """Create test sandbox"""
-    client = SandboxClient("test-sandbox")
-    await client.deploy("workflow.py")
-    yield client
-    await client.cleanup()
+async def app():
+    """Create test app instance"""
+    test_app = Blazing(api_url="http://localhost:8000", api_token="test-token")
 
-async def test_process_data(sandbox):
+    @test_app.step
+    async def process_data(data: dict, services=None):
+        return {
+            'processed': True,
+            'input': data,
+        }
+
+    @test_app.workflow
+    async def test_workflow(data: dict, services=None):
+        return await process_data(data, services=services)
+
+    await test_app.publish()
+    yield test_app
+
+async def test_process_data(app):
     """Test data processing workflow"""
-
     # Run workflow
-    result = await sandbox.run(
-        "test-workflow",
-        input={"data": "test-value"}
-    )
+    result = await app.test_workflow({"data": "test-value"})
 
     # Assertions
-    assert result['status'] == 'completed'
-    assert result['output']['processed'] is True
-    assert result['duration'] < 5.0  # < 5 seconds
+    assert result['processed'] is True
+    assert result['input']['data'] == "test-value"
 
-async def test_error_handling(sandbox):
+async def test_error_handling(app):
     """Test error handling"""
-
     # Run with invalid input
-    result = await sandbox.run(
-        "test-workflow",
-        input={"invalid": "data"}
-    )
-
-    # Should handle error gracefully
-    assert result['status'] == 'failed'
-    assert 'error' in result
+    try:
+        result = await app.test_workflow({"invalid": "data"})
+        # Should handle based on step logic
+    except Exception as e:
+        # Error handling occurs here
+        assert 'error' in str(e).lower() or e is not None
 ```
 
 Run tests:

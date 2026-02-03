@@ -21,8 +21,9 @@ No additional dependencies needed - Blazing Flow Sandbox uses Pyodide (bundled).
 
 ```python
 from blazing import Blazing
+import asyncio
 
-app = Blazing(, api_token="your-token")
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
 
 # Regular step (trusted - runs on native Python)
 @app.step
@@ -42,9 +43,14 @@ async def calculate(a: int, b: int, c: int, services=None):
     sum_result = await add(a, b, services=services)
     return await multiply(sum_result, c, services=services)
 
-# Publish and run
-await app.publish()
-result = await app.calculate(10, 20, 3)  # Returns 90
+async def main():
+    # Publish and run
+    await app.publish()
+    result = await app.calculate(10, 20, 3)  # Returns 90
+    print(f"Result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **That's it!** The `multiply` step runs in WASM isolation automatically.
@@ -67,7 +73,9 @@ For now, all user-defined steps are sandboxed for maximum safety.
 User code in sandbox can't access network/filesystem directly, but CAN call approved service methods:
 
 ```python
-from blazing.base import BaseService
+from blazing import Blazing, BaseService
+
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
 
 # YOUR CODE (trusted) - define what user code can access
 @app.service
@@ -106,8 +114,10 @@ async def process(value: int, services=None):
 ## With Database Access
 
 ```python
-from blazing.base import BaseService
+from blazing import Blazing, BaseService
 from sqlalchemy import create_engine
+
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
 
 @app.service
 class DataAPI(BaseService):

