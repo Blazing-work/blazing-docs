@@ -16,12 +16,14 @@ Expose a Blazing Flow workflow as an HTTP/WebSocket endpoint.
 ### Signature
 
 ```python
-@app.endpoint(
+def endpoint(
     path: str,
     method: str = "POST",
-    auth_handler: Optional[Callable] = None,
+    auth: Optional[Callable] = None,
     enable_websocket: bool = False
-)
+):
+    """Decorator to expose a workflow as an HTTP/WebSocket endpoint."""
+    pass
 ```
 
 ### Parameters
@@ -30,7 +32,7 @@ Expose a Blazing Flow workflow as an HTTP/WebSocket endpoint.
 |-----------|------|----------|---------|-------------|
 | `path` | `str` | ✅ Yes | - | URL path for the endpoint (e.g., `"/calculate"`, `"/v1/users"`) |
 | `method` | `str` | No | `"POST"` | HTTP method: `"GET"`, `"POST"`, `"PUT"`, `"DELETE"` |
-| `auth_handler` | `Callable` | No | `None` | Async function for authentication (see [Authentication](/blazing-flow/endpoints/authentication)) |
+| `auth` | `Callable` | No | `None` | Async function for authentication (see [Authentication](/blazing-flow/endpoints/authentication)) |
 | `enable_websocket` | `bool` | No | `False` | Create WebSocket endpoint at `{path}/ws` |
 
 ### Returns
@@ -67,7 +69,7 @@ Creates endpoint: `GET /users/{user_id}`
 async def verify_api_key(credentials):
     return credentials.credentials == "secret"
 
-@app.endpoint(path="/secure", auth_handler=verify_api_key)
+@app.endpoint(path="/secure", auth=verify_api_key)
 @app.workflow
 async def secure_action(data: str, services=None):
     return data.upper()
@@ -122,7 +124,9 @@ async def create_asgi_app(
     description: str = "",
     version: str = "1.0.0",
     enable_cors: bool = True
-) -> FastAPI
+) -> FastAPI:
+    """Generate a FastAPI application from Blazing Flow workflows."""
+    pass
 ```
 
 ### Parameters
@@ -146,47 +150,56 @@ FastAPI application instance ready for deployment.
 ```python
 from blazing import Blazing
 from blazing.web import create_asgi_app
+import asyncio
 
-app = Blazing(, api_token="token")
+app = Blazing(api_url="https://api.blazingflow.com", api_token="token")
 
 @app.endpoint(path="/calculate")
 @app.workflow
 async def calculate(x: int, y: int, services=None):
     return x + y
 
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+async def main():
+    await app.publish()
+    fastapi_app = await create_asgi_app(app)
+    return fastapi_app
+
+fastapi_app = asyncio.run(main())
 ```
 
 #### Custom Metadata
 
 ```python
-fastapi_app = await create_asgi_app(
-    app,
-    title="My Workflow API",
-    description="Production workflows as REST endpoints",
-    version="2.0.0"
-)
+async def main():
+    fastapi_app = await create_asgi_app(
+        app,
+        title="My Workflow API",
+        description="Production workflows as REST endpoints",
+        version="2.0.0"
+    )
+    return fastapi_app
 ```
 
 #### Disable CORS
 
 ```python
-fastapi_app = await create_asgi_app(
-    app,
-    enable_cors=False  # Disable default CORS
-)
-
-# Add custom CORS configuration
 from fastapi.middleware.cors import CORSMiddleware
 
-fastapi_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://example.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+async def main():
+    fastapi_app = await create_asgi_app(
+        app,
+        enable_cors=False  # Disable default CORS
+    )
+
+    # Add custom CORS configuration
+    fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["https://example.com"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    return fastapi_app
 ```
 
 ### Notes
