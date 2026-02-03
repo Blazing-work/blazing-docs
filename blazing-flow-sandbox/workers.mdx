@@ -48,7 +48,7 @@ Blazing Flow Sandbox uses **4 worker types** to separate trusted code (your infr
 
 **Example:**
 ```python
-from blazing.base import BaseService
+from blazing import BaseService
 
 @app.service
 class DatabaseService(BaseService):
@@ -84,7 +84,7 @@ class DatabaseService(BaseService):
 **Example:**
 ```python
 import httpx
-from blazing.base import BaseService
+from blazing import BaseService
 
 @app.service
 class ExternalAPI(BaseService):

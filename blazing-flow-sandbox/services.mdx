@@ -49,7 +49,7 @@ How sandboxed user code accesses your infrastructure through controlled service 
 ## Basic Service
 
 ```python
-from blazing.base import BaseService
+from blazing import BaseService
 
 @app.service
 class MathAPI(BaseService):
@@ -88,7 +88,7 @@ async def calculate(x: int, y: int, services=None):
 ## Database Service
 
 ```python
-from blazing.base import BaseService
+from blazing import BaseService
 from sqlalchemy import create_engine, text
 
 @app.service
@@ -152,7 +152,7 @@ async def process_user(user_id: int, services=None):
 
 ```python
 import httpx
-from blazing.base import BaseService
+from blazing import BaseService
 
 @app.service
 class ExternalAPI(BaseService):
@@ -196,7 +196,7 @@ class ExternalAPI(BaseService):
 
 ```python
 import boto3
-from blazing.base import BaseService
+from blazing import BaseService
 
 @app.service
 class StorageAPI(BaseService):
@@ -233,7 +233,7 @@ class StorageAPI(BaseService):
 ## Multi-Service Example
 
 ```python
-from blazing.base import BaseService
+from blazing import BaseService
 
 # Service 1: Database
 @app.service
