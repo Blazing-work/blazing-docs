@@ -1,0 +1,18 @@
+{
+  "id": "cli_publish_deploy",
+  "title": "CLI-Based Deployment",
+  "description": "Use the Blazing CLI to publish and manage workflows from the command line.",
+  "category": "Advanced",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": [
+    "cli",
+    "deployment",
+    "publish",
+    "devops"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "scheduling_workflow",
+  "title": "Scheduled Workflow Execution",
+  "description": "Schedule workflows to run periodically using Cron expressions or time intervals.",
+  "category": "Advanced",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "scheduling",
+    "cron",
+    "periodic",
+    "automation"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}
