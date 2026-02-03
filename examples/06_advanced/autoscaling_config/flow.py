@@ -1,10 +1,12 @@
-"""
-Example demonstrating AIMD autoscaling configuration.
+"""AIMD Autoscaling Configuration Example
 
 This example shows how to configure AIMD (Additive Increase Multiplicative Decrease)
 autoscaling for Blazing worker pools using environment variables.
 
 AIMD adapts capacity based on health signals (latency, error rate, etc.).
+
+Documentation: https://blazing.work/docs/advanced/autoscaling
+Related Examples: scheduling_workflow, cli_publish_deploy
 """
 
 from blazing import Blazing

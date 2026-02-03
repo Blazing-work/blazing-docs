@@ -2,6 +2,9 @@
 
 Demonstrates how to cache expensive endpoint responses to
 improve performance and reduce load on backend services.
+
+Documentation: https://blazing.work/docs/endpoints/middleware#response-caching
+Related Examples: middleware_cors, middleware_rate_limit
 """
 
 from blazing import Blazing

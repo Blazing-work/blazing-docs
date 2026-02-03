@@ -2,6 +2,9 @@
 
 Demonstrates protecting HTTP endpoints with JWT token authentication.
 Shows how to validate JWT tokens and access user claims.
+
+Documentation: https://blazing.work/docs/endpoints/authentication#jwtauth
+Related Examples: auth_api_key, auth_oauth2
 """
 
 from blazing import Blazing

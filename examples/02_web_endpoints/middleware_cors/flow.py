@@ -2,6 +2,9 @@
 
 Demonstrates how to enable Cross-Origin Resource Sharing (CORS)
 for a browser-based single-page application (SPA) API.
+
+Documentation: https://blazing.work/docs/endpoints/middleware#cors-cross-origin-resource-sharing
+Related Examples: middleware_rate_limit, middleware_cache
 """
 
 from blazing import Blazing

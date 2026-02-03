@@ -2,6 +2,9 @@
 
 Demonstrates request timeout enforcement to prevent endpoints
 from hanging indefinitely on slow operations.
+
+Documentation: https://blazing.work/docs/endpoints/middleware#timeout-enforcement
+Related Examples: middleware_retry, middleware_circuit_breaker
 """
 
 from blazing import Blazing

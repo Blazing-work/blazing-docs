@@ -117,6 +117,8 @@ The JWT payload should contain:
 - `exp` - Expiration timestamp
 - `iat` - Issued at timestamp
 
+> **Example:** See the complete [JWT Authentication example](/docs/auth_jwt) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_jwt).
+
 ### APIKeyAuth
 
 Validates API keys from headers or query parameters. Supports static keys, hashed keys, and dynamic validation.
@@ -206,6 +208,8 @@ curl -X POST http://localhost:8080/data?api_key=key-123 \
   -d '{"query": "data"}'
 ```
 
+> **Example:** See the complete [API Key Authentication example](/docs/auth_api_key) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_api_key).
+
 ### OAuth2Auth
 
 OAuth2 authentication with token introspection or userinfo endpoint support. Includes presets for Google, GitHub, and Okta.
@@ -264,6 +268,8 @@ curl -X POST http://localhost:8080/oauth \
   -H "Content-Type: application/json" \
   -d '{"data": "value"}'
 ```
+
+> **Example:** See the complete [OAuth2 Authentication example](/docs/auth_oauth2) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_oauth2).
 
 ### BasicAuth
 

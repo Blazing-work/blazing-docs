@@ -1,3 +1,12 @@
+"""Endpoint Routing Example
+
+Demonstrates creating multiple HTTP endpoints with different paths
+using the @app.endpoint decorator.
+
+Documentation: https://blazing.work/docs/endpoints/overview
+Related Examples: endpoint_interact, middleware_cors
+"""
+
 from blazing import Blazing
 from blazing.web import create_asgi_app
 

@@ -2,6 +2,9 @@
 
 Demonstrates protecting HTTP endpoints with API key authentication.
 Shows both header-based and query parameter authentication.
+
+Documentation: https://blazing.work/docs/endpoints/authentication#apikeyauth
+Related Examples: auth_jwt, auth_oauth2
 """
 
 from blazing import Blazing

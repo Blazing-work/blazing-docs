@@ -135,6 +135,8 @@ app.add_middleware(
 
 **Important:** When `allow_credentials=True`, you cannot use `allow_origins=["*"]`. Specify exact origins or use a regex pattern.
 
+> **Example:** See the complete [CORS Middleware example](/docs/middleware_cors) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_cors).
+
 ---
 
 ## Rate Limiting
@@ -233,6 +235,8 @@ await app.publish()
 
 **Production Note:** The in-memory implementation is suitable for single-instance deployments. For multi-instance production, integrate with Redis for distributed rate limiting.
 
+> **Example:** See the complete [Rate Limiting Middleware example](/docs/middleware_rate_limit) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_rate_limit).
+
 ---
 
 ## Response Caching
@@ -312,6 +316,8 @@ await app.publish()
 
 **Production Note:** For distributed caching across multiple instances, integrate with Redis or another distributed cache.
 
+> **Example:** See the complete [Cache Middleware example](/docs/middleware_cache) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_cache).
+
 ---
 
 ## Timeout Enforcement
@@ -366,6 +372,8 @@ await app.publish()
 ```
 
 **Timeout Response:** Returns JSON with `{"detail": "message", "timeout": seconds}` and specified status code.
+
+> **Example:** See the complete [Timeout Middleware example](/docs/middleware_timeout) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_timeout).
 
 ---
 
@@ -453,6 +461,8 @@ await app.publish()
 
 **Jitter Algorithm:** Uses AWS-style full jitter (`sleep = random_between(0, min(cap, base * 2^attempt))`) to prevent retry storms.
 
+> **Example:** See the complete [Retry Middleware example](/docs/middleware_retry) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_retry).
+
 ---
 
 ## Circuit Breaker
@@ -520,6 +530,8 @@ await app.publish()
 - **HALF_OPEN:** Testing recovery, limited requests pass through
 
 **Circuit Headers:** Responses include `X-Circuit-State` header showing current state (closed, open, half_open).
+
+> **Example:** See the complete [Circuit Breaker Middleware example](/docs/middleware_circuit_breaker) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_circuit_breaker).
 
 ---
 

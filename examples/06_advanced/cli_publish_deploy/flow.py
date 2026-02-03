@@ -1,5 +1,4 @@
-"""
-Example workflow for CLI-based deployment.
+"""CLI Publish & Deploy Example
 
 This file demonstrates a simple Blazing workflow that can be published
 using the Blazing CLI.
@@ -11,6 +10,9 @@ Or set environment variables and auto-discover:
     export BLAZING_API_URL=https://api.blazing.example.com
     export BLAZING_API_TOKEN=your-token-here
     blazing publish
+
+Documentation: https://blazing.work/docs/cli/reference#blazing-publish
+Related Examples: scheduling_workflow, autoscaling_config
 """
 
 from blazing import Blazing

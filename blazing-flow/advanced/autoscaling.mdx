@@ -139,6 +139,8 @@ AIMD is configured via `AIMDConfig` dataclass. All parameters can be overridden 
 | `adaptive_persistence_required` | `int` | 2 | N/A | Required triggers in window (2 of 3) |
 | `adaptive_ema_alpha` | `float` | 0.1 | N/A | Smoothing factor for baseline EMA |
 
+> **Example:** See the complete [AIMD Autoscaling Configuration example](/docs/autoscaling_config) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/06_advanced/autoscaling_config).
+
 ## Signal Types
 
 AIMD monitors 5 signals to detect resource saturation:

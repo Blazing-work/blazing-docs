@@ -1,3 +1,12 @@
+"""Endpoint Interact Example
+
+Demonstrates using app.interact() for bidirectional communication
+between workflows and external services.
+
+Documentation: https://blazing.work/docs/endpoints/overview
+Related Examples: endpoint_routing, service_injection
+"""
+
 from blazing import Blazing
 from blazing.web import create_asgi_app
 import asyncio

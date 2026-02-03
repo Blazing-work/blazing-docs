@@ -1,3 +1,12 @@
+"""Custom Service Example
+
+Demonstrates creating a custom service by extending BaseService
+for reusable functionality across workflows.
+
+Documentation: https://blazing.work/docs/guides/custom-connectors#creating-custom-services
+Related Examples: service_injection, endpoint_routing
+"""
+
 from blazing import Blazing, BaseService
 import asyncio
 

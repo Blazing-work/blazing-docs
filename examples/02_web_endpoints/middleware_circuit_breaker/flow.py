@@ -2,6 +2,9 @@
 
 Demonstrates the circuit breaker pattern to protect against
 cascading failures when a downstream service becomes unhealthy.
+
+Documentation: https://blazing.work/docs/endpoints/middleware#circuit-breaker
+Related Examples: middleware_retry, middleware_timeout
 """
 
 from blazing import Blazing

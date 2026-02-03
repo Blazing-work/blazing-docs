@@ -1,3 +1,12 @@
+"""Scheduling Workflow Example
+
+Demonstrates using Cron and Period schedules for periodic workflow execution
+on the Blazing server.
+
+Documentation: https://blazing.work/docs/advanced/scheduling
+Related Examples: cli_publish_deploy, autoscaling_config
+"""
+
 from blazing import Blazing, Cron, Period
 import asyncio
 from datetime import datetime

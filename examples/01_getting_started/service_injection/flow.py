@@ -1,3 +1,12 @@
+"""Service Injection Example
+
+Demonstrates using the services=None parameter for dependency injection
+in steps and workflows to access external services.
+
+Documentation: https://blazing.work/docs/guides/custom-connectors#service-injection-pattern
+Related Examples: custom_service, endpoint_interact
+"""
+
 from blazing import Blazing
 
 

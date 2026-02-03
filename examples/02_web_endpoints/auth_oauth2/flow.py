@@ -2,6 +2,9 @@
 
 Demonstrates protecting HTTP endpoints with OAuth2 token validation.
 Shows both token introspection and built-in provider support.
+
+Documentation: https://blazing.work/docs/endpoints/authentication#oauth2auth
+Related Examples: auth_api_key, auth_jwt
 """
 
 from blazing import Blazing

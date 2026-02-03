@@ -2,6 +2,9 @@
 
 Demonstrates automatic retry with exponential backoff for
 endpoints that call unreliable external services.
+
+Documentation: https://blazing.work/docs/endpoints/middleware#automatic-retries
+Related Examples: middleware_circuit_breaker, middleware_timeout
 """
 
 from blazing import Blazing

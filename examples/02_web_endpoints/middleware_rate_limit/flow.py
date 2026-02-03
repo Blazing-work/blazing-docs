@@ -2,6 +2,9 @@
 
 Demonstrates how to protect an API endpoint from abuse by
 limiting the number of requests per client.
+
+Documentation: https://blazing.work/docs/endpoints/middleware#rate-limiting
+Related Examples: middleware_cors, middleware_circuit_breaker
 """
 
 from blazing import Blazing

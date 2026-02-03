@@ -1,3 +1,12 @@
+"""Semaphore Concurrency Example
+
+Demonstrates using Blazing Semaphore to limit concurrent execution
+and prevent resource exhaustion.
+
+Documentation: https://blazing.work/docs/async-parallel/concurrency
+Related Examples: endpoint_routing, service_injection
+"""
+
 from blazing import Blazing, Semaphore
 import asyncio
 
