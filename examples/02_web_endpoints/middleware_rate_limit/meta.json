@@ -1,0 +1,11 @@
+{
+  "id": "middleware_rate_limit",
+  "title": "Rate Limiting to Prevent API Abuse",
+  "description": "Protect your API from abuse by limiting requests per client using RateLimitMiddleware.",
+  "category": "Web Endpoints",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": ["middleware", "rate-limit", "endpoint", "http", "throttling"],
+  "products": ["blazing-flow"],
+  "primaryProduct": "blazing-flow"
+}
