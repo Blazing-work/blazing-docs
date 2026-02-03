@@ -37,17 +37,17 @@ Lambda gives you serverless. Blazing Flow gives you serverless **and** persisten
 
 ```python
 @app.workflow
-async def pipeline(user_id: str):
-    user = await fetch_user(user_id)
+async def pipeline(user_id: str, services=None):
+    user = await fetch_user(user_id, services=services)
 
     # Real Python - if statements, loops, everything
     if user['premium']:
-        result = await premium_processing(user)
+        result = await premium_processing(user, services=services)
     else:
-        result = await standard_processing(user)
+        result = await standard_processing(user, services=services)
 
     for item in result['items']:
-        await process_item(item)
+        await process_item(item, services=services)
 
     return result
 ```
@@ -162,6 +162,7 @@ async def user_code(x: int, y: int, services=None):
 ## Quick Example
 
 ```python
+import asyncio
 from blazing import Blazing
 
 # Create your app
@@ -169,36 +170,35 @@ app = Blazing()
 
 # Define processing steps with @step
 @app.step
-async def fetch_data(source_id: str):
+async def fetch_data(source_id: str, services=None):
     # Fetch from database or API
     return {"id": source_id, "data": [1, 2, 3]}
 
 @app.step
-async def transform_data(raw_data: dict):
+async def transform_data(raw_data: dict, services=None):
     # Transform the data
     total = sum(raw_data["data"])
     return {"id": raw_data["id"], "result": total}
 
-# Define the pipeline with @route
+# Define the pipeline with @workflow
 @app.workflow
-async def data_pipeline(source_id: str):
+async def data_pipeline(source_id: str, services=None):
     # Orchestrate the workflow
-    data = await fetch_data(source_id)
-    result = await transform_data(data)
+    data = await fetch_data(source_id, services=services)
+    result = await transform_data(data, services=services)
     return result
 
-# Publish and start
+# Publish and run
 async def main():
-    # Publish infrastructure (creates Redis indices, registers routes)
+    # Publish infrastructure
     await app.publish()
 
-    # Start the app (makes routes available to workers)
-    await app.start()
-
-    # Submit a task
-    unit = await app.create_workflow_task("data_pipeline", source_id="123")
-    result = await unit.result()
+    # Execute workflow
+    result = await app.data_pipeline(source_id="123").wait_result()
     print(result)  # {"id": "123", "result": 6}
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Key Features

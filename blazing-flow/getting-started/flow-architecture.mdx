@@ -41,7 +41,7 @@ Workers execute tasks from workflows and steps:
 
 ```python
 # Configure worker mix
-app = Blazing(,
+app = Blazing(
     worker_config={
         'async_workers': 4,
         'blocking_workers': 2,
@@ -72,18 +72,18 @@ app = Blazing(,
 
 ```python
 @app.workflow
-async def process_order(order_id: str):
+async def process_order(order_id: str, services=None):
     # Step 1: Fetch order details
-    order = await fetch_order(order_id)
+    order = await fetch_order(order_id, services=services)
 
     # Step 2: Validate inventory
-    validated = await validate_inventory(order)
+    validated = await validate_inventory(order, services=services)
 
     # Step 3: Process payment
-    payment = await process_payment(validated)
+    payment = await process_payment(validated, services=services)
 
     # Step 4: Ship order
-    shipment = await ship_order(payment)
+    shipment = await ship_order(payment, services=services)
 
     return shipment
 ```
@@ -263,7 +263,7 @@ All Foremen process tasks cooperatively.
 Increase workers per Foreman:
 
 ```python
-app = Blazing(,
+app = Blazing(
     worker_config={
         'async_workers': 16,  # Scale up for I/O workloads
         'blocking_workers': 8  # Scale up for CPU workloads
