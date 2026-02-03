@@ -23,7 +23,7 @@ async def verify_api_key(credentials: HTTPAuthorizationCredentials) -> bool:
     api_key = credentials.credentials
     return api_key in VALID_API_KEYS  # Your validation logic
 
-@app.endpoint(path="/secure", auth_handler=verify_api_key)
+@app.endpoint(path="/secure", auth=verify_api_key)
 @app.workflow
 async def secure_workflow(data: str, services=None):
     return data.upper()
@@ -55,7 +55,7 @@ async def verify_jwt(credentials: HTTPAuthorizationCredentials) -> bool:
     except jwt.InvalidTokenError:
         return False
 
-@app.endpoint(path="/admin", auth_handler=verify_jwt)
+@app.endpoint(path="/admin", auth=verify_jwt)
 @app.workflow
 async def admin_action(action: str, services=None):
     return f"Action {action} executed"
@@ -96,7 +96,7 @@ async def verify_api_key_db(credentials: HTTPAuthorizationCredentials) -> bool:
         api_key = result.scalar_one_or_none()
         return api_key is not None
 
-@app.endpoint(path="/data", auth_handler=verify_api_key_db)
+@app.endpoint(path="/data", auth=verify_api_key_db)
 @app.workflow
 async def fetch_data(query: str, services=None):
     # Your logic
@@ -113,14 +113,14 @@ Different endpoints can have different authentication:
 async def public_workflow(x: int, services=None):
     return x  # No auth required
 
-@app.endpoint(path="/user", auth_handler=verify_api_key)
+@app.endpoint(path="/user", auth=verify_api_key)
 @app.workflow
 async def user_workflow(x: int, services=None):
     return x * 2  # API key required
 
-@app.endpoint(path="/admin", auth_handler=verify_jwt)
+@app.endpoint(path="/admin", auth=verify_jwt)
 @app.workflow
-async def admin_workflow(x: int, services=none):
+async def admin_workflow(x: int, services=None):
     return x * 10  # JWT required
 ```
 
@@ -128,6 +128,7 @@ async def admin_workflow(x: int, services=none):
 
 ```python
 from enum import Enum
+import asyncio
 
 class Role(Enum):
     USER = "user"
@@ -152,12 +153,19 @@ async def require_role(required_role: Role):
 
     return auth_handler
 
-# Admin-only endpoint
-@app.endpoint(path="/admin/delete", auth_handler=await require_role(Role.ADMIN))
-@app.workflow
-async def delete_user(user_id: int, services=None):
-    # Your logic
-    return {"deleted": user_id}
+async def main():
+    # Admin-only endpoint
+    admin_auth = await require_role(Role.ADMIN)
+
+    @app.endpoint(path="/admin/delete", auth=admin_auth)
+    @app.workflow
+    async def delete_user(user_id: int, services=None):
+        # Your logic
+        return {"deleted": user_id}
+
+    return app
+
+app = asyncio.run(main())
 ```
 
 ## OAuth 2.0 Integration
@@ -189,7 +197,7 @@ async def verify_oauth_token(credentials: HTTPAuthorizationCredentials) -> bool:
     except:
         return False
 
-@app.endpoint(path="/oauth", auth_handler=verify_oauth_token)
+@app.endpoint(path="/oauth", auth=verify_oauth_token)
 @app.workflow
 async def oauth_workflow(data: str, services=None):
     return data

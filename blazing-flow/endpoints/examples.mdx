@@ -54,9 +54,10 @@ The simplest possible endpoint: expose a workflow as a public HTTP API.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 import uvicorn
+import asyncio
 
 app = Blazing(
-    ,
+    api_url="https://api.blazingflow.com",
     api_token="your-api-token"
 )
 
@@ -66,11 +67,14 @@ async def calculate(x: int, y: int, services=None):
     """Add two numbers together."""
     return x + y
 
-# Publish and create FastAPI app
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+async def main():
+    # Publish and create FastAPI app
+    await app.publish()
+    fastapi_app = await create_asgi_app(app)
+    return fastapi_app
 
 # Run server
+fastapi_app = asyncio.run(main())
 uvicorn.run(fastapi_app, host="0.0.0.0", port=8080)
 ```
 
@@ -97,7 +101,7 @@ Expose a multi-step workflow that processes data through several stages.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(, api_token="your-token")
+app = Blazing(api_url="https://api.blazingflow.com", api_token="your-token")
 
 # Internal steps (not exposed directly)
 @app.step
@@ -143,8 +147,12 @@ async def analyze_data(data: dict, services=None):
     report = await format_report(stats, services=services)
     return report
 
-await app.publish()
-fastapi_app = await create_asgi_app(app, title="Data Analysis API")
+async def main():
+    await app.publish()
+    fastapi_app = await create_asgi_app(app, title="Data Analysis API")
+    return fastapi_app
+
+fastapi_app = asyncio.run(main())
 ```
 
 **Test it:**
@@ -166,7 +174,9 @@ from blazing.web import create_asgi_app
 from fastapi.security import HTTPAuthorizationCredentials
 import jwt
 
-app = Blazing(, api_token="your-token")
+import asyncio
+
+app = Blazing(api_url="https://api.blazingflow.com", api_token="your-token")
 
 SECRET_KEY = "your-jwt-secret"
 
@@ -197,7 +207,7 @@ async def health_check(services=None):
     return {"status": "healthy", "version": "1.0.0"}
 
 # Protected endpoint (JWT required)
-@app.endpoint(path="/secure/data", auth_handler=verify_jwt)
+@app.endpoint(path="/secure/data", auth=verify_jwt)
 @app.workflow
 async def get_secure_data(user_id: int, services=None):
     """
@@ -208,7 +218,7 @@ async def get_secure_data(user_id: int, services=None):
     return {"user_id": user_id, "data": "sensitive data"}
 
 # Protected endpoint (API key required)
-@app.endpoint(path="/admin/stats", auth_handler=verify_api_key)
+@app.endpoint(path="/admin/stats", auth=verify_api_key)
 @app.workflow
 async def get_admin_stats(services=None):
     """
@@ -218,8 +228,12 @@ async def get_admin_stats(services=None):
     """
     return {"total_users": 1000, "active_jobs": 42}
 
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+async def main():
+    await app.publish()
+    fastapi_app = await create_asgi_app(app)
+    return fastapi_app
+
+fastapi_app = asyncio.run(main())
 ```
 
 **Test it:**
@@ -249,7 +263,7 @@ from blazing import Blazing
 from blazing.web import create_asgi_app
 import asyncio
 
-app = Blazing(, api_token="your-token")
+app = Blazing(api_url="https://api.blazingflow.com", api_token="your-token")
 
 @app.step
 async def process_batch(batch_id: int, services=None):
@@ -272,8 +286,12 @@ async def process_data(num_batches: int, services=None):
         results.append(result)
     return {"processed": len(results), "results": results}
 
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+async def main():
+    await app.publish()
+    fastapi_app = await create_asgi_app(app)
+    return fastapi_app
+
+fastapi_app = asyncio.run(main())
 ```
 
 **JavaScript client:**
@@ -359,7 +377,7 @@ from blazing import Blazing
 from blazing.web import create_asgi_app
 import asyncio
 
-app = Blazing(, api_token="your-token")
+app = Blazing(api_url="https://api.blazingflow.com", api_token="your-token")
 
 @app.step
 async def fetch_user(user_id: int, services=None):
@@ -406,8 +424,12 @@ async def process_users_batch(user_ids: list, multiplier: float, services=None):
         "results": results
     }
 
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+async def main():
+    await app.publish()
+    fastapi_app = await create_asgi_app(app)
+    return fastapi_app
+
+fastapi_app = asyncio.run(main())
 ```
 
 **Test it:**
@@ -427,7 +449,7 @@ Proper error handling with custom error responses.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(, api_token="your-token")
+app = Blazing(api_url="https://api.blazingflow.com", api_token="your-token")
 
 @app.step
 async def validate_input(amount: float, services=None):
@@ -471,8 +493,12 @@ async def calculate_transaction(amount: float, services=None):
         # Errors are automatically caught and returned in job status
         raise e
 
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+async def main():
+    await app.publish()
+    fastapi_app = await create_asgi_app(app)
+    return fastapi_app
+
+fastapi_app = asyncio.run(main())
 ```
 
 **Test error handling:**
@@ -504,7 +530,7 @@ Organize multiple endpoints with different paths and versions.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(, api_token="your-token")
+app = Blazing(api_url="https://api.blazingflow.com", api_token="your-token")
 
 # V1 Endpoints
 @app.endpoint(path="/v1/users/create")
@@ -556,13 +582,17 @@ async def admin_stats(services=None):
         "uptime_seconds": 86400
     }
 
-await app.publish()
-fastapi_app = await create_asgi_app(
-    app,
-    title="User Management API",
-    description="Multi-version user management API",
-    version="2.0.0"
-)
+async def main():
+    await app.publish()
+    fastapi_app = await create_asgi_app(
+        app,
+        title="User Management API",
+        description="Multi-version user management API",
+        version="2.0.0"
+    )
+    return fastapi_app
+
+fastapi_app = asyncio.run(main())
 ```
 
 **Available endpoints:**
