@@ -105,1114 +105,1352 @@ Shared infrastructure access (databases, APIs, caches). Use services when you ne
 ### 1. Simple Step
 ```python
 from blazing import Blazing
+import asyncio
 
-app = Blazing(, api_token="your-token")
+async def main():
+    app = Blazing()
 
-@app.step
-async def hello(name: str, services=None):
-    """Basic step that returns a greeting."""
-    return f"Hello, {name}!"
+    @app.step
+    async def hello(name: str, services=None):
+        """Basic step that returns a greeting."""
+        return f"Hello, {name}!"
 
-await app.publish()
-result = await app.hello("World")
-print(result)  # "Hello, World!"
+    await app.publish()
+    result = await app.hello("World").wait_result()
+    print(result)  # "Hello, World!"
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 2. Step with Math
 ```python
-@app.step
-async def add(a: int, b: int, services=None):
-    """Add two numbers."""
-    return a + b
+from blazing import Blazing
+import asyncio
 
-await app.publish()
-result = await app.add(10, 20)
-print(result)  # 30
+async def main():
+    app = Blazing()
+
+    @app.step
+    async def add(a: int, b: int, services=None):
+        """Add two numbers."""
+        return a + b
+
+    await app.publish()
+    result = await app.add(10, 20).wait_result()
+    print(result)  # 30
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 3. Step with Data Processing
 ```python
-@app.step
-async def filter_positive(numbers: list, services=None):
-    """Filter out negative numbers."""
-    return [n for n in numbers if n > 0]
+from blazing import Blazing
+import asyncio
 
-await app.publish()
-result = await app.filter_positive([1, -2, 3, -4, 5])
-print(result)  # [1, 3, 5]
+async def main():
+    app = Blazing()
+
+    @app.step
+    async def filter_positive(numbers: list, services=None):
+        """Filter out negative numbers."""
+        return [n for n in numbers if n > 0]
+
+    await app.publish()
+    result = await app.filter_positive([1, -2, 3, -4, 5]).wait_result()
+    print(result)  # [1, 3, 5]
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Workflows (Multi-Step Pipelines)
 
 ### 4. Basic Workflow
 ```python
-@app.step
-async def double(x: int, services=None):
-    """Double a number."""
-    return x * 2
+from blazing import Blazing
+import asyncio
 
-@app.step
-async def add_ten(x: int, services=None):
-    """Add 10 to a number."""
-    return x + 10
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def process_number(x: int, services=None):
-    """Workflow: double then add 10."""
-    doubled = await double(x, services=services)
-    result = await add_ten(doubled, services=services)
-    return result
+    @app.step
+    async def double(x: int, services=None):
+        """Double a number."""
+        return x * 2
 
-await app.publish()
-result = await app.process_number(5)
-print(result)  # 20 ((5 * 2) + 10)
+    @app.step
+    async def add_ten(x: int, services=None):
+        """Add 10 to a number."""
+        return x + 10
+
+    @app.workflow
+    async def process_number(x: int, services=None):
+        """Workflow: double then add 10."""
+        doubled = await double(x, services=services)
+        result = await add_ten(doubled, services=services)
+        return result
+
+    await app.publish()
+    result = await app.process_number(5).wait_result()
+    print(result)  # 20 ((5 * 2) + 10)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 5. Data Transformation Workflow
 ```python
-@app.step
-async def clean_data(data: list, services=None):
-    """Remove null values."""
-    return [x for x in data if x is not None]
+from blazing import Blazing
+import asyncio
 
-@app.step
-async def normalize(data: list, services=None):
-    """Normalize to 0-1 range."""
-    min_val, max_val = min(data), max(data)
-    return [(x - min_val) / (max_val - min_val) for x in data]
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def prepare_dataset(raw_data: list, services=None):
-    """Clean and normalize dataset."""
-    cleaned = await clean_data(raw_data, services=services)
-    normalized = await normalize(cleaned, services=services)
-    return normalized
+    @app.step
+    async def clean_data(data: list, services=None):
+        """Remove null values."""
+        return [x for x in data if x is not None]
 
-await app.publish()
-result = await app.prepare_dataset([1, None, 5, 10, None, 15])
-print(result)  # [0.0, 0.29, 0.64, 1.0]
+    @app.step
+    async def normalize(data: list, services=None):
+        """Normalize to 0-1 range."""
+        min_val, max_val = min(data), max(data)
+        return [(x - min_val) / (max_val - min_val) for x in data]
+
+    @app.workflow
+    async def prepare_dataset(raw_data: list, services=None):
+        """Clean and normalize dataset."""
+        cleaned = await clean_data(raw_data, services=services)
+        normalized = await normalize(cleaned, services=services)
+        return normalized
+
+    await app.publish()
+    result = await app.prepare_dataset([1, None, 5, 10, None, 15]).wait_result()
+    print(result)  # [0.0, 0.29, 0.64, 1.0]
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 6. Multi-Branch Workflow
 ```python
-@app.step
-async def calculate_mean(numbers: list, services=None):
-    """Calculate mean."""
-    return sum(numbers) / len(numbers)
+from blazing import Blazing
+import asyncio
 
-@app.step
-async def calculate_median(numbers: list, services=None):
-    """Calculate median."""
-    sorted_nums = sorted(numbers)
-    mid = len(sorted_nums) // 2
-    return sorted_nums[mid]
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def get_statistics(numbers: list, services=None):
-    """Calculate multiple statistics in parallel."""
-    import asyncio
-    mean, median = await asyncio.gather(
-        calculate_mean(numbers, services=services),
-        calculate_median(numbers, services=services)
-    )
-    return {"mean": mean, "median": median, "count": len(numbers)}
+    @app.step
+    async def calculate_mean(numbers: list, services=None):
+        """Calculate mean."""
+        return sum(numbers) / len(numbers)
 
-await app.publish()
-result = await app.get_statistics([1, 2, 3, 4, 5])
-print(result)  # {"mean": 3.0, "median": 3, "count": 5}
+    @app.step
+    async def calculate_median(numbers: list, services=None):
+        """Calculate median."""
+        sorted_nums = sorted(numbers)
+        mid = len(sorted_nums) // 2
+        return sorted_nums[mid]
+
+    @app.workflow
+    async def get_statistics(numbers: list, services=None):
+        """Calculate multiple statistics in parallel."""
+        mean, median = await asyncio.gather(
+            calculate_mean(numbers, services=services),
+            calculate_median(numbers, services=services)
+        )
+        return {"mean": mean, "median": median, "count": len(numbers)}
+
+    await app.publish()
+    result = await app.get_statistics([1, 2, 3, 4, 5]).wait_result()
+    print(result)  # {"mean": 3.0, "median": 3, "count": 5}
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Services (Database & API Access)
 
 ### 7. Database Service
 ```python
+from blazing import Blazing
 from blazing.base import BaseService
 from sqlalchemy import text
+import asyncio
 
-@app.service
-class UserDatabase(BaseService):
-    def __init__(self, connectors):
-        self._db = connectors.get('postgres')
+async def main():
+    app = Blazing()
 
-    async def get_user(self, user_id: int) -> dict:
-        """Fetch user from database."""
-        query = text("SELECT id, name, email FROM users WHERE id = :id")
-        result = await self._db.execute(query, {"id": user_id})
-        row = result.fetchone()
-        return {"id": row[0], "name": row[1], "email": row[2]}
+    @app.service
+    class UserDatabase(BaseService):
+        def __init__(self, connectors):
+            self._db = connectors.get('postgres')
 
-    async def create_user(self, name: str, email: str) -> int:
-        """Create new user."""
-        query = text("INSERT INTO users (name, email) VALUES (:name, :email) RETURNING id")
-        result = await self._db.execute(query, {"name": name, "email": email})
-        return result.fetchone()[0]
+        async def get_user(self, user_id: int) -> dict:
+            """Fetch user from database."""
+            query = text("SELECT id, name, email FROM users WHERE id = :id")
+            result = await self._db.execute(query, {"id": user_id})
+            row = result.fetchone()
+            return {"id": row[0], "name": row[1], "email": row[2]}
 
-@app.step
-async def register_user(name: str, email: str, services=None):
-    """Register new user (uses database service)."""
-    user_id = await services['UserDatabase'].create_user(name, email)
-    return {"user_id": user_id, "name": name, "email": email}
+        async def create_user(self, name: str, email: str) -> int:
+            """Create new user."""
+            query = text("INSERT INTO users (name, email) VALUES (:name, :email) RETURNING id")
+            result = await self._db.execute(query, {"name": name, "email": email})
+            return result.fetchone()[0]
 
-await app.publish()
+    @app.step
+    async def register_user(name: str, email: str, services=None):
+        """Register new user (uses database service)."""
+        user_id = await services['UserDatabase'].create_user(name, email)
+        return {"user_id": user_id, "name": name, "email": email}
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 8. REST API Service
 ```python
-import httpx
+from blazing import Blazing
 from blazing.base import BaseService
+import httpx
+import asyncio
 
-@app.service
-class WeatherAPI(BaseService):
-    def __init__(self, connectors):
-        self._api_key = connectors.get('weather_api_key')
+async def main():
+    app = Blazing()
 
-    async def get_weather(self, city: str) -> dict:
-        """Fetch weather for city."""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"https://api.weather.com/v1/{city}",
-                headers={"Authorization": f"Bearer {self._api_key}"}
-            )
-            return response.json()
+    @app.service
+    class WeatherAPI(BaseService):
+        def __init__(self, connectors):
+            self._api_key = connectors.get('weather_api_key')
 
-@app.step
-async def check_weather(city: str, services=None):
-    """Check weather for city."""
-    weather = await services['WeatherAPI'].get_weather(city)
-    return {
-        "city": city,
-        "temperature": weather['temp'],
-        "conditions": weather['conditions']
-    }
+        async def get_weather(self, city: str) -> dict:
+            """Fetch weather for city."""
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"https://api.weather.com/v1/{city}",
+                    headers={"Authorization": f"Bearer {self._api_key}"}
+                )
+                return response.json()
 
-await app.publish()
+    @app.step
+    async def check_weather(city: str, services=None):
+        """Check weather for city."""
+        weather = await services['WeatherAPI'].get_weather(city)
+        return {
+            "city": city,
+            "temperature": weather['temp'],
+            "conditions": weather['conditions']
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 9. Cache Service
 ```python
-import redis.asyncio as redis
+from blazing import Blazing
 from blazing.base import BaseService
+import redis.asyncio as redis
+import asyncio
 
-@app.service
-class CacheService(BaseService):
-    def __init__(self, connectors):
-        self._redis = connectors.get('redis')
+async def main():
+    app = Blazing()
 
-    async def get(self, key: str) -> str:
-        """Get value from cache."""
-        value = await self._redis.get(key)
-        return value.decode() if value else None
+    @app.service
+    class CacheService(BaseService):
+        def __init__(self, connectors):
+            self._redis = connectors.get('redis')
 
-    async def set(self, key: str, value: str, ttl: int = 3600):
-        """Set value in cache with TTL."""
-        await self._redis.set(key, value, ex=ttl)
+        async def get(self, key: str) -> str:
+            """Get value from cache."""
+            value = await self._redis.get(key)
+            return value.decode() if value else None
 
-@app.step
-async def cached_lookup(key: str, services=None):
-    """Lookup value with caching."""
-    cached = await services['CacheService'].get(key)
-    if cached:
-        return {"source": "cache", "value": cached}
+        async def set(self, key: str, value: str, ttl: int = 3600):
+            """Set value in cache with TTL."""
+            await self._redis.set(key, value, ex=ttl)
 
-    # Simulate expensive operation
-    value = f"computed_value_for_{key}"
-    await services['CacheService'].set(key, value)
-    return {"source": "computed", "value": value}
+    @app.step
+    async def cached_lookup(key: str, services=None):
+        """Lookup value with caching."""
+        cached = await services['CacheService'].get(key)
+        if cached:
+            return {"source": "cache", "value": cached}
 
-await app.publish()
+        # Simulate expensive operation
+        value = f"computed_value_for_{key}"
+        await services['CacheService'].set(key, value)
+        return {"source": "computed", "value": value}
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 10. Email Service
 ```python
+from blazing import Blazing
 from blazing.base import BaseService
+import asyncio
 
-@app.service
-class EmailService(BaseService):
-    def __init__(self, connectors):
-        self._smtp = connectors.get('smtp')
+async def main():
+    app = Blazing()
 
-    async def send(self, to: str, subject: str, body: str):
-        """Send email."""
-        message = {
-            "to": to,
-            "subject": subject,
-            "body": body
-        }
-        await self._smtp.send(message)
-        return {"sent": True, "to": to}
+    @app.service
+    class EmailService(BaseService):
+        def __init__(self, connectors):
+            self._smtp = connectors.get('smtp')
 
-@app.workflow
-async def send_welcome_email(user_email: str, user_name: str, services=None):
-    """Send welcome email to new user."""
-    subject = f"Welcome, {user_name}!"
-    body = f"Hello {user_name},\n\nWelcome to our platform!"
-    result = await services['EmailService'].send(user_email, subject, body)
-    return result
+        async def send(self, to: str, subject: str, body: str):
+            """Send email."""
+            message = {
+                "to": to,
+                "subject": subject,
+                "body": body
+            }
+            await self._smtp.send(message)
+            return {"sent": True, "to": to}
 
-await app.publish()
+    @app.workflow
+    async def send_welcome_email(user_email: str, user_name: str, services=None):
+        """Send welcome email to new user."""
+        subject = f"Welcome, {user_name}!"
+        body = f"Hello {user_name},\n\nWelcome to our platform!"
+        result = await services['EmailService'].send(user_email, subject, body)
+        return result
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Concurrent Processing
 
 ### 11. Parallel Data Processing
 ```python
-@app.step
-async def process_item(item_id: int, services=None):
-    """Process single item."""
-    # Simulate processing
-    result = item_id * 2
-    return {"item_id": item_id, "processed_value": result}
+from blazing import Blazing
+import asyncio
 
-@app.workflow
-async def process_batch(item_ids: list, services=None):
-    """Process multiple items in parallel."""
-    import asyncio
-    tasks = [
-        process_item(item_id, services=services)
-        for item_id in item_ids
-    ]
-    results = await asyncio.gather(*tasks)
-    return {"processed_count": len(results), "results": results}
+async def main():
+    app = Blazing()
 
-await app.publish()
-result = await app.process_batch([1, 2, 3, 4, 5])
+    @app.step
+    async def process_item(item_id: int, services=None):
+        """Process single item."""
+        # Simulate processing
+        result = item_id * 2
+        return {"item_id": item_id, "processed_value": result}
+
+    @app.workflow
+    async def process_batch(item_ids: list, services=None):
+        """Process multiple items in parallel."""
+        tasks = [
+            process_item(item_id, services=services)
+            for item_id in item_ids
+        ]
+        results = await asyncio.gather(*tasks)
+        return {"processed_count": len(results), "results": results}
+
+    await app.publish()
+    result = await app.process_batch([1, 2, 3, 4, 5]).wait_result()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 12. Fan-Out / Fan-In Pattern
 ```python
-@app.step
-async def fetch_user_data(user_id: int, services=None):
-    """Fetch user data."""
-    user = await services['UserDatabase'].get_user(user_id)
-    return user
+from blazing import Blazing
+import asyncio
 
-@app.step
-async def fetch_user_orders(user_id: int, services=None):
-    """Fetch user orders."""
-    orders = await services['OrderDatabase'].get_orders(user_id)
-    return orders
+async def main():
+    app = Blazing()
 
-@app.step
-async def fetch_user_preferences(user_id: int, services=none):
-    """Fetch user preferences."""
-    prefs = await services['PreferenceService'].get(user_id)
-    return prefs
+    @app.step
+    async def fetch_user_data(user_id: int, services=None):
+        """Fetch user data."""
+        user = await services['UserDatabase'].get_user(user_id)
+        return user
 
-@app.workflow
-async def get_user_profile(user_id: int, services=None):
-    """Fetch all user data in parallel (fan-out), then combine (fan-in)."""
-    import asyncio
-    user, orders, prefs = await asyncio.gather(
-        fetch_user_data(user_id, services=services),
-        fetch_user_orders(user_id, services=services),
-        fetch_user_preferences(user_id, services=services)
-    )
-    return {
-        "user": user,
-        "orders": orders,
-        "preferences": prefs
-    }
+    @app.step
+    async def fetch_user_orders(user_id: int, services=None):
+        """Fetch user orders."""
+        orders = await services['OrderDatabase'].get_orders(user_id)
+        return orders
 
-await app.publish()
+    @app.step
+    async def fetch_user_preferences(user_id: int, services=None):
+        """Fetch user preferences."""
+        prefs = await services['PreferenceService'].get(user_id)
+        return prefs
+
+    @app.workflow
+    async def get_user_profile(user_id: int, services=None):
+        """Fetch all user data in parallel (fan-out), then combine (fan-in)."""
+        user, orders, prefs = await asyncio.gather(
+            fetch_user_data(user_id, services=services),
+            fetch_user_orders(user_id, services=services),
+            fetch_user_preferences(user_id, services=services)
+        )
+        return {
+            "user": user,
+            "orders": orders,
+            "preferences": prefs
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 13. Rate-Limited API Calls
 ```python
-import asyncio
+from blazing import Blazing
 from blazing.base import BaseService
+import httpx
+import asyncio
 
-@app.service
-class RateLimitedAPI(BaseService):
-    def __init__(self, connectors):
-        self._api_key = connectors.get('api_key')
-        self._semaphore = asyncio.Semaphore(5)  # Max 5 concurrent
+async def main():
+    app = Blazing()
 
-    async def call_api(self, endpoint: str) -> dict:
-        """Call API with rate limiting."""
-        async with self._semaphore:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"https://api.example.com/{endpoint}",
-                    headers={"Authorization": f"Bearer {self._api_key}"}
-                )
-                return response.json()
+    @app.service
+    class RateLimitedAPI(BaseService):
+        def __init__(self, connectors):
+            self._api_key = connectors.get('api_key')
+            self._semaphore = asyncio.Semaphore(5)  # Max 5 concurrent
 
-@app.workflow
-async def fetch_multiple_endpoints(endpoints: list, services=None):
-    """Fetch multiple API endpoints with rate limiting."""
-    import asyncio
-    tasks = [
-        services['RateLimitedAPI'].call_api(endpoint)
-        for endpoint in endpoints
-    ]
-    results = await asyncio.gather(*tasks)
-    return results
+        async def call_api(self, endpoint: str) -> dict:
+            """Call API with rate limiting."""
+            async with self._semaphore:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(
+                        f"https://api.example.com/{endpoint}",
+                        headers={"Authorization": f"Bearer {self._api_key}"}
+                    )
+                    return response.json()
 
-await app.publish()
+    @app.workflow
+    async def fetch_multiple_endpoints(endpoints: list, services=None):
+        """Fetch multiple API endpoints with rate limiting."""
+        tasks = [
+            services['RateLimitedAPI'].call_api(endpoint)
+            for endpoint in endpoints
+        ]
+        results = await asyncio.gather(*tasks)
+        return results
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Error Handling
 
 ### 14. Retry Logic
 ```python
+from blazing import Blazing
 import asyncio
+import random
 
-@app.step
-async def unreliable_operation(data: str, services=None):
-    """Operation that might fail."""
-    # Simulate occasional failure
-    import random
-    if random.random() < 0.3:  # 30% failure rate
-        raise ValueError("Transient error")
-    return f"processed: {data}"
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def with_retry(data: str, max_retries: int = 3, services=None):
-    """Workflow with retry logic."""
-    for attempt in range(max_retries):
-        try:
-            result = await unreliable_operation(data, services=services)
-            return {"success": True, "result": result, "attempts": attempt + 1}
-        except ValueError as e:
-            if attempt == max_retries - 1:
-                return {"success": False, "error": str(e), "attempts": attempt + 1}
-            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+    @app.step
+    async def unreliable_operation(data: str, services=None):
+        """Operation that might fail."""
+        # Simulate occasional failure
+        if random.random() < 0.3:  # 30% failure rate
+            raise ValueError("Transient error")
+        return f"processed: {data}"
 
-await app.publish()
+    @app.workflow
+    async def with_retry(data: str, max_retries: int = 3, services=None):
+        """Workflow with retry logic."""
+        for attempt in range(max_retries):
+            try:
+                result = await unreliable_operation(data, services=services)
+                return {"success": True, "result": result, "attempts": attempt + 1}
+            except ValueError as e:
+                if attempt == max_retries - 1:
+                    return {"success": False, "error": str(e), "attempts": attempt + 1}
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 15. Validation & Error Handling
 ```python
-@app.step
-async def validate_email(email: str, services=None):
-    """Validate email format."""
-    import re
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    if not re.match(pattern, email):
-        raise ValueError(f"Invalid email: {email}")
-    return {"valid": True, "email": email}
+from blazing import Blazing
+import asyncio
+import re
 
-@app.workflow
-async def process_user_registration(email: str, name: str, services=None):
-    """Register user with validation."""
-    try:
-        # Validate email
-        validation = await validate_email(email, services=services)
+async def main():
+    app = Blazing()
 
-        # Create user
-        user_id = await services['UserDatabase'].create_user(name, email)
+    @app.step
+    async def validate_email(email: str, services=None):
+        """Validate email format."""
+        pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+        if not re.match(pattern, email):
+            raise ValueError(f"Invalid email: {email}")
+        return {"valid": True, "email": email}
 
-        # Send welcome email
-        await services['EmailService'].send(email, "Welcome!", f"Hello {name}")
+    @app.workflow
+    async def process_user_registration(email: str, name: str, services=None):
+        """Register user with validation."""
+        try:
+            # Validate email
+            validation = await validate_email(email, services=services)
 
-        return {"success": True, "user_id": user_id}
-    except ValueError as e:
-        return {"success": False, "error": str(e)}
+            # Create user
+            user_id = await services['UserDatabase'].create_user(name, email)
 
-await app.publish()
+            # Send welcome email
+            await services['EmailService'].send(email, "Welcome!", f"Hello {name}")
+
+            return {"success": True, "user_id": user_id}
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 16. Timeout Handling
 ```python
+from blazing import Blazing
 import asyncio
 
-@app.step
-async def slow_operation(data: str, services=None):
-    """Operation that might take too long."""
-    await asyncio.sleep(10)  # Simulate slow operation
-    return f"processed: {data}"
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def with_timeout(data: str, timeout_seconds: int = 5, services=None):
-    """Workflow with timeout."""
-    try:
-        result = await asyncio.wait_for(
-            slow_operation(data, services=services),
-            timeout=timeout_seconds
-        )
-        return {"success": True, "result": result}
-    except asyncio.TimeoutError:
-        return {"success": False, "error": "Operation timed out"}
+    @app.step
+    async def slow_operation(data: str, services=None):
+        """Operation that might take too long."""
+        await asyncio.sleep(10)  # Simulate slow operation
+        return f"processed: {data}"
 
-await app.publish()
+    @app.workflow
+    async def with_timeout(data: str, timeout_seconds: int = 5, services=None):
+        """Workflow with timeout."""
+        try:
+            result = await asyncio.wait_for(
+                slow_operation(data, services=services),
+                timeout=timeout_seconds
+            )
+            return {"success": True, "result": result}
+        except asyncio.TimeoutError:
+            return {"success": False, "error": "Operation timed out"}
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Data Aggregation
 
 ### 17. Aggregating Results
 ```python
-@app.step
-async def fetch_sales_data(region: str, services=None):
-    """Fetch sales data for region."""
-    data = await services['SalesDatabase'].get_by_region(region)
-    return {"region": region, "total": sum(d['amount'] for d in data)}
+from blazing import Blazing
+import asyncio
 
-@app.workflow
-async def aggregate_sales(regions: list, services=None):
-    """Aggregate sales across all regions."""
-    import asyncio
-    results = await asyncio.gather(*[
-        fetch_sales_data(region, services=services)
-        for region in regions
-    ])
+async def main():
+    app = Blazing()
 
-    total_sales = sum(r['total'] for r in results)
-    return {
-        "by_region": results,
-        "grand_total": total_sales,
-        "regions_count": len(regions)
-    }
+    @app.step
+    async def fetch_sales_data(region: str, services=None):
+        """Fetch sales data for region."""
+        data = await services['SalesDatabase'].get_by_region(region)
+        return {"region": region, "total": sum(d['amount'] for d in data)}
 
-await app.publish()
+    @app.workflow
+    async def aggregate_sales(regions: list, services=None):
+        """Aggregate sales across all regions."""
+        results = await asyncio.gather(*[
+            fetch_sales_data(region, services=services)
+            for region in regions
+        ])
+
+        total_sales = sum(r['total'] for r in results)
+        return {
+            "by_region": results,
+            "grand_total": total_sales,
+            "regions_count": len(regions)
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 18. Map-Reduce Pattern
 ```python
-@app.step
-async def map_operation(chunk: list, services=None):
-    """Map operation: process chunk."""
-    return sum(x ** 2 for x in chunk)
+from blazing import Blazing
+import asyncio
 
-@app.step
-async def reduce_operation(results: list, services=None):
-    """Reduce operation: combine results."""
-    return sum(results)
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def map_reduce_sum_of_squares(numbers: list, chunk_size: int = 100, services=None):
-    """Map-reduce pattern for sum of squares."""
-    import asyncio
+    @app.step
+    async def map_operation(chunk: list, services=None):
+        """Map operation: process chunk."""
+        return sum(x ** 2 for x in chunk)
 
-    # Split into chunks (map phase)
-    chunks = [numbers[i:i+chunk_size] for i in range(0, len(numbers), chunk_size)]
+    @app.step
+    async def reduce_operation(results: list, services=None):
+        """Reduce operation: combine results."""
+        return sum(results)
 
-    # Process chunks in parallel
-    mapped_results = await asyncio.gather(*[
-        map_operation(chunk, services=services)
-        for chunk in chunks
-    ])
+    @app.workflow
+    async def map_reduce_sum_of_squares(numbers: list, chunk_size: int = 100, services=None):
+        """Map-reduce pattern for sum of squares."""
+        # Split into chunks (map phase)
+        chunks = [numbers[i:i+chunk_size] for i in range(0, len(numbers), chunk_size)]
 
-    # Combine results (reduce phase)
-    final_result = await reduce_operation(mapped_results, services=services)
+        # Process chunks in parallel
+        mapped_results = await asyncio.gather(*[
+            map_operation(chunk, services=services)
+            for chunk in chunks
+        ])
 
-    return {
-        "result": final_result,
-        "chunks_processed": len(chunks),
-        "total_numbers": len(numbers)
-    }
+        # Combine results (reduce phase)
+        final_result = await reduce_operation(mapped_results, services=services)
 
-await app.publish()
+        return {
+            "result": final_result,
+            "chunks_processed": len(chunks),
+            "total_numbers": len(numbers)
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Real-World Patterns
 
 ### 19. ETL Pipeline
 ```python
-@app.step
-async def extract(source: str, services=None):
-    """Extract data from source."""
-    data = await services['DataSource'].fetch(source)
-    return data
+from blazing import Blazing
+import asyncio
+from datetime import datetime
 
-@app.step
-async def transform(data: list, services=none):
-    """Transform data."""
-    # Clean, normalize, enrich
-    cleaned = [d for d in data if d.get('valid')]
-    enriched = [
-        {**d, 'processed_at': datetime.now().isoformat()}
-        for d in cleaned
-    ]
-    return enriched
+async def main():
+    app = Blazing()
 
-@app.step
-async def load(data: list, destination: str, services=None):
-    """Load data to destination."""
-    await services['DataWarehouse'].bulk_insert(destination, data)
-    return {"loaded": len(data), "destination": destination}
+    @app.step
+    async def extract(source: str, services=None):
+        """Extract data from source."""
+        data = await services['DataSource'].fetch(source)
+        return data
 
-@app.workflow
-async def etl_pipeline(source: str, destination: str, services=None):
-    """Complete ETL pipeline."""
-    raw_data = await extract(source, services=services)
-    transformed = await transform(raw_data, services=services)
-    result = await load(transformed, destination, services=services)
-    return {
-        "source": source,
-        "destination": destination,
-        "rows_processed": result['loaded']
-    }
+    @app.step
+    async def transform(data: list, services=None):
+        """Transform data."""
+        # Clean, normalize, enrich
+        cleaned = [d for d in data if d.get('valid')]
+        enriched = [
+            {**d, 'processed_at': datetime.now().isoformat()}
+            for d in cleaned
+        ]
+        return enriched
 
-await app.publish()
+    @app.step
+    async def load(data: list, destination: str, services=None):
+        """Load data to destination."""
+        await services['DataWarehouse'].bulk_insert(destination, data)
+        return {"loaded": len(data), "destination": destination}
+
+    @app.workflow
+    async def etl_pipeline(source: str, destination: str, services=None):
+        """Complete ETL pipeline."""
+        raw_data = await extract(source, services=services)
+        transformed = await transform(raw_data, services=services)
+        result = await load(transformed, destination, services=services)
+        return {
+            "source": source,
+            "destination": destination,
+            "rows_processed": result['loaded']
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 20. Event Processing
 ```python
-@app.step
-async def validate_event(event: dict, services=None):
-    """Validate event structure."""
-    required = ['event_type', 'user_id', 'timestamp']
-    if not all(k in event for k in required):
-        raise ValueError("Invalid event structure")
-    return event
+from blazing import Blazing
+import asyncio
 
-@app.step
-async def enrich_event(event: dict, services=None):
-    """Enrich event with user data."""
-    user = await services['UserDatabase'].get_user(event['user_id'])
-    return {**event, 'user_name': user['name'], 'user_email': user['email']}
+async def main():
+    app = Blazing()
 
-@app.step
-async def store_event(event: dict, services=None):
-    """Store event in analytics database."""
-    await services['EventDatabase'].insert(event)
-    return {"stored": True, "event_id": event.get('id')}
+    @app.step
+    async def validate_event(event: dict, services=None):
+        """Validate event structure."""
+        required = ['event_type', 'user_id', 'timestamp']
+        if not all(k in event for k in required):
+            raise ValueError("Invalid event structure")
+        return event
 
-@app.workflow
-async def process_event(event: dict, services=None):
-    """Process incoming event."""
-    validated = await validate_event(event, services=services)
-    enriched = await enrich_event(validated, services=services)
-    result = await store_event(enriched, services=services)
-    return result
+    @app.step
+    async def enrich_event(event: dict, services=None):
+        """Enrich event with user data."""
+        user = await services['UserDatabase'].get_user(event['user_id'])
+        return {**event, 'user_name': user['name'], 'user_email': user['email']}
 
-await app.publish()
+    @app.step
+    async def store_event(event: dict, services=None):
+        """Store event in analytics database."""
+        await services['EventDatabase'].insert(event)
+        return {"stored": True, "event_id": event.get('id')}
+
+    @app.workflow
+    async def process_event(event: dict, services=None):
+        """Process incoming event."""
+        validated = await validate_event(event, services=services)
+        enriched = await enrich_event(validated, services=services)
+        result = await store_event(enriched, services=services)
+        return result
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Webhook Processing
 
 ### 21. GitHub Webhook Handler
 ```python
-@app.step
-async def validate_github_signature(payload: dict, signature: str, services=None):
-    """Validate GitHub webhook signature."""
-    secret = await services['ConfigService'].get('github_webhook_secret')
-    import hmac
-    import hashlib
-    expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(f"sha256={expected}", signature):
-        raise ValueError("Invalid signature")
-    return payload
+from blazing import Blazing
+import asyncio
+import hmac
+import hashlib
 
-@app.step
-async def process_pull_request(pr_data: dict, services=None):
-    """Process pull request event."""
-    if pr_data['action'] == 'opened':
-        # Notify team
-        await services['SlackService'].notify(
-            f"New PR: {pr_data['title']} by {pr_data['user']}"
-        )
-    return {"processed": True, "action": pr_data['action']}
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def handle_github_webhook(payload: dict, signature: str, services=None):
-    """Handle GitHub webhook."""
-    validated = await validate_github_signature(payload, signature, services=services)
-    if validated['event_type'] == 'pull_request':
-        result = await process_pull_request(validated['data'], services=services)
-    return result
+    @app.step
+    async def validate_github_signature(payload: dict, signature: str, services=None):
+        """Validate GitHub webhook signature."""
+        secret = await services['ConfigService'].get('github_webhook_secret')
+        expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(f"sha256={expected}", signature):
+            raise ValueError("Invalid signature")
+        return payload
 
-await app.publish()
+    @app.step
+    async def process_pull_request(pr_data: dict, services=None):
+        """Process pull request event."""
+        if pr_data['action'] == 'opened':
+            # Notify team
+            await services['SlackService'].notify(
+                f"New PR: {pr_data['title']} by {pr_data['user']}"
+            )
+        return {"processed": True, "action": pr_data['action']}
+
+    @app.workflow
+    async def handle_github_webhook(payload: dict, signature: str, services=None):
+        """Handle GitHub webhook."""
+        validated = await validate_github_signature(payload, signature, services=services)
+        if validated['event_type'] == 'pull_request':
+            result = await process_pull_request(validated['data'], services=services)
+        return result
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 22. Stripe Payment Webhook
 ```python
-@app.step
-async def verify_stripe_signature(payload: str, signature: str, services=None):
-    """Verify Stripe webhook signature."""
-    import stripe
-    endpoint_secret = await services['ConfigService'].get('stripe_webhook_secret')
-    try:
-        event = stripe.Webhook.construct_event(payload, signature, endpoint_secret)
-        return event
-    except ValueError:
-        raise ValueError("Invalid payload")
-    except stripe.error.SignatureVerificationError:
-        raise ValueError("Invalid signature")
+from blazing import Blazing
+import asyncio
+import stripe
 
-@app.step
-async def handle_payment_success(payment_intent: dict, services=None):
-    """Handle successful payment."""
-    order_id = payment_intent['metadata']['order_id']
-    await services['OrderDatabase'].mark_paid(order_id)
-    await services['EmailService'].send_receipt(payment_intent['receipt_email'])
-    return {"order_id": order_id, "status": "paid"}
+async def main():
+    app = Blazing()
 
-@app.workflow
-async def process_stripe_webhook(payload: str, signature: str, services=None):
-    """Process Stripe webhook event."""
-    event = await verify_stripe_signature(payload, signature, services=services)
+    @app.step
+    async def verify_stripe_signature(payload: str, signature: str, services=None):
+        """Verify Stripe webhook signature."""
+        endpoint_secret = await services['ConfigService'].get('stripe_webhook_secret')
+        try:
+            event = stripe.Webhook.construct_event(payload, signature, endpoint_secret)
+            return event
+        except ValueError:
+            raise ValueError("Invalid payload")
+        except stripe.error.SignatureVerificationError:
+            raise ValueError("Invalid signature")
 
-    if event['type'] == 'payment_intent.succeeded':
-        result = await handle_payment_success(event['data']['object'], services=services)
+    @app.step
+    async def handle_payment_success(payment_intent: dict, services=None):
+        """Handle successful payment."""
+        order_id = payment_intent['metadata']['order_id']
+        await services['OrderDatabase'].mark_paid(order_id)
+        await services['EmailService'].send_receipt(payment_intent['receipt_email'])
+        return {"order_id": order_id, "status": "paid"}
 
-    return result
+    @app.workflow
+    async def process_stripe_webhook(payload: str, signature: str, services=None):
+        """Process Stripe webhook event."""
+        event = await verify_stripe_signature(payload, signature, services=services)
 
-await app.publish()
+        if event['type'] == 'payment_intent.succeeded':
+            result = await handle_payment_success(event['data']['object'], services=services)
+
+        return result
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Notification Systems
 
 ### 23. Email Queue Processor
 ```python
+from blazing import Blazing
 from blazing.base import BaseService
+import asyncio
+import json
 
-@app.service
-class EmailQueueService(BaseService):
-    def __init__(self, connectors):
-        self._queue = connectors.get('redis')
-        self._smtp = connectors.get('smtp')
+async def main():
+    app = Blazing()
 
-    async def enqueue(self, to: str, subject: str, body: str):
-        """Add email to queue."""
-        import json
-        email = json.dumps({"to": to, "subject": subject, "body": body})
-        await self._queue.lpush('email_queue', email)
+    @app.service
+    class EmailQueueService(BaseService):
+        def __init__(self, connectors):
+            self._queue = connectors.get('redis')
+            self._smtp = connectors.get('smtp')
 
-    async def dequeue(self) -> dict:
-        """Get next email from queue."""
-        import json
-        email = await self._queue.rpop('email_queue')
-        return json.loads(email) if email else None
+        async def enqueue(self, to: str, subject: str, body: str):
+            """Add email to queue."""
+            email = json.dumps({"to": to, "subject": subject, "body": body})
+            await self._queue.lpush('email_queue', email)
 
-@app.step
-async def send_queued_email(services=None):
-    """Process one email from queue."""
-    email = await services['EmailQueueService'].dequeue()
-    if email:
-        await services['EmailQueueService']._smtp.send(email)
-        return {"sent": True, "to": email['to']}
-    return {"sent": False, "reason": "queue_empty"}
+        async def dequeue(self) -> dict:
+            """Get next email from queue."""
+            email = await self._queue.rpop('email_queue')
+            return json.loads(email) if email else None
 
-@app.workflow
-async def process_email_queue(batch_size: int = 10, services=None):
-    """Process email queue in batches."""
-    import asyncio
-    results = await asyncio.gather(*[
-        send_queued_email(services=services)
-        for _ in range(batch_size)
-    ])
-    sent_count = sum(1 for r in results if r['sent'])
-    return {"processed": batch_size, "sent": sent_count}
+    @app.step
+    async def send_queued_email(services=None):
+        """Process one email from queue."""
+        email = await services['EmailQueueService'].dequeue()
+        if email:
+            await services['EmailQueueService']._smtp.send(email)
+            return {"sent": True, "to": email['to']}
+        return {"sent": False, "reason": "queue_empty"}
 
-await app.publish()
+    @app.workflow
+    async def process_email_queue(batch_size: int = 10, services=None):
+        """Process email queue in batches."""
+        results = await asyncio.gather(*[
+            send_queued_email(services=services)
+            for _ in range(batch_size)
+        ])
+        sent_count = sum(1 for r in results if r['sent'])
+        return {"processed": batch_size, "sent": sent_count}
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 24. Multi-Channel Notification
 ```python
-@app.step
-async def send_email_notification(user_id: int, message: str, services=None):
-    """Send email notification."""
-    user = await services['UserDatabase'].get_user(user_id)
-    await services['EmailService'].send(user['email'], "Notification", message)
-    return {"channel": "email", "sent": True}
+from blazing import Blazing
+import asyncio
 
-@app.step
-async def send_sms_notification(user_id: int, message: str, services=None):
-    """Send SMS notification."""
-    user = await services['UserDatabase'].get_user(user_id)
-    await services['SMSService'].send(user['phone'], message)
-    return {"channel": "sms", "sent": True}
+async def main():
+    app = Blazing()
 
-@app.step
-async def send_push_notification(user_id: int, message: str, services=None):
-    """Send push notification."""
-    await services['PushService'].send(user_id, message)
-    return {"channel": "push", "sent": True}
+    @app.step
+    async def send_email_notification(user_id: int, message: str, services=None):
+        """Send email notification."""
+        user = await services['UserDatabase'].get_user(user_id)
+        await services['EmailService'].send(user['email'], "Notification", message)
+        return {"channel": "email", "sent": True}
 
-@app.workflow
-async def notify_user(user_id: int, message: str, channels: list, services=None):
-    """Send notification through multiple channels."""
-    import asyncio
-    tasks = []
-    if 'email' in channels:
-        tasks.append(send_email_notification(user_id, message, services=services))
-    if 'sms' in channels:
-        tasks.append(send_sms_notification(user_id, message, services=services))
-    if 'push' in channels:
-        tasks.append(send_push_notification(user_id, message, services=services))
+    @app.step
+    async def send_sms_notification(user_id: int, message: str, services=None):
+        """Send SMS notification."""
+        user = await services['UserDatabase'].get_user(user_id)
+        await services['SMSService'].send(user['phone'], message)
+        return {"channel": "sms", "sent": True}
 
-    results = await asyncio.gather(*tasks)
-    return {"user_id": user_id, "channels": results}
+    @app.step
+    async def send_push_notification(user_id: int, message: str, services=None):
+        """Send push notification."""
+        await services['PushService'].send(user_id, message)
+        return {"channel": "push", "sent": True}
 
-await app.publish()
+    @app.workflow
+    async def notify_user(user_id: int, message: str, channels: list, services=None):
+        """Send notification through multiple channels."""
+        tasks = []
+        if 'email' in channels:
+            tasks.append(send_email_notification(user_id, message, services=services))
+        if 'sms' in channels:
+            tasks.append(send_sms_notification(user_id, message, services=services))
+        if 'push' in channels:
+            tasks.append(send_push_notification(user_id, message, services=services))
+
+        results = await asyncio.gather(*tasks)
+        return {"user_id": user_id, "channels": results}
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## File Processing
 
 ### 25. CSV Import Pipeline
 ```python
+from blazing import Blazing
+from blazing.base import BaseService
+import asyncio
 import csv
 import io
-from blazing.base import BaseService
 
-@app.service
-class FileStorageService(BaseService):
-    def __init__(self, connectors):
-        self._s3 = connectors.get('s3')
+async def main():
+    app = Blazing()
 
-    async def download(self, file_key: str) -> bytes:
-        """Download file from S3."""
-        return await self._s3.get_object(file_key)
+    @app.service
+    class FileStorageService(BaseService):
+        def __init__(self, connectors):
+            self._s3 = connectors.get('s3')
 
-    async def upload(self, file_key: str, data: bytes):
-        """Upload file to S3."""
-        await self._s3.put_object(file_key, data)
+        async def download(self, file_key: str) -> bytes:
+            """Download file from S3."""
+            return await self._s3.get_object(file_key)
 
-@app.step
-async def parse_csv(file_content: bytes, services=None):
-    """Parse CSV file."""
-    content = file_content.decode('utf-8')
-    reader = csv.DictReader(io.StringIO(content))
-    rows = list(reader)
-    return {"rows": rows, "count": len(rows)}
+        async def upload(self, file_key: str, data: bytes):
+            """Upload file to S3."""
+            await self._s3.put_object(file_key, data)
 
-@app.step
-async def validate_csv_rows(rows: list, services=None):
-    """Validate CSV rows."""
-    valid_rows = []
-    errors = []
+    @app.step
+    async def parse_csv(file_content: bytes, services=None):
+        """Parse CSV file."""
+        content = file_content.decode('utf-8')
+        reader = csv.DictReader(io.StringIO(content))
+        rows = list(reader)
+        return {"rows": rows, "count": len(rows)}
 
-    for idx, row in enumerate(rows):
-        try:
-            # Validate required fields
-            if not row.get('email') or not row.get('name'):
-                raise ValueError("Missing required fields")
-            valid_rows.append(row)
-        except ValueError as e:
-            errors.append({"row": idx, "error": str(e)})
+    @app.step
+    async def validate_csv_rows(rows: list, services=None):
+        """Validate CSV rows."""
+        valid_rows = []
+        errors = []
 
-    return {"valid": valid_rows, "errors": errors}
+        for idx, row in enumerate(rows):
+            try:
+                # Validate required fields
+                if not row.get('email') or not row.get('name'):
+                    raise ValueError("Missing required fields")
+                valid_rows.append(row)
+            except ValueError as e:
+                errors.append({"row": idx, "error": str(e)})
 
-@app.step
-async def import_csv_rows(rows: list, services=None):
-    """Import validated rows to database."""
-    imported = []
-    for row in rows:
-        user_id = await services['UserDatabase'].create_user(row['name'], row['email'])
-        imported.append(user_id)
-    return {"imported": len(imported), "ids": imported}
+        return {"valid": valid_rows, "errors": errors}
 
-@app.workflow
-async def import_csv_file(file_key: str, services=None):
-    """Import CSV file from S3."""
-    # Download file
-    file_content = await services['FileStorageService'].download(file_key)
+    @app.step
+    async def import_csv_rows(rows: list, services=None):
+        """Import validated rows to database."""
+        imported = []
+        for row in rows:
+            user_id = await services['UserDatabase'].create_user(row['name'], row['email'])
+            imported.append(user_id)
+        return {"imported": len(imported), "ids": imported}
 
-    # Parse CSV
-    parsed = await parse_csv(file_content, services=services)
+    @app.workflow
+    async def import_csv_file(file_key: str, services=None):
+        """Import CSV file from S3."""
+        # Download file
+        file_content = await services['FileStorageService'].download(file_key)
 
-    # Validate rows
-    validated = await validate_csv_rows(parsed['rows'], services=services)
+        # Parse CSV
+        parsed = await parse_csv(file_content, services=services)
 
-    # Import valid rows
-    result = await import_csv_rows(validated['valid'], services=services)
+        # Validate rows
+        validated = await validate_csv_rows(parsed['rows'], services=services)
 
-    return {
-        "file": file_key,
-        "total_rows": parsed['count'],
-        "imported": result['imported'],
-        "errors": len(validated['errors'])
-    }
+        # Import valid rows
+        result = await import_csv_rows(validated['valid'], services=services)
 
-await app.publish()
+        return {
+            "file": file_key,
+            "total_rows": parsed['count'],
+            "imported": result['imported'],
+            "errors": len(validated['errors'])
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 26. PDF Generation
 ```python
-@app.step
-async def generate_invoice_data(order_id: str, services=None):
-    """Fetch data for invoice."""
-    order = await services['OrderDatabase'].get_order(order_id)
-    customer = await services['UserDatabase'].get_user(order['customer_id'])
-    items = await services['OrderDatabase'].get_items(order_id)
+from blazing import Blazing
+import asyncio
+from weasyprint import HTML
 
-    return {
-        "order": order,
-        "customer": customer,
-        "items": items,
-        "total": sum(item['price'] * item['qty'] for item in items)
-    }
+async def main():
+    app = Blazing()
 
-@app.step
-async def render_pdf(data: dict, template: str, services=None):
-    """Render PDF from template."""
-    from weasyprint import HTML
+    @app.step
+    async def generate_invoice_data(order_id: str, services=None):
+        """Fetch data for invoice."""
+        order = await services['OrderDatabase'].get_order(order_id)
+        customer = await services['UserDatabase'].get_user(order['customer_id'])
+        items = await services['OrderDatabase'].get_items(order_id)
 
-    # Render HTML from template
-    html_content = await services['TemplateService'].render(template, data)
+        return {
+            "order": order,
+            "customer": customer,
+            "items": items,
+            "total": sum(item['price'] * item['qty'] for item in items)
+        }
 
-    # Convert to PDF
-    pdf_bytes = HTML(string=html_content).write_pdf()
+    @app.step
+    async def render_pdf(data: dict, template: str, services=None):
+        """Render PDF from template."""
+        # Render HTML from template
+        html_content = await services['TemplateService'].render(template, data)
 
-    return pdf_bytes
+        # Convert to PDF
+        pdf_bytes = HTML(string=html_content).write_pdf()
 
-@app.step
-async def upload_invoice(order_id: str, pdf_bytes: bytes, services=None):
-    """Upload invoice to storage."""
-    file_key = f"invoices/{order_id}.pdf"
-    await services['FileStorageService'].upload(file_key, pdf_bytes)
+        return pdf_bytes
 
-    # Generate signed URL
-    url = await services['FileStorageService'].get_signed_url(file_key, expires_in=3600)
-    return {"url": url, "file_key": file_key}
+    @app.step
+    async def upload_invoice(order_id: str, pdf_bytes: bytes, services=None):
+        """Upload invoice to storage."""
+        file_key = f"invoices/{order_id}.pdf"
+        await services['FileStorageService'].upload(file_key, pdf_bytes)
 
-@app.workflow
-async def create_invoice(order_id: str, services=None):
-    """Generate and store invoice PDF."""
-    data = await generate_invoice_data(order_id, services=services)
-    pdf_bytes = await render_pdf(data, "invoice_template.html", services=services)
-    result = await upload_invoice(order_id, pdf_bytes, services=services)
+        # Generate signed URL
+        url = await services['FileStorageService'].get_signed_url(file_key, expires_in=3600)
+        return {"url": url, "file_key": file_key}
 
-    return {
-        "order_id": order_id,
-        "invoice_url": result['url'],
-        "total": data['total']
-    }
+    @app.workflow
+    async def create_invoice(order_id: str, services=None):
+        """Generate and store invoice PDF."""
+        data = await generate_invoice_data(order_id, services=services)
+        pdf_bytes = await render_pdf(data, "invoice_template.html", services=services)
+        result = await upload_invoice(order_id, pdf_bytes, services=services)
 
-await app.publish()
+        return {
+            "order_id": order_id,
+            "invoice_url": result['url'],
+            "total": data['total']
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Scheduled Tasks & Batch Jobs
 
 ### 27. Daily Report Generation
 ```python
-@app.step
-async def fetch_daily_metrics(date: str, services=None):
-    """Fetch metrics for date."""
-    metrics = await services['MetricsDatabase'].get_by_date(date)
+from blazing import Blazing
+import asyncio
 
-    return {
-        "date": date,
-        "total_orders": metrics['order_count'],
-        "revenue": metrics['revenue'],
-        "active_users": metrics['active_users']
-    }
+async def main():
+    app = Blazing()
 
-@app.step
-async def generate_report(metrics: dict, services=None):
-    """Generate report from metrics."""
-    report = f"""
-    Daily Report - {metrics['date']}
-    ================================
-    Total Orders: {metrics['total_orders']}
-    Revenue: ${metrics['revenue']:,.2f}
-    Active Users: {metrics['active_users']}
-    """
-    return report
+    @app.step
+    async def fetch_daily_metrics(date: str, services=None):
+        """Fetch metrics for date."""
+        metrics = await services['MetricsDatabase'].get_by_date(date)
 
-@app.step
-async def distribute_report(report: str, recipients: list, services=None):
-    """Email report to recipients."""
-    import asyncio
-    tasks = [
-        services['EmailService'].send(email, "Daily Report", report)
-        for email in recipients
-    ]
-    await asyncio.gather(*tasks)
-    return {"sent_to": len(recipients)}
+        return {
+            "date": date,
+            "total_orders": metrics['order_count'],
+            "revenue": metrics['revenue'],
+            "active_users": metrics['active_users']
+        }
 
-@app.workflow
-async def daily_report_job(date: str, services=None):
-    """Generate and send daily report."""
-    metrics = await fetch_daily_metrics(date, services=services)
-    report = await generate_report(metrics, services=services)
+    @app.step
+    async def generate_report(metrics: dict, services=None):
+        """Generate report from metrics."""
+        report = f"""
+        Daily Report - {metrics['date']}
+        ================================
+        Total Orders: {metrics['total_orders']}
+        Revenue: ${metrics['revenue']:,.2f}
+        Active Users: {metrics['active_users']}
+        """
+        return report
 
-    recipients = await services['ConfigService'].get('report_recipients')
-    result = await distribute_report(report, recipients, services=services)
+    @app.step
+    async def distribute_report(report: str, recipients: list, services=None):
+        """Email report to recipients."""
+        tasks = [
+            services['EmailService'].send(email, "Daily Report", report)
+            for email in recipients
+        ]
+        await asyncio.gather(*tasks)
+        return {"sent_to": len(recipients)}
 
-    return {"date": date, "recipients": result['sent_to']}
+    @app.workflow
+    async def daily_report_job(date: str, services=None):
+        """Generate and send daily report."""
+        metrics = await fetch_daily_metrics(date, services=services)
+        report = await generate_report(metrics, services=services)
 
-await app.publish()
+        recipients = await services['ConfigService'].get('report_recipients')
+        result = await distribute_report(report, recipients, services=services)
+
+        return {"date": date, "recipients": result['sent_to']}
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### 28. Cleanup Expired Records
 ```python
-@app.step
-async def find_expired_sessions(cutoff_date: str, services=None):
-    """Find sessions older than cutoff date."""
-    from sqlalchemy import text
+from blazing import Blazing
+import asyncio
+from sqlalchemy import text
+from datetime import datetime, timedelta
 
-    query = text("""
-        SELECT session_id FROM sessions
-        WHERE last_activity < :cutoff
-        LIMIT 1000
-    """)
+async def main():
+    app = Blazing()
 
-    result = await services['Database'].execute(query, {"cutoff": cutoff_date})
-    return [row[0] for row in result.fetchall()]
+    @app.step
+    async def find_expired_sessions(cutoff_date: str, services=None):
+        """Find sessions older than cutoff date."""
+        query = text("""
+            SELECT session_id FROM sessions
+            WHERE last_activity < :cutoff
+            LIMIT 1000
+        """)
 
-@app.step
-async def delete_sessions(session_ids: list, services=None):
-    """Delete expired sessions."""
-    from sqlalchemy import text
+        result = await services['Database'].execute(query, {"cutoff": cutoff_date})
+        return [row[0] for row in result.fetchall()]
 
-    query = text("DELETE FROM sessions WHERE session_id = ANY(:ids)")
-    await services['Database'].execute(query, {"ids": session_ids})
+    @app.step
+    async def delete_sessions(session_ids: list, services=None):
+        """Delete expired sessions."""
+        query = text("DELETE FROM sessions WHERE session_id = ANY(:ids)")
+        await services['Database'].execute(query, {"ids": session_ids})
 
-    return {"deleted": len(session_ids)}
+        return {"deleted": len(session_ids)}
 
-@app.workflow
-async def cleanup_expired_sessions(days_old: int = 30, services=None):
-    """Clean up sessions older than N days."""
-    from datetime import datetime, timedelta
+    @app.workflow
+    async def cleanup_expired_sessions(days_old: int = 30, services=None):
+        """Clean up sessions older than N days."""
+        cutoff_date = (datetime.now() - timedelta(days=days_old)).isoformat()
 
-    cutoff_date = (datetime.now() - timedelta(days=days_old)).isoformat()
+        # Find expired sessions
+        session_ids = await find_expired_sessions(cutoff_date, services=services)
 
-    # Find expired sessions
-    session_ids = await find_expired_sessions(cutoff_date, services=services)
+        if not session_ids:
+            return {"deleted": 0, "message": "No expired sessions"}
 
-    if not session_ids:
-        return {"deleted": 0, "message": "No expired sessions"}
+        # Delete sessions
+        result = await delete_sessions(session_ids, services=services)
 
-    # Delete sessions
-    result = await delete_sessions(session_ids, services=services)
+        return {
+            "cutoff_date": cutoff_date,
+            "deleted": result['deleted']
+        }
 
-    return {
-        "cutoff_date": cutoff_date,
-        "deleted": result['deleted']
-    }
+    await app.publish()
 
-await app.publish()
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Streaming & Real-Time Processing
 
 ### 29. Event Stream Processor
 ```python
+from blazing import Blazing
 from blazing.base import BaseService
+import asyncio
+from datetime import datetime
+from collections import Counter
 
-@app.service
-class EventStreamService(BaseService):
-    def __init__(self, connectors):
-        self._kafka = connectors.get('kafka')
+async def main():
+    app = Blazing()
 
-    async def consume_batch(self, topic: str, batch_size: int = 100) -> list:
-        """Consume batch of events from Kafka."""
-        events = []
-        async for message in self._kafka.consume(topic, max_messages=batch_size):
-            events.append(message.value)
-        return events
+    @app.service
+    class EventStreamService(BaseService):
+        def __init__(self, connectors):
+            self._kafka = connectors.get('kafka')
 
-    async def produce(self, topic: str, event: dict):
-        """Produce event to Kafka."""
-        await self._kafka.produce(topic, event)
+        async def consume_batch(self, topic: str, batch_size: int = 100) -> list:
+            """Consume batch of events from Kafka."""
+            events = []
+            async for message in self._kafka.consume(topic, max_messages=batch_size):
+                events.append(message.value)
+            return events
 
-@app.step
-async def process_event_batch(events: list, services=None):
-    """Process batch of events."""
-    processed = []
+        async def produce(self, topic: str, event: dict):
+            """Produce event to Kafka."""
+            await self._kafka.produce(topic, event)
 
-    for event in events:
-        # Transform event
-        transformed = {
-            **event,
-            'processed_at': datetime.now().isoformat(),
-            'enriched': True
+    @app.step
+    async def process_event_batch(events: list, services=None):
+        """Process batch of events."""
+        processed = []
+
+        for event in events:
+            # Transform event
+            transformed = {
+                **event,
+                'processed_at': datetime.now().isoformat(),
+                'enriched': True
+            }
+            processed.append(transformed)
+
+        return processed
+
+    @app.step
+    async def aggregate_events(events: list, services=None):
+        """Aggregate events by type."""
+        event_types = Counter(e['event_type'] for e in events)
+
+        return {
+            "total_events": len(events),
+            "by_type": dict(event_types)
         }
-        processed.append(transformed)
 
-    return processed
+    @app.workflow
+    async def stream_processing_job(topic: str, batch_size: int = 100, services=None):
+        """Process event stream in batches."""
+        # Consume batch
+        events = await services['EventStreamService'].consume_batch(topic, batch_size)
 
-@app.step
-async def aggregate_events(events: list, services=None):
-    """Aggregate events by type."""
-    from collections import Counter
+        if not events:
+            return {"processed": 0, "message": "No events"}
 
-    event_types = Counter(e['event_type'] for e in events)
+        # Process batch
+        processed = await process_event_batch(events, services=services)
 
-    return {
-        "total_events": len(events),
-        "by_type": dict(event_types)
-    }
+        # Aggregate
+        stats = await aggregate_events(processed, services=services)
 
-@app.workflow
-async def stream_processing_job(topic: str, batch_size: int = 100, services=None):
-    """Process event stream in batches."""
-    # Consume batch
-    events = await services['EventStreamService'].consume_batch(topic, batch_size)
+        # Store processed events
+        for event in processed:
+            await services['EventDatabase'].insert(event)
 
-    if not events:
-        return {"processed": 0, "message": "No events"}
+        return {
+            "topic": topic,
+            "processed": len(processed),
+            "stats": stats
+        }
 
-    # Process batch
-    processed = await process_event_batch(events, services=services)
+    await app.publish()
 
-    # Aggregate
-    stats = await aggregate_events(processed, services=services)
-
-    # Store processed events
-    for event in processed:
-        await services['EventDatabase'].insert(event)
-
-    return {
-        "topic": topic,
-        "processed": len(processed),
-        "stats": stats
-    }
-
-await app.publish()
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Monitoring & Testing
 
 ### 30. Health Check Workflow
 ```python
-@app.step
-async def check_database_health(services=None):
-    """Check database connectivity."""
-    try:
-        from sqlalchemy import text
-        await services['Database'].execute(text("SELECT 1"))
-        return {"service": "database", "status": "healthy"}
-    except Exception as e:
-        return {"service": "database", "status": "unhealthy", "error": str(e)}
+from blazing import Blazing
+import asyncio
+from sqlalchemy import text
+import httpx
+from datetime import datetime
 
-@app.step
-async def check_cache_health(services=None):
-    """Check cache connectivity."""
-    try:
-        await services['CacheService'].set('health_check', 'ok', ttl=10)
-        value = await services['CacheService'].get('health_check')
-        if value == 'ok':
-            return {"service": "cache", "status": "healthy"}
-        return {"service": "cache", "status": "unhealthy", "error": "Value mismatch"}
-    except Exception as e:
-        return {"service": "cache", "status": "unhealthy", "error": str(e)}
+async def main():
+    app = Blazing()
 
-@app.step
-async def check_external_api_health(services=None):
-    """Check external API connectivity."""
-    try:
-        import httpx
-        async with httpx.AsyncClient() as client:
-            response = await client.get("https://api.example.com/health", timeout=5.0)
-            if response.status_code == 200:
-                return {"service": "external_api", "status": "healthy"}
-            return {"service": "external_api", "status": "unhealthy", "error": f"Status {response.status_code}"}
-    except Exception as e:
-        return {"service": "external_api", "status": "unhealthy", "error": str(e)}
+    @app.step
+    async def check_database_health(services=None):
+        """Check database connectivity."""
+        try:
+            await services['Database'].execute(text("SELECT 1"))
+            return {"service": "database", "status": "healthy"}
+        except Exception as e:
+            return {"service": "database", "status": "unhealthy", "error": str(e)}
 
-@app.workflow
-async def health_check(services=None):
-    """Run health checks for all services."""
-    import asyncio
+    @app.step
+    async def check_cache_health(services=None):
+        """Check cache connectivity."""
+        try:
+            await services['CacheService'].set('health_check', 'ok', ttl=10)
+            value = await services['CacheService'].get('health_check')
+            if value == 'ok':
+                return {"service": "cache", "status": "healthy"}
+            return {"service": "cache", "status": "unhealthy", "error": "Value mismatch"}
+        except Exception as e:
+            return {"service": "cache", "status": "unhealthy", "error": str(e)}
 
-    checks = await asyncio.gather(
-        check_database_health(services=services),
-        check_cache_health(services=services),
-        check_external_api_health(services=services)
-    )
+    @app.step
+    async def check_external_api_health(services=None):
+        """Check external API connectivity."""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("https://api.example.com/health", timeout=5.0)
+                if response.status_code == 200:
+                    return {"service": "external_api", "status": "healthy"}
+                return {"service": "external_api", "status": "unhealthy", "error": f"Status {response.status_code}"}
+        except Exception as e:
+            return {"service": "external_api", "status": "unhealthy", "error": str(e)}
 
-    healthy = all(c['status'] == 'healthy' for c in checks)
+    @app.workflow
+    async def health_check(services=None):
+        """Run health checks for all services."""
+        checks = await asyncio.gather(
+            check_database_health(services=services),
+            check_cache_health(services=services),
+            check_external_api_health(services=services)
+        )
 
-    return {
-        "overall_status": "healthy" if healthy else "degraded",
-        "checks": checks,
-        "timestamp": datetime.now().isoformat()
-    }
+        healthy = all(c['status'] == 'healthy' for c in checks)
 
-await app.publish()
+        return {
+            "overall_status": "healthy" if healthy else "degraded",
+            "checks": checks,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Next Steps
