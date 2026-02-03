@@ -1,0 +1,18 @@
+{
+  "id": "endpoint_routing",
+  "title": "Multiple HTTP Endpoints",
+  "description": "Configure multiple HTTP routes with different paths in a single application.",
+  "category": "Web Endpoints",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": [
+    "endpoint",
+    "routing",
+    "http",
+    "rest-api"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}
