@@ -203,11 +203,24 @@ Wrap FastAPI app:
 
 ```python
 from mangum import Mangum
+from blazing import Blazing
+from blazing.web import create_asgi_app
+import asyncio
 
-# Your FastAPI app
-fastapi_app = await create_asgi_app(app)
+async def setup():
+    app = Blazing()
 
-# Wrap for Lambda
+    @app.endpoint(path="/health")
+    @app.workflow
+    async def health_check(services=None):
+        return {"status": "healthy"}
+
+    await app.publish()
+    fastapi_app = await create_asgi_app(app)
+    return fastapi_app
+
+# Initialize for Lambda
+fastapi_app = asyncio.run(setup())
 handler = Mangum(fastapi_app)
 ```
 
@@ -502,20 +515,27 @@ scrape_configs:
 ### Worker Configuration
 
 ```python
+import os
+
 # Optimal workers = (2 x CPU cores) + 1
 workers = (2 * os.cpu_count()) + 1
+print(f"Recommended workers: {workers}")
+```
 
+```bash
+# Use in gunicorn command
 gunicorn main:fastapi_app \
-  --workers $workers \
+  --workers 4 \
   --worker-class uvicorn.workers.UvicornWorker
 ```
 
 ### Connection Pooling
 
 ```python
+from blazing import Blazing
+
 # Configure connection pool for Blazing backend
 app = Blazing(
-    ,
     api_token="token",
     max_connections=100,  # Connection pool size
     timeout=30            # Request timeout

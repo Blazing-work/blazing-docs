@@ -110,13 +110,21 @@ Sent when job fails.
 ## WebSocket with Authentication
 
 ```python
-async def verify_ws_token(credentials: HTTPAuthorizationCredentials) -> bool:
-    return credentials and credentials.credentials == "valid-token"
+from blazing.auth import AuthContext
+
+async def verify_ws_token(request) -> AuthContext | None:
+    """Custom auth handler for WebSocket."""
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        if token == "valid-token":
+            return AuthContext(user_id="authenticated-user")
+    return None
 
 @app.endpoint(
     path="/secure",
     enable_websocket=True,
-    auth_handler=verify_ws_token
+    auth=verify_ws_token
 )
 @app.workflow
 async def secure_stream(value: int, services=None):
