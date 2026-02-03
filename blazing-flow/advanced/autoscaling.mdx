@@ -299,7 +299,7 @@ AIMD controls capacity for these resources across Blazing components:
 
 | Resource | What It Controls | Default Capacity | Env Vars |
 |----------|------------------|------------------|----------|
-| **Pyodide Concurrency** | Concurrent WASM operation slots | 2 (1-4, CPU-bound) | `AIMD_PYODIDE_MIN`, `AIMD_PYODIDE_MAX`, `AIMD_PYODIDE_INITIAL`, `AIMD_PYODIDE_ALPHA`, `AIMD_PYODIDE_BETA`, `AIMD_PYODIDE_P95_THRESHOLD_MS`, `AIMD_PYODIDE_P99_THRESHOLD_MS` |
+| **Pyodide Concurrency** | Concurrent WASM operation slots | 2 (1-4, CPU-bound) | `AIMD_PYODIDE_MIN`, `AIMD_PYODIDE_MAX`, `AIMD_PYODIDE_INITIAL`, `AIMD_PYODIDE_ALPHA`, `AIMD_PYODIDE_BETA`, `AIMD_PYODIDE_P95_THRESHOLD_MS`, `AIMD_PYODIDE_P99_THRESHOLD_MS`, `AIMD_PYODIDE_INCREASE_AFTER_TICKS`, `AIMD_PYODIDE_DECREASE_COOLDOWN_TICKS` |
 
 ### How to Identify AIMD Resources
 
@@ -610,5 +610,6 @@ export AIMD_REDIS_ALPHA=20.0
 
 - **[Arrow Flight](./arrow-flight)**: Learn about Arrow Flight bulk data transfer (one of the resources AIMD manages)
 - **[Worker Types](../workers/overview)**: Understand worker concurrency (another AIMD-managed resource)
-- **[Monitoring](../monitoring/overview)**: Set up dashboards to observe AIMD behavior
-- **[Deployment](../deployment/production)**: Production deployment patterns with AIMD enabled
+- **[Monitoring](../monitoring/flow-monitoring)**: Set up dashboards to observe AIMD behavior
+- **[Deployment](../deployment/flow-deployment)**: Production deployment patterns with AIMD enabled
+- **[Emulators](./emulators)**: Development environment setup with AIMD testing
