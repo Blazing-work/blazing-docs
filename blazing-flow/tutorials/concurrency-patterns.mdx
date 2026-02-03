@@ -1,328 +1,296 @@
 ---
 title: Concurrency Patterns
 label: Concurrency Patterns
-description: Advanced patterns for CRDT queue operations and multi-node coordination
+description: Advanced patterns for concurrency control and rate limiting
 position: 3
 ---
 
-Learn advanced concurrency patterns for distributed task processing with Blazing Batch's CRDT-based queue system.
+Learn advanced concurrency patterns for controlling workflow execution with Blazing Flow's Semaphore and parallel execution primitives.
 
-## CRDT Queue Architecture
+## Concurrency Control with Semaphore
 
-Blazing Batch uses **CRDT (Conflict-free Replicated Data Types)** for safe distributed queue operations:
+### Basic Semaphore Usage
 
-- **No duplicate processing** - Each task processed exactly once
-- **Lock-free operations** - No distributed locks needed
-- **Multi-node coordination** - Workers on different nodes coordinate automatically
-- **Partition tolerance** - Works across network partitions
-
-## Node-Based Queue Partitioning
-
-### How It Works
-
-Each API node writes to its own queue segment:
-
-```python
-# Node 1 writes to: queue:station-123:node-1
-# Node 2 writes to: queue:station-123:node-2
-# Node 3 writes to: queue:station-123:node-3
-```
-
-Workers scan all queue segments and dequeue operations safely.
-
-### Example: Multi-Node Enqueue
-
-```python
-import os
-from blazing_service.data_access.data_access import StationDAO
-
-# Simulate different nodes
-nodes = ["api-node-1", "api-node-2", "api-node-3"]
-
-for node_id in nodes:
-    os.environ['NODE_ID'] = node_id
-
-    # Each node enqueues to its own segment
-    await StationDAO.enqueue_non_blocking_operation(
-        station_id="station-123",
-        operation_id=f"op-from-{node_id}"
-    )
-
-# Result: 3 queue segments created
-# - queue:station-123:api-node-1
-# - queue:station-123:api-node-2
-# - queue:station-123:api-node-3
-```
-
-## Race Condition Handling
-
-### Concurrent Status Updates
-
-Multiple workers can safely update operation status concurrently:
+Use `Semaphore` from the Blazing SDK to limit concurrent operations:
 
 ```python
 import asyncio
-from blazing_service.data_access.data_access import OperationDAO
+from blazing import Blazing, Semaphore
 
-async def concurrent_status_updates():
-    """Multiple workers updating same operation."""
-
-    operation_id = "op-12345"
-
-    # Simulate 5 workers trying to claim the operation
-    async def worker_claim(worker_id: int):
-        success = await OperationDAO.try_claim_operation(
-            operation_id,
-            worker_id=f"worker-{worker_id}"
-        )
-        return (worker_id, success)
-
-    # Race: Only one worker should successfully claim
-    results = await asyncio.gather(*[
-        worker_claim(i) for i in range(5)
-    ])
-
-    successful = [r for r in results if r[1]]
-
-    assert len(successful) == 1, "Exactly one worker should claim operation"
-    print(f"✓ Worker {successful[0][0]} claimed operation")
-```
-
-### Lock-Free Dequeuing
-
-Workers dequeue operations without locks using atomic Redis operations:
-
-```python
-from blazing_service.data_access.data_access import StationDAO
-
-async def lock_free_dequeue(station_id: str):
-    """Dequeue next operation without blocking."""
-
-    # Atomic operation - safe for concurrent workers
-    operation_id = await StationDAO.dequeue_non_blocking_operation(
-        station_id
-    )
-
-    if operation_id:
-        print(f"✓ Dequeued: {operation_id}")
-        return operation_id
-    else:
-        print("Queue empty")
-        return None
-```
-
-## Multi-App Isolation
-
-### Concurrent App Instances
-
-Multiple Blazing app instances can run concurrently with full isolation:
-
-```python
-from blazing import Blazing
-
-# Create multiple isolated apps
-apps = [Blazing(app_id=f"app-{i}") for i in range(5)]
-
-# Each app has isolated:
-# - Queue namespace
-# - Operation tracking
-# - Worker pool
-
-# Run tasks from all apps concurrently
-all_tasks = []
-for i, app in enumerate(apps):
-    unit = await app.create_workflow_task(
-        "fetch_timeseries",
-        symbol=f"APP{i}-STOCK",
-        points=100
-    )
-    all_tasks.append(unit)
-
-# All apps process in parallel, fully isolated
-results = await asyncio.gather(*[
-    app.gather([task])
-    for app, task in zip(apps, all_tasks)
-])
-```
-
-### Cross-App Communication
-
-Apps are isolated by default, but can share data through Redis:
-
-```python
-from blazing_service.data_access.data_access import CrossAppDAO
-
-# App 1 publishes result
-await CrossAppDAO.publish_result(
-    channel="shared-channel",
-    data={"result": "processing complete"}
-)
-
-# App 2 subscribes
-async for message in CrossAppDAO.subscribe("shared-channel"):
-    print(f"Received: {message}")
-```
-
-## Network Resilience
-
-### Handling Network Partitions
-
-Blazing Batch is designed to handle network issues gracefully:
-
-```python
-import asyncio
-
-async def resilient_task_execution():
-    """Execute tasks with network fault tolerance."""
-
+async def main():
     app = Blazing()
 
-    try:
-        unit = await app.create_workflow_task(
-            "fetch_timeseries",
-            symbol="AAPL",
-            points=1000
-        )
+    # Create semaphore with limit of 3 concurrent operations
+    sem = Semaphore(3)
 
-        # Set timeout for network issues
-        result = await asyncio.wait_for(
-            unit.result(),
-            timeout=30.0
-        )
+    @app.step
+    async def rate_limited_operation(item_id: int, services=None):
+        """Operation with concurrency limit."""
+        async with sem:
+            # Only 3 of these can run at once
+            await asyncio.sleep(1)  # Simulate work
+            return f"Processed item {item_id}"
 
+    @app.workflow
+    async def batch_process(items: list, services=None):
+        """Process items with rate limiting."""
+        tasks = [
+            rate_limited_operation(item, services=services)
+            for item in items
+        ]
+        results = await asyncio.gather(*tasks)
+        return results
+
+    await app.publish()
+
+    # Process 10 items with max 3 concurrent
+    result = await app.batch_process(list(range(10))).wait_result()
+    print(f"Processed {len(result)} items")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**Key points:**
+- Import `Semaphore` from `blazing` (NOT `asyncio.Semaphore`)
+- Use `async with sem:` to acquire/release automatically
+- Limits concurrent executions to specified count
+
+### Rate Limiting API Calls
+
+Prevent overwhelming external APIs:
+
+```python
+import asyncio
+from blazing import Blazing, Semaphore
+
+async def main():
+    app = Blazing()
+
+    # Allow only 5 concurrent API calls
+    api_semaphore = Semaphore(5)
+
+    @app.step
+    async def fetch_from_api(url: str, services=None):
+        """Fetch data with rate limiting."""
+        async with api_semaphore:
+            # Simulate API call
+            await asyncio.sleep(0.5)
+            return {"url": url, "data": f"Data from {url}"}
+
+    @app.workflow
+    async def fetch_multiple_urls(urls: list, services=None):
+        """Fetch from multiple URLs with rate limiting."""
+        tasks = [
+            fetch_from_api(url, services=services)
+            for url in urls
+        ]
+        results = await asyncio.gather(*tasks)
+        return {
+            "total": len(results),
+            "results": results
+        }
+
+    await app.publish()
+
+    # Fetch 20 URLs with max 5 concurrent
+    urls = [f"https://api.example.com/data/{i}" for i in range(20)]
+    result = await app.fetch_multiple_urls(urls).wait_result()
+    print(f"Fetched {result['total']} URLs")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Resource Pool Management
+
+Manage limited resources like database connections:
+
+```python
+import asyncio
+from blazing import Blazing, Semaphore
+
+async def main():
+    app = Blazing()
+
+    # Pool of 10 database connections
+    db_pool = Semaphore(10)
+
+    @app.step
+    async def query_database(query: str, services=None):
+        """Execute query with connection pooling."""
+        async with db_pool:
+            # Acquire connection from pool
+            await asyncio.sleep(0.1)  # Simulate query
+            return {"query": query, "rows": 42}
+
+    @app.workflow
+    async def batch_queries(queries: list, services=None):
+        """Execute multiple queries with pooling."""
+        tasks = [
+            query_database(query, services=services)
+            for query in queries
+        ]
+        results = await asyncio.gather(*tasks)
+        return {"executed": len(results), "results": results}
+
+    await app.publish()
+
+    queries = [f"SELECT * FROM table_{i}" for i in range(50)]
+    result = await app.batch_queries(queries).wait_result()
+    print(f"Executed {result['executed']} queries")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Parallel Workflow Execution
+
+### Running Multiple Workflow Instances
+
+Execute multiple workflow instances concurrently:
+
+```python
+import asyncio
+from blazing import Blazing
+
+async def main():
+    app = Blazing()
+
+    @app.step
+    async def process_item(item: dict, services=None):
+        """Process a single item."""
+        await asyncio.sleep(0.5)
+        return {
+            "id": item["id"],
+            "processed": True,
+            "value": item["value"] * 2
+        }
+
+    @app.workflow
+    async def item_workflow(item: dict, services=None):
+        """Workflow for processing one item."""
+        result = await process_item(item, services=services)
         return result
 
-    except asyncio.TimeoutError:
-        # Network partition or slow worker
-        print("✗ Task timeout - possible network issue")
+    await app.publish()
 
-        # Check if task eventually completed
-        await asyncio.sleep(5)
-        status = await app.check_task_status(unit)
+    # Create multiple workflow instances
+    items = [{"id": i, "value": i * 10} for i in range(20)]
 
-        if status == "completed":
-            print("✓ Task completed despite timeout")
-            return await unit.result()
+    # Execute all workflows in parallel
+    tasks = [
+        app.item_workflow(item).wait_result()
+        for item in items
+    ]
+    results = await asyncio.gather(*tasks)
 
-    finally:
-        await app.close()
+    print(f"Processed {len(results)} items in parallel")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Automatic Retry on Network Failure
+### Controlled Parallel Execution
+
+Combine Semaphore with parallel workflows for controlled concurrency:
 
 ```python
-async def network_resilient_gather(app, units, max_retries=3):
-    """Gather with automatic retry on network failures."""
+import asyncio
+from blazing import Blazing, Semaphore
 
-    for attempt in range(max_retries):
-        try:
-            return await asyncio.wait_for(
-                app.gather(units),
-                timeout=60.0
-            )
-        except asyncio.TimeoutError:
-            if attempt == max_retries - 1:
-                raise
+async def main():
+    app = Blazing()
 
-            wait_time = 2 ** attempt
-            print(f"Network timeout, retry {attempt + 1}/{max_retries}")
-            await asyncio.sleep(wait_time)
-```
+    # Limit to 5 concurrent workflows
+    workflow_sem = Semaphore(5)
 
-## Worker Lifecycle Management
+    @app.step
+    async def expensive_operation(data: dict, services=None):
+        """Resource-intensive operation."""
+        await asyncio.sleep(2)
+        return {"processed": data, "result": "success"}
 
-### Coordinated Worker Startup
+    @app.workflow
+    async def controlled_workflow(data: dict, services=None):
+        """Workflow with concurrency control."""
+        async with workflow_sem:
+            result = await expensive_operation(data, services=services)
+            return result
 
-```python
-from blazing_service.worker import Worker
+    await app.publish()
 
-async def coordinated_worker_pool(num_workers: int):
-    """Start multiple workers in coordinated fashion."""
+    # Process 100 items with max 5 concurrent workflows
+    items = [{"id": i, "value": i} for i in range(100)]
 
-    workers = []
+    tasks = [
+        app.controlled_workflow(item).wait_result()
+        for item in items
+    ]
+    results = await asyncio.gather(*tasks)
 
-    for i in range(num_workers):
-        worker = Worker(
-            worker_id=f"worker-{i}",
-            app_id="default"
-        )
-        workers.append(worker)
+    print(f"Completed {len(results)} workflows")
 
-    # Start all workers concurrently
-    await asyncio.gather(*[
-        worker.start() for worker in workers
-    ])
-
-    print(f"✓ Started {len(workers)} coordinated workers")
-
-    return workers
-```
-
-### Graceful Shutdown
-
-```python
-async def graceful_worker_shutdown(workers: list):
-    """Shut down workers gracefully, completing in-flight tasks."""
-
-    print("Initiating graceful shutdown...")
-
-    # Signal workers to stop accepting new tasks
-    for worker in workers:
-        await worker.stop_accepting()
-
-    # Wait for in-flight tasks to complete (max 30s)
-    try:
-        await asyncio.wait_for(
-            asyncio.gather(*[
-                worker.wait_for_completion()
-                for worker in workers
-            ]),
-            timeout=30.0
-        )
-        print("✓ All tasks completed")
-    except asyncio.TimeoutError:
-        print("⚠ Timeout waiting for tasks, forcing shutdown")
-
-    # Final cleanup
-    for worker in workers:
-        await worker.close()
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Advanced Patterns
 
 ### Fan-Out / Fan-In
 
-Process tasks in parallel, then aggregate results:
+Distribute work across multiple steps, then aggregate:
 
 ```python
-async def fan_out_fan_in(data_chunks: list):
-    """Fan-out: process chunks in parallel, fan-in: aggregate."""
+import asyncio
+from blazing import Blazing
 
+async def main():
     app = Blazing()
 
-    # Fan-out: Create tasks for all chunks
-    units = []
-    for i, chunk in enumerate(data_chunks):
-        unit = await app.create_workflow_task(
-            "process_chunk",
-            chunk_id=i,
-            data=chunk
-        )
-        units.append(unit)
+    @app.step
+    async def process_chunk(chunk: list, chunk_id: int, services=None):
+        """Process a data chunk."""
+        await asyncio.sleep(0.5)
+        return {"chunk_id": chunk_id, "count": len(chunk), "sum": sum(chunk)}
 
-    # Execute in parallel
-    chunk_results = await app.gather(units)
+    @app.step
+    async def aggregate_results(results: list, services=None):
+        """Aggregate all chunk results."""
+        total_count = sum(r["count"] for r in results)
+        total_sum = sum(r["sum"] for r in results)
+        return {"total_count": total_count, "total_sum": total_sum}
 
-    # Fan-in: Aggregate all results
-    aggregated = await app.create_workflow_task(
-        "aggregate_results",
-        results=chunk_results
-    )
+    @app.workflow
+    async def fan_out_fan_in(data: list, chunk_size: int, services=None):
+        """Fan-out: process chunks, fan-in: aggregate."""
+        # Fan-out: split data into chunks
+        chunks = [
+            data[i:i + chunk_size]
+            for i in range(0, len(data), chunk_size)
+        ]
 
-    final_result = await aggregated.result()
+        # Process all chunks in parallel
+        chunk_tasks = [
+            process_chunk(chunk, i, services=services)
+            for i, chunk in enumerate(chunks)
+        ]
+        chunk_results = await asyncio.gather(*chunk_tasks)
 
-    await app.close()
-    return final_result
+        # Fan-in: aggregate results
+        final_result = await aggregate_results(chunk_results, services=services)
+        return final_result
+
+    await app.publish()
+
+    # Process 1000 items in chunks of 100
+    data = list(range(1000))
+    result = await app.fan_out_fan_in(data, chunk_size=100).wait_result()
+    print(f"Total count: {result['total_count']}")
+    print(f"Total sum: {result['total_sum']}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Pipeline Processing
@@ -330,74 +298,201 @@ async def fan_out_fan_in(data_chunks: list):
 Chain multiple processing stages:
 
 ```python
-async def multi_stage_pipeline(input_data: list):
-    """Process data through multiple stages."""
+import asyncio
+from blazing import Blazing
 
+async def main():
     app = Blazing()
 
-    # Stage 1: Data extraction
-    extract_units = [
-        await app.create_workflow_task("extract", item=item)
-        for item in input_data
-    ]
-    extracted = await app.gather(extract_units)
+    @app.step
+    async def extract(source: str, services=None):
+        """Extract data from source."""
+        await asyncio.sleep(0.2)
+        return {"source": source, "raw_data": [1, 2, 3, 4, 5]}
 
-    # Stage 2: Data transformation
-    transform_units = [
-        await app.create_workflow_task("transform", data=data)
-        for data in extracted
-    ]
-    transformed = await app.gather(transform_units)
+    @app.step
+    async def transform(data: dict, services=None):
+        """Transform extracted data."""
+        await asyncio.sleep(0.2)
+        transformed = [x * 2 for x in data["raw_data"]]
+        return {"source": data["source"], "transformed": transformed}
 
-    # Stage 3: Data loading
-    load_units = [
-        await app.create_workflow_task("load", data=data)
-        for data in transformed
-    ]
-    loaded = await app.gather(load_units)
+    @app.step
+    async def load(data: dict, services=None):
+        """Load transformed data."""
+        await asyncio.sleep(0.2)
+        return {"source": data["source"], "loaded": True, "count": len(data["transformed"])}
 
-    await app.close()
-    return loaded
+    @app.workflow
+    async def etl_pipeline(sources: list, services=None):
+        """Execute ETL pipeline for multiple sources."""
+        # Stage 1: Extract
+        extract_tasks = [extract(source, services=services) for source in sources]
+        extracted = await asyncio.gather(*extract_tasks)
+
+        # Stage 2: Transform
+        transform_tasks = [transform(data, services=services) for data in extracted]
+        transformed = await asyncio.gather(*transform_tasks)
+
+        # Stage 3: Load
+        load_tasks = [load(data, services=services) for data in transformed]
+        loaded = await asyncio.gather(*load_tasks)
+
+        return {"pipeline_complete": True, "sources_processed": len(loaded)}
+
+    await app.publish()
+
+    sources = [f"source_{i}" for i in range(10)]
+    result = await app.etl_pipeline(sources).wait_result()
+    print(f"Processed {result['sources_processed']} sources")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-## Performance Characteristics
+### Batched Processing with Windows
 
-### CRDT Queue Performance
+Process data in sliding windows:
 
-| Operation | Time Complexity | Concurrency |
-|-----------|----------------|-------------|
-| Enqueue   | O(1)           | Lock-free   |
-| Dequeue   | O(n) segments  | Lock-free   |
-| Status Update | O(1)        | Atomic      |
-| Claim Operation | O(1)      | Atomic      |
+```python
+import asyncio
+from blazing import Blazing
 
-### Multi-Node Scalability
+async def main():
+    app = Blazing()
 
-| Nodes | Throughput | Latency | Coordination Overhead |
-|-------|-----------|---------|----------------------|
-| 1     | 1,000 ops/s | 10ms | None |
-| 3     | 2,800 ops/s | 12ms | Minimal |
-| 5     | 4,500 ops/s | 15ms | Low |
-| 10    | 8,000 ops/s | 20ms | Moderate |
+    @app.step
+    async def process_window(window: list, window_id: int, services=None):
+        """Process a time window of data."""
+        await asyncio.sleep(0.3)
+        return {
+            "window_id": window_id,
+            "count": len(window),
+            "avg": sum(window) / len(window) if window else 0
+        }
+
+    @app.workflow
+    async def windowed_processing(data: list, window_size: int, services=None):
+        """Process data in sliding windows."""
+        windows = []
+        for i in range(0, len(data), window_size):
+            window = data[i:i + window_size]
+            windows.append(window)
+
+        # Process all windows in parallel
+        tasks = [
+            process_window(window, i, services=services)
+            for i, window in enumerate(windows)
+        ]
+        results = await asyncio.gather(*tasks)
+
+        return {
+            "windows_processed": len(results),
+            "results": results
+        }
+
+    await app.publish()
+
+    # Process 100 data points in windows of 10
+    data = list(range(100))
+    result = await app.windowed_processing(data, window_size=10).wait_result()
+    print(f"Processed {result['windows_processed']} windows")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Performance Optimization
+
+### Optimal Concurrency Levels
+
+Finding the right concurrency limit:
+
+```python
+import asyncio
+import time
+from blazing import Blazing, Semaphore
+
+async def main():
+    app = Blazing()
+
+    async def benchmark_concurrency(limit: int):
+        """Benchmark a specific concurrency limit."""
+        sem = Semaphore(limit)
+
+        @app.step
+        async def work(item: int, services=None):
+            async with sem:
+                await asyncio.sleep(0.1)
+                return item * 2
+
+        @app.workflow
+        async def benchmark_workflow(items: list, services=None):
+            tasks = [work(item, services=services) for item in items]
+            results = await asyncio.gather(*tasks)
+            return len(results)
+
+        await app.publish()
+
+        start = time.time()
+        result = await app.benchmark_workflow(list(range(100))).wait_result()
+        elapsed = time.time() - start
+
+        return {"limit": limit, "time": elapsed, "throughput": result / elapsed}
+
+    # Test different concurrency limits
+    for limit in [1, 5, 10, 20, 50]:
+        result = await benchmark_concurrency(limit)
+        print(f"Limit {result['limit']}: {result['time']:.2f}s, {result['throughput']:.1f} ops/s")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
 
 ## Best Practices
 
-1. **Use NODE_ID** - Set unique `NODE_ID` for each API instance
-2. **Implement timeouts** - Always use timeouts for network operations
-3. **Handle retries** - Implement exponential backoff for transient failures
-4. **Monitor queue depth** - Track queue segments per step
-5. **Graceful shutdown** - Wait for in-flight tasks before termination
-6. **Isolate apps** - Use separate `app_id` for different workloads
+1. **Use Blazing Semaphore** - Import from `blazing`, not `asyncio`
+2. **Set appropriate limits** - Match resource capacity (DB connections, API rate limits)
+3. **Always use `async with`** - Ensures semaphore is released even on exceptions
+4. **Monitor queue depth** - Track how many tasks are waiting
+5. **Tune concurrency** - Benchmark to find optimal settings
+6. **Avoid deadlocks** - Don't nest semaphore acquisitions
+7. **Use timeouts** - Prevent tasks from holding semaphore indefinitely
+
+## Common Patterns
+
+### Rate Limiting
+```python
+# 10 requests per second
+sem = Semaphore(10)
+async with sem:
+    await api_call()
+```
+
+### Resource Pooling
+```python
+# Pool of 20 database connections
+db_pool = Semaphore(20)
+async with db_pool:
+    await db.query()
+```
+
+### Workflow Throttling
+```python
+# Max 5 concurrent workflows
+workflow_sem = Semaphore(5)
+async with workflow_sem:
+    result = await expensive_workflow()
+```
 
 ## Next Steps
 
-- [Flow Configuration](/docs/flow-configuration) - Configure your workflows
-- [Flow Monitoring](/docs/flow-monitoring) - Track distributed operations
-- [Error Handling](/docs/tutorials/error-handling) - Handle failures gracefully
+- [Parallel Execution](/docs/tutorials/parallel-execution) - Scale workflow execution
+- [Error Handling](/docs/tutorials/error-handling) - Handle failures in concurrent workflows
+- [Performance Tuning](/docs/advanced/performance) - Optimize throughput
 
-## Source
+## Related
 
-Based on test suite examples:
-- `tests/test_concurrency.py` - CRDT queue operations
-- `tests/test_network_resilience.py` - Network fault tolerance
-- `tests/test_worker_lifecycle_timing.py` - Worker coordination
+- [PATTERNS.md](https://github.com/digitalfrontier/blazing/blob/main/docs/examples/PATTERNS.md) - Concurrency patterns reference
+- [Semaphore Documentation](/docs/api/semaphore) - Complete Semaphore API
+- [Monitoring](/docs/monitoring/overview) - Track concurrency metrics
