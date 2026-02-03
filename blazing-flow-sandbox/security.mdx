@@ -56,6 +56,122 @@ How Blazing Flow Sandbox keeps your infrastructure safe from untrusted code.
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+## Cryptographic Signing Flow
+
+Blazing Flow Sandbox uses a multi-layer security model with cryptographic signing to ensure that only validated, trusted code executes in your infrastructure.
+
+### The Complete Signing Flow
+
+**Step 1: Generate Signing Key**
+
+```python
+from blazing.dynamic_code import create_signing_key
+
+# Generate a secure 32-byte HMAC key
+SIGNING_KEY = create_signing_key()
+
+# Store securely (environment variable, secret manager, etc.)
+import os
+os.environ['BLAZING_SIGNING_KEY'] = SIGNING_KEY.hex()
+```
+
+**Step 2: Client-Side Serialization + Signing**
+
+```python
+from blazing.dynamic_code import serialize_user_function
+
+# User-provided transformation function
+def user_transform(data):
+    """Process data - double positive numbers."""
+    return [x * 2 for x in data if x > 0]
+
+# Serialize with AST validation + HMAC signing
+serialized_code, signature = serialize_user_function(
+    user_transform,
+    signing_key=SIGNING_KEY,
+    validate=True,  # AST validation before serialization
+    strict_mode=True  # Block dangerous patterns
+)
+
+# serialized_code: Base64-encoded dill-serialized function
+# signature: HMAC-SHA256 hex signature
+```
+
+**Step 3: Server-Side Verification + Execution**
+
+```python
+from blazing import Blazing
+from blazing.dynamic_code import execute_signed_function
+
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
+
+@app.step(sandboxed=True)
+async def execute_user_code(
+    serialized_func: str,
+    signature: str,
+    *args,
+    services=None,
+    **kwargs
+):
+    """Execute signed user code with full security validation.
+
+    Security Layers:
+    1. Signature verification (before deserialization)
+    2. Bytecode validation (after deserialization)
+    3. Sandbox isolation (Pyodide WASM)
+    """
+    return await execute_signed_function(
+        serialized_func,
+        signature,
+        args=args,
+        kwargs=kwargs,
+        signing_key=SIGNING_KEY,
+        validate_bytecode=True,
+    )
+
+@app.workflow
+async def process_user_strategy(data: list, services=None):
+    """Workflow that executes signed user code."""
+    # Execute the signed user function
+    result = await execute_user_code(
+        serialized_code,
+        signature,
+        data,
+        services=services
+    )
+    return result
+```
+
+### Security Layers Explained
+
+**Layer 1: AST Validation (Client-Side)**
+- Blocks dangerous imports (`os`, `socket`, `subprocess`)
+- Blocks dangerous builtins (`eval`, `exec`, `__import__`)
+- Blocks filesystem operations (`open`, `pathlib`)
+- Happens BEFORE serialization
+
+**Layer 2: Cryptographic Signing (Client-Side)**
+- HMAC-SHA256 signature of serialized code
+- Prevents tampering during transmission
+- Ensures code authenticity
+
+**Layer 3: Signature Verification (Server-Side)**
+- Validates signature BEFORE deserialization
+- Refuses to deserialize tampered code
+- Uses constant-time comparison to prevent timing attacks
+
+**Layer 4: Bytecode Validation (Server-Side)**
+- Inspects compiled bytecode for dangerous operations
+- Defense-in-depth (secondary check after AST validation)
+- Catches runtime code generation attempts
+
+**Layer 5: Sandbox Isolation (Server-Side)**
+- Pyodide WASM sandbox
+- No network access
+- No filesystem access
+- No process spawning
+- Complete memory isolation
+
 ## What User Code CANNOT Do
 
 ### ❌ Network Access
@@ -128,6 +244,7 @@ async def malicious_cross_tenant(services=None):
     # Cannot access other tenants' data
     # Cannot access other executions' memory
     # Cannot read environment variables from other jobs
+    return {"error": "Isolation prevents cross-tenant access"}
 ```
 
 **Complete isolation between executions.**
@@ -264,10 +381,10 @@ async def sandboxed_step(services=None):
 
 ```python
 # Enforced per execution:
-CPU_LIMIT = 10 minutes (timeout)
-MEMORY_LIMIT = 512 MB (WASM heap)
-DISK_LIMIT = 0 (no disk access)
-NETWORK_LIMIT = 0 (no network)
+CPU_LIMIT = 10 * 60  # 10 minutes (timeout)
+MEMORY_LIMIT = 512 * 1024 * 1024  # 512 MB (WASM heap)
+DISK_LIMIT = 0  # No disk access
+NETWORK_LIMIT = 0  # No network
 ```
 
 ## Attack Scenarios & Mitigations
@@ -359,13 +476,12 @@ async def exhaust_memory(services=None):
 
 ### Monitoring Recommendations
 
-```python
-# Alert on suspicious patterns:
+Alert on suspicious patterns:
+
 - High volume of service calls from single user
 - Repeated failed service calls (potential probing)
 - Unusual parameter patterns
 - Long execution times (possible infinite loops)
-```
 
 ## Best Practices
 
