@@ -98,16 +98,33 @@ Use semantic versioning for workflows:
 
 ```python
 # workflow.py
-from blazing import Flow
+from blazing import Blazing
+import asyncio
 
-flow = Flow(
-    name="data-pipeline",
-    version="2.1.0"  # Major.Minor.Patch
-)
+async def main():
+    app = Blazing()
 
-# 2.1.0 -> 2.1.1: Bug fix
-# 2.1.0 -> 2.2.0: New feature (backward compatible)
-# 2.1.0 -> 3.0.0: Breaking change
+    @app.step
+    async def process_data(data: dict, services=None):
+        """Process data."""
+        return {"processed": True, "data": data}
+
+    @app.workflow
+    async def data_pipeline(data: dict, services=None):
+        """Main data pipeline workflow.
+
+        Version: 2.1.0
+        2.1.0 -> 2.1.1: Bug fix
+        2.1.0 -> 2.2.0: New feature (backward compatible)
+        2.1.0 -> 3.0.0: Breaking change
+        """
+        result = await process_data(data, services=services)
+        return result
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Version Management
@@ -202,23 +219,31 @@ deployment:
 Implement health checks:
 
 ```python
-from blazing import Flow, health
+from blazing import Blazing
+from datetime import datetime
+import asyncio
 
-flow = Flow(name="production-workflow")
+async def main():
+    app = Blazing()
 
-@flow.health_check
-async def check_health():
-    """Health check endpoint"""
-    # Check database connectivity
-    await db.ping()
+    @app.workflow
+    async def health_check(services=None):
+        """Health check endpoint."""
+        # Check database connectivity
+        # await db.ping()
 
-    # Check external services
-    await external_api.health()
+        # Check external services
+        # await external_api.health()
 
-    return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat()
-    }
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat()
+        }
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Graceful Shutdown
@@ -226,22 +251,37 @@ async def check_health():
 Handle shutdown gracefully:
 
 ```python
-from blazing import Flow
+from blazing import Blazing
+import asyncio
 
-flow = Flow(name="production-workflow")
+async def main():
+    app = Blazing()
 
-@flow.on_shutdown
-async def shutdown_handler():
-    """Cleanup on shutdown"""
-    # Finish in-flight tasks
-    await flow.wait_for_tasks()
+    @app.step
+    async def cleanup(services=None):
+        """Cleanup on shutdown."""
+        # Finish in-flight tasks
+        # await app.wait_for_tasks()
 
-    # Close connections
-    await db.close()
-    await cache.close()
+        # Close connections
+        # await db.close()
+        # await cache.close()
 
-    # Save state
-    await save_checkpoint()
+        # Save state
+        # await save_checkpoint()
+
+        return {"status": "cleanup_complete"}
+
+    @app.workflow
+    async def shutdown_handler(services=None):
+        """Handle graceful shutdown."""
+        result = await cleanup(services=services)
+        return result
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Resource Management

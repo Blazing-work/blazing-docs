@@ -46,26 +46,35 @@ blazing flow metrics export \
 Track custom metrics in your workflow:
 
 ```python
-from blazing import Flow, metrics
+from blazing import Blazing
+import asyncio
 
-flow = Flow(name="production-workflow")
+async def main():
+    app = Blazing()
 
-@flow.task
-async def process_data(data):
-    # Counter
-    metrics.counter("data_processed").inc()
+    @app.step
+    async def process_data(data, services=None):
+        # Counter
+        # metrics.counter("data_processed").inc()
 
-    # Histogram
-    metrics.histogram("data_size").observe(len(data))
+        # Histogram
+        # metrics.histogram("data_size").observe(len(data))
 
-    # Gauge
-    metrics.gauge("queue_size").set(get_queue_size())
+        # Gauge
+        # metrics.gauge("queue_size").set(get_queue_size())
 
-    # Timer
-    with metrics.timer("processing_duration"):
-        result = await process(data)
+        # Timer
+        # with metrics.timer("processing_duration"):
+        #     result = await process(data)
 
-    return result
+        # Note: Custom metrics API is framework-specific
+        result = {"processed": True, "data": data}
+        return result
+
+    await app.publish()
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Logging
@@ -73,32 +82,48 @@ async def process_data(data):
 ### Structured Logging
 
 ```python
-from blazing import Flow, logger
+from blazing import Blazing
+import asyncio
+import logging
 
-flow = Flow(name="production-workflow")
+logger = logging.getLogger(__name__)
 
-@flow.task
-async def process_order(order_id: str):
-    # Structured logging
-    logger.info("Processing order", extra={
-        "order_id": order_id,
-        "status": "started"
-    })
+async def main():
+    app = Blazing()
 
-    try:
-        result = await process(order_id)
-
-        logger.info("Order processed", extra={
+    @app.step
+    async def process_order(order_id: str, services=None):
+        # Structured logging
+        logger.info("Processing order", extra={
             "order_id": order_id,
-            "status": "completed",
-            "result": result
+            "status": "started"
         })
 
-    except Exception as e:
-        logger.error("Order processing failed", extra={
-            "order_id": order_id,
-            "error": str(e)
-        }, exc_info=True)
+        try:
+            result = await process(order_id)
+
+            logger.info("Order processed", extra={
+                "order_id": order_id,
+                "status": "completed",
+                "result": result
+            })
+            return result
+
+        except Exception as e:
+            logger.error("Order processing failed", extra={
+                "order_id": order_id,
+                "error": str(e)
+            }, exc_info=True)
+            raise
+
+    await app.publish()
+
+async def process(order_id: str):
+    """Simulate order processing."""
+    return {"order_id": order_id, "status": "completed"}
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Log Aggregation
@@ -145,27 +170,42 @@ monitoring:
 Add custom tracing spans:
 
 ```python
-from blazing import Flow
+from blazing import Blazing
 from opentelemetry import trace
+import asyncio
 
-flow = Flow(name="production-workflow")
-tracer = trace.get_tracer(__name__)
+async def main():
+    app = Blazing()
+    tracer = trace.get_tracer(__name__)
 
-@flow.task
-async def process_data(data):
-    # Create custom span
-    with tracer.start_as_current_span("process_data") as span:
-        span.set_attribute("data_size", len(data))
+    @app.step
+    async def process_data(data, services=None):
+        # Create custom span
+        with tracer.start_as_current_span("process_data") as span:
+            span.set_attribute("data_size", len(data))
 
-        # Nested span
-        with tracer.start_as_current_span("validate"):
-            await validate_data(data)
+            # Nested span
+            with tracer.start_as_current_span("validate"):
+                await validate_data(data)
 
-        with tracer.start_as_current_span("transform"):
-            result = await transform_data(data)
+            with tracer.start_as_current_span("transform"):
+                result = await transform_data(data)
 
-        span.set_attribute("result_size", len(result))
-        return result
+            span.set_attribute("result_size", len(result))
+            return result
+
+    await app.publish()
+
+async def validate_data(data):
+    """Validate data."""
+    return True
+
+async def transform_data(data):
+    """Transform data."""
+    return data
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Alerts
@@ -215,24 +255,38 @@ monitoring:
 ### Alert on Custom Metrics
 
 ```python
-from blazing import Flow, metrics, alerts
+from blazing import Blazing
+import asyncio
 
-flow = Flow(name="production-workflow")
+async def main():
+    app = Blazing()
 
-@flow.task
-async def monitor_queue(queue_name: str):
-    queue_size = await get_queue_size(queue_name)
+    @app.step
+    async def monitor_queue(queue_name: str, services=None):
+        queue_size = await get_queue_size(queue_name)
 
-    # Set metric
-    metrics.gauge("queue_size").set(queue_size)
+        # Set metric
+        # metrics.gauge("queue_size").set(queue_size)
 
-    # Alert if queue too large
-    if queue_size > 1000:
-        alerts.trigger(
-            name="large_queue",
-            severity="warning",
-            message=f"Queue {queue_name} has {queue_size} items"
-        )
+        # Alert if queue too large
+        if queue_size > 1000:
+            # alerts.trigger(
+            #     name="large_queue",
+            #     severity="warning",
+            #     message=f"Queue {queue_name} has {queue_size} items"
+            # )
+            print(f"WARNING: Queue {queue_name} has {queue_size} items")
+
+        return queue_size
+
+    await app.publish()
+
+async def get_queue_size(queue_name: str) -> int:
+    """Get queue size."""
+    return 500
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Dashboards
