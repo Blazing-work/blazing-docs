@@ -83,13 +83,10 @@ async def data_pipeline(source_id: str):
     result = await transform_data(data)
     return result
 
-# Publish and start the app
+# Publish and run the app
 async def main():
     # Publish infrastructure (creates Redis indices, registers routes)
     await app.publish()
-
-    # Start the app (makes routes available to workers)
-    await app.start()
 
     # Execute workflow - choose whichever style you prefer:
 
@@ -220,7 +217,7 @@ The Foreman automatically adjusts the worker mix based on queue metrics:
 You can configure optimization:
 
 ```python
-app = Blazing(,
+app = Blazing(
     worker_config={
         'async_workers': 4,
         'blocking_workers': 2,

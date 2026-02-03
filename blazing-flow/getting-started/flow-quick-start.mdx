@@ -77,6 +77,7 @@ Initialize your Blazing application - it uses our SaaS infrastructure by default
 
 ```python
 from blazing import Blazing
+from blazing.base import BaseService
 
 # Create the app (uses Blazing SaaS by default)
 app = Blazing()
@@ -84,7 +85,8 @@ app = Blazing()
 # Register your service
 @app.service
 class DataProcessor(BaseService):
-    # ... your service implementation
+    async def fetch_data(self, source_id: str):
+        return {"id": source_id, "data": [1, 2, 3, 4, 5]}
 ```
 
 ### Step 3: Define Steps
