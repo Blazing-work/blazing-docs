@@ -6,9 +6,11 @@
     "overview",
     "quick-start",
     "authentication",
+    "middleware",
     "websocket",
     "api-reference",
     "deployment",
-    "examples"
+    "examples",
+    "examples-expanded"
   ]
 }

@@ -1,0 +1,617 @@
+---
+title: AIMD Autoscaling
+label: Autoscaling
+description: Configure AIMD (Additive Increase Multiplicative Decrease) autoscaling for adaptive resource capacity tuning
+position: 2
+---
+
+# AIMD Autoscaling
+
+Blazing uses AIMD (Additive Increase Multiplicative Decrease) to dynamically adjust resource capacity based on real-time performance signals. This document explains how AIMD works and how to configure it for your workload.
+
+## What is AIMD?
+
+AIMD is a feedback control algorithm that adapts resource capacity (connection pools, thread pools, concurrency limits) based on observed system health. It's the same algorithm that powers TCP congestion control and provides proven stability for distributed systems.
+
+**Key characteristics:**
+
+- **Additive Increase**: When the system is healthy, gradually increase capacity by adding a fixed amount (alpha)
+- **Multiplicative Decrease**: When any signal exceeds its threshold, quickly reduce capacity by a percentage (beta)
+- **Stability**: Converges to optimal capacity without oscillation
+- **Safety**: Conservative decrease prevents cascading failures
+
+## Why Blazing Uses AIMD
+
+Traditional fixed-size pools waste resources during low load and bottleneck during high load. AIMD solves both problems:
+
+- **Adapts to load**: Automatically scales up during traffic spikes, scales down during idle periods
+- **Self-healing**: Detects saturation (high latency, errors, timeouts) and reduces load before failures cascade
+- **Cost-efficient**: Uses only the capacity needed for current demand
+- **Zero-configuration**: Works out-of-the-box with sensible defaults
+
+## How AIMD Works
+
+### The Algorithm
+
+Every tick (typically 1 second), AIMD observes 5 health signals and makes a capacity decision:
+
+```
+For each resource (Redis pool, httpx pool, etc):
+  1. Collect signals: p95 latency, p99 latency, error rate, timeout rate, event loop lag
+  2. Check thresholds:
+     - If ANY signal exceeds threshold → Multiplicative Decrease
+     - If ALL signals healthy for N ticks → Additive Increase
+     - Otherwise → Hold current capacity
+  3. Apply capacity change to resource
+```
+
+### Decision Logic
+
+**Multiplicative Decrease** (scale down):
+- Triggered by: `p95 > threshold` OR `p99 > threshold` OR `error_rate > threshold` OR `timeout_rate > threshold` OR `event_loop_lag > threshold`
+- Action: `new_capacity = current_capacity * beta`
+- Cooldown: Cannot decrease again for `decrease_cooldown_ticks` ticks (prevents thrashing)
+
+**Additive Increase** (scale up):
+- Triggered by: ALL signals healthy for `increase_after_ticks` consecutive ticks
+- Action: `new_capacity = current_capacity + alpha`
+- Demand gate: Only increases if `utilization >= utilization_increase_threshold` (prevents over-provisioning)
+
+**Hold** (no change):
+- Triggered by: In cooldown period OR not enough consecutive healthy ticks OR underutilized
+- Action: No capacity change
+
+### Visual Example
+
+```
+Capacity over time:
+150 ┤                                    ╭─╮
+140 ┤                              ╭────╯ │
+130 ┤                        ╭────╯      │
+120 ┤                  ╭────╯            │ (additive increase: +10 per tick)
+110 ┤            ╭────╯                  │
+100 ┤      ╭────╯                        ╰╮ (multiplicative decrease: *0.7)
+ 90 ┤╭────╯                               │
+ 80 ┤│                                    ╰─╮
+ 70 ┼╯                                      ╰────
+    └───────────────────────────────────────────> time (seconds)
+     0   5   10  15  20  25  30  35  40  45  50
+
+Events:
+- 0-10s: Healthy → gradual increase (+10/tick after 3 healthy ticks)
+- 40s: P95 latency spike → immediate decrease (*0.7)
+- 45s: Still recovering → cooldown holds capacity
+- 50s+: Returns to healthy → resume gradual increase
+```
+
+## Configuration Reference
+
+AIMD is configured via `AIMDConfig` dataclass. All parameters can be overridden via environment variables.
+
+### Core Parameters
+
+| Parameter | Type | Default | Env Var | Description |
+|-----------|------|---------|---------|-------------|
+| `resource_name` | `str` | (required) | N/A | Identifier for this resource (e.g., "redis", "httpx") |
+| `min_capacity` | `int` | 10 | Resource-specific | Absolute minimum capacity (never breached) |
+| `max_capacity` | `int` | 500 | Resource-specific | Maximum capacity limit |
+| `initial_capacity` | `int` | 100 | Resource-specific | Starting capacity at initialization |
+
+### AIMD Algorithm Parameters
+
+| Parameter | Type | Default | Env Var | Description |
+|-----------|------|---------|---------|-------------|
+| `alpha` | `float` | 1.0 | Resource-specific | Amount to add per healthy tick (Additive Increase) |
+| `beta` | `float` | 0.5 | Resource-specific | Multiplication factor for backlog (0.5 = 50% reduction) |
+
+### Signal Thresholds (Static Mode)
+
+| Parameter | Type | Default | Env Var | Description |
+|-----------|------|---------|---------|-------------|
+| `p95_latency_threshold_ms` | `float` | 500.0 | Resource-specific | P95 latency above this triggers decrease |
+| `p99_latency_threshold_ms` | `float` | 1000.0 | Resource-specific | P99 latency above this triggers decrease |
+| `error_rate_threshold` | `float` | 0.05 | `AIMD_ERROR_RATE_THRESHOLD` | Error rate above this triggers decrease (5%) |
+| `timeout_rate_threshold` | `float` | 0.02 | `AIMD_TIMEOUT_RATE_THRESHOLD` | Timeout rate above this triggers decrease (2%) |
+| `event_loop_lag_threshold_ms` | `float` | 50.0 | `AIMD_EVENT_LOOP_LAG_THRESHOLD_MS` | Event loop lag above this triggers decrease |
+
+### Hysteresis Parameters
+
+| Parameter | Type | Default | Env Var | Description |
+|-----------|------|---------|---------|-------------|
+| `increase_after_ticks` | `int` | 3 | `AIMD_INCREASE_AFTER_TICKS` | Must be healthy for N consecutive ticks before increasing |
+| `decrease_cooldown_ticks` | `int` | 5 | `AIMD_DECREASE_COOLDOWN_TICKS` | Wait N ticks after decrease before another decrease |
+
+### Demand Gating
+
+| Parameter | Type | Default | Env Var | Description |
+|-----------|------|---------|---------|-------------|
+| `utilization_increase_threshold` | `float` | 0.7 | `AIMD_UTILIZATION_THRESHOLD` | Only increase capacity when utilization >= threshold (70%). Set to 0.0 to disable. |
+
+### Adaptive Mode (Optional)
+
+| Parameter | Type | Default | Env Var | Description |
+|-----------|------|---------|---------|-------------|
+| `adaptive_mode` | `bool` | False | `AIMD_ADAPTIVE_MODE` | Enable adaptive baseline learning (auto-adjusting thresholds) |
+| `adaptive_ratio_multiplier` | `float` | 1.7 | N/A | Trigger if `x > μ * 1.7` (70% above baseline) |
+| `adaptive_deviation_multiplier` | `float` | 6.0 | N/A | Trigger if `x > μ + 6*d` (6 "sigmas" above baseline) |
+| `adaptive_warmup_ticks` | `int` | 20 | N/A | Ticks before adaptive mode activates (~20 seconds) |
+| `adaptive_persistence_windows` | `int` | 3 | N/A | Number of windows for hysteresis |
+| `adaptive_persistence_required` | `int` | 2 | N/A | Required triggers in window (2 of 3) |
+| `adaptive_ema_alpha` | `float` | 0.1 | N/A | Smoothing factor for baseline EMA |
+
+> **Example:** See the complete [AIMD Autoscaling Configuration example](/docs/autoscaling_config) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/06_advanced/autoscaling_config).
+
+## Signal Types
+
+AIMD monitors 5 signals to detect resource saturation:
+
+### 1. P95 Latency (`p95_latency_ms`)
+
+**What it measures**: 95th percentile operation latency in milliseconds
+
+**Why it matters**: Indicates typical performance degradation. When p95 spikes, most operations are slow.
+
+**Threshold behavior**:
+- Static mode: Fixed threshold (e.g., 500ms for Redis, 200ms for httpx)
+- Adaptive mode: Learned baseline with 70% deviation trigger
+
+### 2. P99 Latency (`p99_latency_ms`)
+
+**What it measures**: 99th percentile operation latency (tail latency)
+
+**Why it matters**: Catches outliers and tail degradation. High p99 indicates occasional slow operations affecting user experience.
+
+**Threshold behavior**:
+- Static mode: Fixed threshold (e.g., 1000ms for Redis, 500ms for httpx)
+- Adaptive mode: Learned baseline with 70% deviation trigger
+
+### 3. Error Rate (`error_rate`)
+
+**What it measures**: Ratio of errors to total operations (0.0 to 1.0)
+
+**Why it matters**: Direct indicator of system health. Errors propagate and cause cascading failures.
+
+**Threshold behavior**:
+- Always static: 5% (0.05) default
+- NOT adaptive (errors are discrete events, not continuous metrics)
+
+### 4. Timeout Rate (`timeout_rate`)
+
+**What it measures**: Ratio of timeouts to total operations
+
+**Why it matters**: Indicates resource exhaustion. Timeouts waste client time and tie up connections.
+
+**Threshold behavior**:
+- Always static: 2% (0.02) default
+- NOT adaptive (timeouts indicate hard capacity limits)
+
+### 5. Event Loop Lag (`event_loop_lag_ms`)
+
+**What it measures**: How much the event loop is delayed from its scheduled execution time
+
+**Why it matters**: Detects when the event loop is overwhelmed with synchronous work, affecting all async operations.
+
+**Threshold behavior**:
+- Static mode: 50ms default
+- Adaptive mode: Learned baseline with 70% deviation trigger
+
+### How Thresholds Interact
+
+**ANY threshold violation triggers Multiplicative Decrease**:
+```python
+if (p95 > threshold OR
+    p99 > threshold OR
+    error_rate > threshold OR
+    timeout_rate > threshold OR
+    event_loop_lag > threshold):
+    capacity *= beta  # Scale down
+```
+
+**ALL signals must be healthy for Additive Increase**:
+```python
+if (p95 <= threshold AND
+    p99 <= threshold AND
+    error_rate <= threshold AND
+    timeout_rate <= threshold AND
+    event_loop_lag <= threshold):
+    healthy_ticks += 1
+    if healthy_ticks >= increase_after_ticks:
+        capacity += alpha  # Scale up
+```
+
+## Static vs Adaptive Thresholds
+
+AIMD supports two threshold modes:
+
+### Static Thresholds (Default)
+
+**How it works**: Fixed thresholds configured via environment variables or `AIMDConfig`
+
+**Best for**:
+- Predictable workloads with known latency expectations
+- Initial deployment (safe defaults)
+- Compliance/SLA requirements with hard latency limits
+
+**Example**:
+```python
+from blazing_service.aimd import AIMDConfig
+
+config = AIMDConfig(
+    resource_name="redis",
+    min_capacity=50,
+    max_capacity=1000,
+    initial_capacity=500,
+    alpha=10.0,
+    beta=0.7,
+    p95_latency_threshold_ms=50.0,  # Fixed: 50ms
+    p99_latency_threshold_ms=100.0, # Fixed: 100ms
+    adaptive_mode=False,  # Static mode
+)
+```
+
+### Adaptive Thresholds (Optional)
+
+**How it works**: Learns baseline performance via EMA and triggers on relative deviation
+
+**Algorithm**:
+1. **Baseline learning (μ)**: EMA of metric when system is healthy: `μ = α*x + (1-α)*μ`
+2. **Deviation learning (d)**: EWMA of absolute deviation: `d = α*|x-μ| + (1-α)*d`
+3. **Ratio trigger**: `x > μ * ratio_multiplier` (default: 1.7 = 70% above baseline)
+4. **Deviation trigger**: `x > μ + k*d` (default: 6 "sigmas")
+
+**Best for**:
+- Variable workloads (diurnal patterns, bursty traffic)
+- Different infrastructure (cloud regions with different latency characteristics)
+- Auto-adapting to infrastructure changes (instance upgrades, network changes)
+
+**Example**:
+```python
+config = AIMDConfig(
+    resource_name="redis",
+    adaptive_mode=True,  # Enable adaptive baselines
+    adaptive_ratio_multiplier=1.7,    # Trigger at 70% above baseline
+    adaptive_deviation_multiplier=6.0, # Trigger at 6 deviations
+    adaptive_warmup_ticks=20,          # Learn baseline for 20 ticks
+)
+```
+
+**Healthy gating**: Adaptive mode only updates baseline when system is healthy (error_rate < 0.1%, timeout_rate < 0.1%). This prevents learning from bad states.
+
+## AIMD-Managed Resources
+
+AIMD controls capacity for these resources across Blazing components:
+
+### Coordinator Resources
+
+| Resource | What It Controls | Default Capacity | Env Vars |
+|----------|------------------|------------------|----------|
+| **Redis Connection Pool** | Coordinator Redis pool size | 500 (50-1000) | `AIMD_REDIS_MIN`, `AIMD_REDIS_MAX`, `AIMD_REDIS_INITIAL`, `AIMD_REDIS_ALPHA`, `AIMD_REDIS_BETA`, `AIMD_REDIS_P95_THRESHOLD_MS`, `AIMD_REDIS_P99_THRESHOLD_MS` |
+| **httpx Connection Pool** | Coordinator httpx client pool | 100 (20-200) | `AIMD_HTTPX_MIN`, `AIMD_HTTPX_MAX`, `AIMD_HTTPX_INITIAL`, `AIMD_HTTPX_ALPHA`, `AIMD_HTTPX_BETA`, `AIMD_HTTPX_P95_THRESHOLD_MS`, `AIMD_HTTPX_P99_THRESHOLD_MS` |
+| **Async Concurrency** | Async worker concurrency slots | 10 (1-64) | `AIMD_ASYNC_MIN`, `AIMD_ASYNC_MAX`, `AIMD_ASYNC_INITIAL`, `AIMD_ASYNC_ALPHA`, `AIMD_ASYNC_BETA`, `AIMD_ASYNC_P95_THRESHOLD_MS`, `AIMD_ASYNC_P99_THRESHOLD_MS` |
+
+### Executor Resources
+
+| Resource | What It Controls | Default Capacity | Env Vars |
+|----------|------------------|------------------|----------|
+| **Redis Data Client Pool** | Executor Redis pool size | 50 (10-200) | `AIMD_EXEC_REDIS_MIN`, `AIMD_EXEC_REDIS_MAX`, `AIMD_EXEC_REDIS_INITIAL`, `AIMD_EXEC_REDIS_ALPHA`, `AIMD_EXEC_REDIS_BETA`, `AIMD_EXEC_REDIS_P95_THRESHOLD_MS`, `AIMD_EXEC_REDIS_P99_THRESHOLD_MS` |
+| **Arrow Flight Pool** | Arrow Flight connection pool | 5 (2-10) | `AIMD_ARROW_POOL_MIN`, `AIMD_ARROW_POOL_MAX`, `AIMD_ARROW_POOL_INITIAL`, `AIMD_ARROW_POOL_ALPHA`, `AIMD_ARROW_POOL_BETA`, `AIMD_ARROW_POOL_P95_THRESHOLD_MS`, `AIMD_ARROW_POOL_P99_THRESHOLD_MS` |
+| **Arrow Flight Threads** | Arrow Flight thread pool | 20 (4-40) | `AIMD_ARROW_THREADS_MIN`, `AIMD_ARROW_THREADS_MAX`, `AIMD_ARROW_THREADS_INITIAL`, `AIMD_ARROW_THREADS_ALPHA`, `AIMD_ARROW_THREADS_BETA`, `AIMD_ARROW_THREADS_P95_THRESHOLD_MS`, `AIMD_ARROW_THREADS_P99_THRESHOLD_MS` |
+
+### Pyodide Executor Resources
+
+| Resource | What It Controls | Default Capacity | Env Vars |
+|----------|------------------|------------------|----------|
+| **Pyodide Concurrency** | Concurrent WASM operation slots | 2 (1-4, CPU-bound) | `AIMD_PYODIDE_MIN`, `AIMD_PYODIDE_MAX`, `AIMD_PYODIDE_INITIAL`, `AIMD_PYODIDE_ALPHA`, `AIMD_PYODIDE_BETA`, `AIMD_PYODIDE_P95_THRESHOLD_MS`, `AIMD_PYODIDE_P99_THRESHOLD_MS`, `AIMD_PYODIDE_INCREASE_AFTER_TICKS`, `AIMD_PYODIDE_DECREASE_COOLDOWN_TICKS` |
+
+### How to Identify AIMD Resources
+
+**In logs**: Look for AIMD controller initialization and decision messages:
+```
+INFO [blazing_service.aimd.controller] AIMD controller initialized for coordinator_redis: capacity=500, range=[50, 1000], alpha=10.0, beta=0.7, mode=static
+INFO [blazing_service.aimd.controller] AIMD coordinator_redis: DECREASE - reason=p95_latency=75.2ms > 50.0ms, capacity: 500 -> 350
+INFO [blazing_service.aimd.controller] AIMD coordinator_redis: INCREASE - healthy_ticks=3, utilization=0.82, capacity: 350 -> 360
+```
+
+**In Prometheus metrics**: Query AIMD metrics by component and resource:
+```
+blazing_aimd_capacity{component="coordinator", resource="redis"}
+blazing_aimd_increases_total{component="coordinator", resource="redis"}
+blazing_aimd_decreases_total{component="coordinator", resource="redis"}
+```
+
+**Via API**: Get AIMD state from coordinator or executor:
+```python
+# Coordinator
+state = coordinator.aimd_manager.get_state()
+print(state['controllers']['redis']['current_capacity'])
+
+# Executor
+state = executor.aimd_manager.get_state()
+print(state['controllers']['arrow_pool']['current_capacity'])
+```
+
+## Tuning Guide
+
+### High-Throughput Workloads
+
+**Characteristics**: High request volume, batch processing, data pipelines
+
+**Tuning goals**: Maximize throughput, tolerate higher latency
+
+**Configuration**:
+```bash
+# Larger capacity range
+export AIMD_REDIS_MAX=2000       # Allow higher max capacity
+export AIMD_HTTPX_MAX=500
+
+# Faster scaling up
+export AIMD_REDIS_ALPHA=20.0     # Larger additive increase
+export AIMD_HTTPX_ALPHA=10.0
+
+# Slower scaling down (tolerate spikes)
+export AIMD_REDIS_BETA=0.8       # Gentle decrease (20% reduction)
+export AIMD_DECREASE_COOLDOWN_TICKS=10  # Longer cooldown
+
+# Higher latency tolerance
+export AIMD_REDIS_P95_THRESHOLD_MS=100.0
+export AIMD_REDIS_P99_THRESHOLD_MS=200.0
+```
+
+**Why it works**: Larger pools prevent queueing, faster scale-up handles bursts, gentler scale-down prevents over-correction.
+
+### Latency-Sensitive Workloads
+
+**Characteristics**: User-facing APIs, real-time applications, strict SLAs
+
+**Tuning goals**: Minimize tail latency, quick reaction to degradation
+
+**Configuration**:
+```bash
+# Moderate capacity range (don't over-provision)
+export AIMD_REDIS_MAX=500
+
+# Moderate scaling up (don't overshoot)
+export AIMD_REDIS_ALPHA=5.0
+
+# Aggressive scaling down
+export AIMD_REDIS_BETA=0.5       # Quick decrease (50% reduction)
+export AIMD_DECREASE_COOLDOWN_TICKS=3  # Short cooldown
+
+# Strict latency thresholds
+export AIMD_REDIS_P95_THRESHOLD_MS=20.0
+export AIMD_REDIS_P99_THRESHOLD_MS=50.0
+export AIMD_HTTPX_P95_THRESHOLD_MS=100.0
+```
+
+**Why it works**: Tight thresholds catch degradation early, aggressive decrease prevents cascading failures, moderate increase avoids overshoot.
+
+### Cost-Optimized Workloads
+
+**Characteristics**: Batch jobs, background tasks, cost-sensitive environments
+
+**Tuning goals**: Minimize resource usage, tolerate longer processing times
+
+**Configuration**:
+```bash
+# Lower capacity range
+export AIMD_REDIS_MIN=10
+export AIMD_REDIS_MAX=100        # Cap at lower value
+export AIMD_REDIS_INITIAL=20
+
+# Slow scaling up
+export AIMD_REDIS_ALPHA=1.0      # Minimal additive increase
+export AIMD_INCREASE_AFTER_TICKS=5  # Wait longer before increasing
+
+# Aggressive demand gating
+export AIMD_UTILIZATION_THRESHOLD=0.9  # Only grow when 90% utilized
+
+# Moderate thresholds (don't scale down too early)
+export AIMD_REDIS_P95_THRESHOLD_MS=100.0
+```
+
+**Why it works**: Lower caps prevent over-provisioning, slow scale-up and high utilization gate keep capacity minimal, moderate thresholds tolerate some queueing.
+
+### Variable Workloads (Diurnal Patterns)
+
+**Characteristics**: Day/night traffic patterns, weekend/weekday differences
+
+**Tuning goals**: Auto-adapt to changing baseline performance
+
+**Configuration**:
+```bash
+# Enable adaptive mode
+export AIMD_ADAPTIVE_MODE=true
+
+# Standard capacity range
+export AIMD_REDIS_MAX=1000
+
+# Moderate scaling parameters
+export AIMD_REDIS_ALPHA=10.0
+export AIMD_REDIS_BETA=0.7
+
+# Adaptive mode handles thresholds automatically
+# Static thresholds ignored when adaptive_mode=true
+```
+
+**Why it works**: Adaptive baselines learn "normal" latency for current time-of-day and traffic level, automatically adjusting expectations without manual tuning.
+
+### Default Settings (Recommended Starting Point)
+
+**Characteristics**: Mixed workload, unknown traffic patterns, first deployment
+
+**Tuning goals**: Balanced performance, safety, observability
+
+**Configuration**: Use built-in defaults (no environment variables needed)
+```python
+# Defaults from config.py (coordinator Redis example):
+min_capacity=50
+max_capacity=1000
+initial_capacity=500
+alpha=10.0
+beta=0.7
+p95_latency_threshold_ms=50.0
+p99_latency_threshold_ms=100.0
+error_rate_threshold=0.05
+timeout_rate_threshold=0.02
+event_loop_lag_threshold_ms=50.0
+increase_after_ticks=3
+decrease_cooldown_ticks=5
+utilization_increase_threshold=0.7
+adaptive_mode=False
+```
+
+**Why it works**: Conservative defaults balance safety (quick decrease on issues) with performance (gradual increase). Good starting point for monitoring AIMD behavior before tuning.
+
+**When to tune**: After observing AIMD behavior for 24-48 hours, tune based on:
+- Frequency of INCREASE/DECREASE decisions (check Prometheus `blazing_aimd_increases_total`, `blazing_aimd_decreases_total`)
+- Capacity oscillation (check `blazing_aimd_capacity` time-series)
+- Latency P95/P99 relative to thresholds (check `blazing_aimd_p95_latency_ms`, `blazing_aimd_p99_latency_ms`)
+
+## Monitoring
+
+### Prometheus Metrics
+
+AIMD exports comprehensive metrics for observability:
+
+**Capacity Gauges**:
+```
+blazing_aimd_capacity{component, resource, app_id}         # Current capacity
+blazing_aimd_min_capacity{component, resource}             # Configured minimum
+blazing_aimd_max_capacity{component, resource}             # Configured maximum
+```
+
+**Decision Counters**:
+```
+blazing_aimd_increases_total{component, resource, app_id}  # Total additive increases
+blazing_aimd_decreases_total{component, resource, app_id}  # Total multiplicative decreases
+blazing_aimd_holds_total{component, resource, app_id}      # Total hold decisions
+```
+
+**Signal Gauges**:
+```
+blazing_aimd_p95_latency_ms{component, resource, app_id}   # P95 latency observed
+blazing_aimd_p99_latency_ms{component, resource, app_id}   # P99 latency observed
+blazing_aimd_error_rate{component, resource, app_id}       # Error rate observed
+blazing_aimd_timeout_rate{component, resource, app_id}     # Timeout rate observed
+blazing_aimd_event_loop_lag_ms{component}                  # Event loop lag observed
+blazing_aimd_utilization{component, resource, app_id}      # Resource utilization (0.0-1.0)
+```
+
+**State Gauges**:
+```
+blazing_aimd_healthy_ticks{component, resource, app_id}    # Consecutive healthy ticks
+blazing_aimd_ticks_since_decrease{component, resource, app_id}  # Ticks since last decrease
+```
+
+### Example Grafana Queries
+
+**Capacity over time**:
+```promql
+blazing_aimd_capacity{component="coordinator", resource="redis"}
+```
+
+**Decision rate (decisions per minute)**:
+```promql
+rate(blazing_aimd_increases_total{component="coordinator", resource="redis"}[1m]) * 60 +
+rate(blazing_aimd_decreases_total{component="coordinator", resource="redis"}[1m]) * 60
+```
+
+**Latency vs threshold**:
+```promql
+# P95 latency with threshold overlay
+blazing_aimd_p95_latency_ms{component="coordinator", resource="redis"}
+```
+
+**Utilization trend**:
+```promql
+# Utilization percentage
+blazing_aimd_utilization{component="coordinator", resource="redis"} * 100
+```
+
+### Observing Autoscaling Behavior
+
+**1. Check if AIMD is enabled**:
+```bash
+# In coordinator/executor logs:
+grep "AIMD is ENABLED" logs/*.log
+```
+
+**2. Monitor capacity changes**:
+```bash
+# In logs:
+grep "AIMD.*capacity:" logs/*.log | tail -20
+
+# Example output:
+# AIMD coordinator_redis: INCREASE - healthy_ticks=3, utilization=0.85, capacity: 500 -> 510
+# AIMD coordinator_redis: DECREASE - reason=p95_latency=75.2ms > 50.0ms, capacity: 510 -> 357
+```
+
+**3. Query current state via API**:
+```python
+import httpx
+
+async def check_aimd_state():
+    async with httpx.AsyncClient() as client:
+        # Coordinator state
+        response = await client.get("http://coordinator:8000/api/v1/admin/aimd/state")
+        state = response.json()
+        print(f"Redis capacity: {state['controllers']['redis']['current_capacity']}")
+        print(f"Healthy ticks: {state['controllers']['redis']['healthy_ticks']}")
+```
+
+**4. Set up alerts**:
+```yaml
+# Prometheus alert rules
+groups:
+- name: aimd_alerts
+  rules:
+  # Alert when capacity maxed out
+  - alert: AIMDCapacityMaxed
+    expr: blazing_aimd_capacity >= blazing_aimd_max_capacity
+    for: 5m
+    annotations:
+      summary: "AIMD capacity maxed for {{ $labels.resource }}"
+      description: "{{ $labels.component }}.{{ $labels.resource }} at max capacity for 5m"
+
+  # Alert on frequent decreases (potential saturation)
+  - alert: AIMDFrequentDecreases
+    expr: rate(blazing_aimd_decreases_total[5m]) > 0.1
+    for: 5m
+    annotations:
+      summary: "AIMD frequent decreases for {{ $labels.resource }}"
+      description: "{{ $labels.component }}.{{ $labels.resource }} decreasing >6 times/min"
+
+  # Alert on high latency
+  - alert: AIMDHighLatency
+    expr: blazing_aimd_p95_latency_ms > 100
+    for: 2m
+    annotations:
+      summary: "AIMD high P95 latency for {{ $labels.resource }}"
+      description: "{{ $labels.component }}.{{ $labels.resource }} P95 latency >100ms"
+```
+
+## Enabling AIMD
+
+AIMD is **disabled by default**. Enable it via environment variable:
+
+```bash
+# Master toggle (required)
+export AIMD_ENABLED=true
+
+# Optional: Enable adaptive mode
+export AIMD_ADAPTIVE_MODE=true
+
+# Optional: Tune individual resources
+export AIMD_REDIS_MAX=2000
+export AIMD_REDIS_ALPHA=20.0
+```
+
+**Why disabled by default**: AIMD behavior should be observed and tuned for your specific workload. Start with defaults, monitor for 24-48 hours, then tune parameters based on observed metrics.
+
+## Next Steps
+
+- **[Arrow Flight](./arrow-flight)**: Learn about Arrow Flight bulk data transfer (one of the resources AIMD manages)
+- **[Worker Types](../workers/overview)**: Understand worker concurrency (another AIMD-managed resource)
+- **[Monitoring](../monitoring/flow-monitoring)**: Set up dashboards to observe AIMD behavior
+- **[Deployment](../deployment/flow-deployment)**: Production deployment patterns with AIMD enabled
+- **[Emulators](./emulators)**: Development environment setup with AIMD testing
