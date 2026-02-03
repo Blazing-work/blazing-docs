@@ -204,6 +204,32 @@
     "href": "/docs/parallel_execution"
   },
   {
+    "id": "service_injection",
+    "title": "Service Injection",
+    "description": "Pass custom services to workflows and steps for dependency injection.",
+    "category": "Getting Started",
+    "difficulty": "Beginner",
+    "time": "10 min",
+    "tags": [
+      "workflow",
+      "service-injection",
+      "dependency-injection",
+      "services"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "01_getting_started/service_injection",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/01_getting_started/service_injection",
+    "href": "/docs/service_injection"
+  },
+  {
     "id": "simple_step",
     "title": "Simple Step",
     "description": "The simplest possible Blazing Flow example - a single processing step.",
@@ -252,6 +278,86 @@
     "folder_path": "01_getting_started/step_with_math",
     "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/01_getting_started/step_with_math",
     "href": "/docs/step_with_math"
+  },
+  {
+    "id": "auth_api_key",
+    "title": "API Key Authentication",
+    "description": "Protect HTTP endpoints using API key authentication with header or query parameter validation",
+    "category": "Web Endpoints",
+    "difficulty": "Beginner",
+    "time": "15 min",
+    "tags": [
+      "authentication",
+      "api-key",
+      "endpoint",
+      "security"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/auth_api_key",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_api_key",
+    "href": "/docs/auth_api_key"
+  },
+  {
+    "id": "auth_jwt",
+    "title": "JWT Authentication",
+    "description": "Protect HTTP endpoints using JWT token authentication with claims validation and scope checking",
+    "category": "Web Endpoints",
+    "difficulty": "Intermediate",
+    "time": "15 min",
+    "tags": [
+      "authentication",
+      "jwt",
+      "token",
+      "endpoint",
+      "security"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/auth_jwt",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_jwt",
+    "href": "/docs/auth_jwt"
+  },
+  {
+    "id": "auth_oauth2",
+    "title": "OAuth2 Authentication",
+    "description": "Protect HTTP endpoints using OAuth2 token validation with introspection and built-in provider support",
+    "category": "Web Endpoints",
+    "difficulty": "Advanced",
+    "time": "15 min",
+    "tags": [
+      "authentication",
+      "oauth2",
+      "token",
+      "endpoint",
+      "security"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/auth_oauth2",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_oauth2",
+    "href": "/docs/auth_oauth2"
   },
   {
     "id": "authenticated_api",
@@ -333,6 +439,58 @@
     "href": "/docs/batch_processing_api"
   },
   {
+    "id": "endpoint_interact",
+    "title": "Interactive Service Communication",
+    "description": "Use app.interact() for bidirectional communication with running services.",
+    "category": "Web Endpoints",
+    "difficulty": "Intermediate",
+    "time": "15 min",
+    "tags": [
+      "interact",
+      "bidirectional",
+      "service-communication",
+      "endpoint"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/endpoint_interact",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/endpoint_interact",
+    "href": "/docs/endpoint_interact"
+  },
+  {
+    "id": "endpoint_routing",
+    "title": "Multiple HTTP Endpoints",
+    "description": "Configure multiple HTTP routes with different paths in a single application.",
+    "category": "Web Endpoints",
+    "difficulty": "Beginner",
+    "time": "10 min",
+    "tags": [
+      "endpoint",
+      "routing",
+      "http",
+      "rest-api"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/endpoint_routing",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/endpoint_routing",
+    "href": "/docs/endpoint_routing"
+  },
+  {
     "id": "error_handling_api",
     "title": "Error Handling in APIs",
     "description": "Proper error handling with custom error responses.",
@@ -356,6 +514,170 @@
     "folder_path": "02_web_endpoints/error_handling_api",
     "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/error_handling_api",
     "href": "/docs/error_handling_api"
+  },
+  {
+    "id": "middleware_cache",
+    "title": "Response Caching for Performance",
+    "description": "Cache expensive endpoint responses using CacheMiddleware with configurable TTL.",
+    "category": "Web Endpoints",
+    "difficulty": "Beginner",
+    "time": "10 min",
+    "tags": [
+      "middleware",
+      "cache",
+      "endpoint",
+      "http",
+      "performance"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/middleware_cache",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_cache",
+    "href": "/docs/middleware_cache"
+  },
+  {
+    "id": "middleware_circuit_breaker",
+    "title": "Circuit Breaker for Fault Tolerance",
+    "description": "Protect against cascading failures using CircuitBreakerMiddleware with failure threshold and automatic recovery.",
+    "category": "Web Endpoints",
+    "difficulty": "Intermediate",
+    "time": "15 min",
+    "tags": [
+      "middleware",
+      "circuit-breaker",
+      "endpoint",
+      "http",
+      "resilience",
+      "fault-tolerance"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/middleware_circuit_breaker",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_circuit_breaker",
+    "href": "/docs/middleware_circuit_breaker"
+  },
+  {
+    "id": "middleware_cors",
+    "title": "CORS Middleware for Browser APIs",
+    "description": "Enable cross-origin requests from browsers using CORSMiddleware with configurable origins and headers.",
+    "category": "Web Endpoints",
+    "difficulty": "Beginner",
+    "time": "10 min",
+    "tags": [
+      "middleware",
+      "cors",
+      "endpoint",
+      "http",
+      "browser"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/middleware_cors",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_cors",
+    "href": "/docs/middleware_cors"
+  },
+  {
+    "id": "middleware_rate_limit",
+    "title": "Rate Limiting to Prevent API Abuse",
+    "description": "Protect your API from abuse by limiting requests per client using RateLimitMiddleware.",
+    "category": "Web Endpoints",
+    "difficulty": "Beginner",
+    "time": "10 min",
+    "tags": [
+      "middleware",
+      "rate-limit",
+      "endpoint",
+      "http",
+      "throttling"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/middleware_rate_limit",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_rate_limit",
+    "href": "/docs/middleware_rate_limit"
+  },
+  {
+    "id": "middleware_retry",
+    "title": "Automatic Retry with Exponential Backoff",
+    "description": "Automatically retry failed requests to external services using RetryMiddleware with exponential backoff and jitter.",
+    "category": "Web Endpoints",
+    "difficulty": "Intermediate",
+    "time": "15 min",
+    "tags": [
+      "middleware",
+      "retry",
+      "endpoint",
+      "http",
+      "resilience",
+      "backoff"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/middleware_retry",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_retry",
+    "href": "/docs/middleware_retry"
+  },
+  {
+    "id": "middleware_timeout",
+    "title": "Request Timeout Enforcement",
+    "description": "Prevent endpoints from hanging indefinitely using TimeoutMiddleware with configurable timeout limits.",
+    "category": "Web Endpoints",
+    "difficulty": "Beginner",
+    "time": "10 min",
+    "tags": [
+      "middleware",
+      "timeout",
+      "endpoint",
+      "http",
+      "resilience"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "02_web_endpoints/middleware_timeout",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_timeout",
+    "href": "/docs/middleware_timeout"
   },
   {
     "id": "multi_step_pipeline_api",
@@ -799,6 +1121,32 @@
     "href": "/docs/rate_limited_api"
   },
   {
+    "id": "semaphore_concurrency",
+    "title": "Concurrency Control with Semaphore",
+    "description": "Use Blazing's Semaphore to limit concurrent execution of parallel tasks.",
+    "category": "Async & Parallel",
+    "difficulty": "Intermediate",
+    "time": "15 min",
+    "tags": [
+      "semaphore",
+      "concurrency",
+      "parallel",
+      "rate-limiting"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "04_async_parallel/semaphore_concurrency",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/04_async_parallel/semaphore_concurrency",
+    "href": "/docs/semaphore_concurrency"
+  },
+  {
     "id": "cache_service",
     "title": "Cache Service",
     "description": "Implement caching with Redis for faster lookups.",
@@ -850,6 +1198,32 @@
     "folder_path": "05_integrations/connector_integration",
     "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/05_integrations/connector_integration",
     "href": "/docs/connector_integration"
+  },
+  {
+    "id": "custom_service",
+    "title": "Custom Service Integration",
+    "description": "Create custom services by extending BaseService for reusable business logic.",
+    "category": "Integrations",
+    "difficulty": "Intermediate",
+    "time": "20 min",
+    "tags": [
+      "service",
+      "custom",
+      "integration",
+      "extensibility"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "05_integrations/custom_service",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/05_integrations/custom_service",
+    "href": "/docs/custom_service"
   },
   {
     "id": "database_service",
@@ -1035,6 +1409,32 @@
     "href": "/docs/stripe_webhook"
   },
   {
+    "id": "autoscaling_config",
+    "title": "AIMD Autoscaling Configuration",
+    "description": "Configure AIMD (Additive Increase Multiplicative Decrease) autoscaling for worker pools.",
+    "category": "Advanced",
+    "difficulty": "Advanced",
+    "time": "20 min",
+    "tags": [
+      "autoscaling",
+      "aimd",
+      "performance",
+      "workers"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "06_advanced/autoscaling_config",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/06_advanced/autoscaling_config",
+    "href": "/docs/autoscaling_config"
+  },
+  {
     "id": "batch_stock_processing",
     "title": "Batch Stock Processing",
     "description": "This example demonstrates batch processing patterns inspired by financial data\npipelines. Process hundreds of stocks efficiently with:\n\n- Batch processing with configurable sizes\n- Throttling to respect API rate limits\n- Resilient error handling (partial failures don't stop the batch)\n- Progress tracking and reporting\n\n**Use Cases:**\n- Daily stock price updates\n- Portfolio rebalancing workflows\n- Market data synchronization\n- Financial indicator calculations",
@@ -1086,6 +1486,32 @@
     "folder_path": "06_advanced/cleanup_expired_records",
     "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/06_advanced/cleanup_expired_records",
     "href": "/docs/cleanup_expired_records"
+  },
+  {
+    "id": "cli_publish_deploy",
+    "title": "CLI-Based Deployment",
+    "description": "Use the Blazing CLI to publish and manage workflows from the command line.",
+    "category": "Advanced",
+    "difficulty": "Beginner",
+    "time": "10 min",
+    "tags": [
+      "cli",
+      "deployment",
+      "publish",
+      "devops"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "06_advanced/cli_publish_deploy",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/06_advanced/cli_publish_deploy",
+    "href": "/docs/cli_publish_deploy"
   },
   {
     "id": "daily_reports",
@@ -1371,6 +1797,32 @@
     "folder_path": "06_advanced/sandboxed_step_execution",
     "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/06_advanced/sandboxed_step_execution",
     "href": "/docs/sandboxed_step_execution"
+  },
+  {
+    "id": "scheduling_workflow",
+    "title": "Scheduled Workflow Execution",
+    "description": "Schedule workflows to run periodically using Cron expressions or time intervals.",
+    "category": "Advanced",
+    "difficulty": "Intermediate",
+    "time": "15 min",
+    "tags": [
+      "scheduling",
+      "cron",
+      "periodic",
+      "automation"
+    ],
+    "products": [
+      "blazing-flow"
+    ],
+    "primaryProduct": "blazing-flow",
+    "files": {
+      "flow": true,
+      "sandbox": false,
+      "core": false
+    },
+    "folder_path": "06_advanced/scheduling_workflow",
+    "github_url": "https://github.com/Blazing-work/blazing-examples/blob/main/06_advanced/scheduling_workflow",
+    "href": "/docs/scheduling_workflow"
   },
   {
     "id": "trading_strategy_sandbox",
