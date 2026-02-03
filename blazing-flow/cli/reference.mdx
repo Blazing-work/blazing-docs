@@ -1,0 +1,494 @@
+---
+title: CLI Reference
+label: CLI Reference
+description: Complete reference for all Blazing CLI commands, options, and workflows
+position: 8
+---
+
+# Blazing CLI Reference
+
+The Blazing CLI provides commands for deploying and managing Blazing applications from the command line.
+
+## Installation
+
+Install the Blazing CLI via pip:
+
+```bash
+pip install blazing
+```
+
+The CLI is included with the main Blazing package and provides the `blazing` command.
+
+## Environment Variables
+
+The Blazing CLI uses environment variables for configuration. These can be overridden with command-line options.
+
+| Variable | Required | Description | Default |
+|----------|----------|-------------|---------|
+| `BLAZING_API_URL` | Yes | URL of the Blazing control plane | None |
+| `BLAZING_API_TOKEN` | Yes | Authentication token for API access | None |
+| `BLAZING_ORCHESTRATOR_URL` | No | URL of the Blazing orchestrator for job routing | None |
+
+**Setting Environment Variables:**
+
+```bash
+# Export for current session
+export BLAZING_API_URL="https://api.blazing.example.com"
+export BLAZING_API_TOKEN="your-token-here"
+
+# Or use .env file
+echo "BLAZING_API_URL=https://api.blazing.example.com" >> .env
+echo "BLAZING_API_TOKEN=your-token-here" >> .env
+```
+
+## Commands
+
+### `blazing`
+
+The root command provides version information and help.
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--version` | Show the Blazing version and exit |
+| `--help` | Show help message and exit |
+
+**Examples:**
+
+```bash
+# Check CLI version
+blazing --version
+
+# Show available commands
+blazing --help
+```
+
+### `blazing publish`
+
+Publish routes, steps, and services to the Blazing backend.
+
+**What it does:**
+
+1. Load your Blazing app (auto-discover or via `--app` option)
+2. Serialize all decorated routes, steps, and services
+3. Upload them to the remote Blazing control plane
+
+**Options:**
+
+| Option | Short | Description | Default | Metavar |
+|--------|-------|-------------|---------|---------|
+| `--app` | `-a` | Application path in format 'module:attribute' | Auto-discover | MODULE:ATTR |
+| `--url` | | Blazing API URL (overrides BLAZING_API_URL env var) | BLAZING_API_URL | URL |
+| `--token` | | Blazing API token (overrides BLAZING_API_TOKEN env var) | BLAZING_API_TOKEN | TOKEN |
+| `--orchestrator-url` | | Blazing Orchestrator URL for job routing (overrides BLAZING_ORCHESTRATOR_URL env var) | BLAZING_ORCHESTRATOR_URL | URL |
+| `--verbose` | `-v` | Enable verbose output (shows stack traces on error) | False | |
+
+**Examples:**
+
+```bash
+# Auto-discover app in current directory
+blazing publish
+
+# Specify app location explicitly
+blazing publish --app myapp.main:app
+
+# Override environment variables
+blazing publish --url https://api.example.com --token abc123
+
+# Use orchestrator URL for job routing
+blazing publish --orchestrator-url https://orchestrator.example.com
+
+# Enable verbose output for debugging
+blazing publish --verbose
+```
+
+**Success Output:**
+
+```
+Auto-discovering Blazing app...
+✓ Discovered app: main:app
+Connecting to: https://api.blazing.example.com
+
+Publishing to https://api.blazing.example.com:
+  • 3 step(s)
+  • 2 workflow(s)
+  • 1 service(s)
+
+✓ Published successfully!
+```
+
+**Error Messages:**
+
+- **"No Blazing app found in current directory"**: The CLI couldn't auto-discover an app. Use `--app` to specify the app location explicitly.
+- **"Blazing API URL not provided"**: Set the `BLAZING_API_URL` environment variable or use the `--url` option.
+- **"Blazing API token not provided"**: Set the `BLAZING_API_TOKEN` environment variable or use the `--token` option.
+- **"Invalid app path"**: The app path must be in format `module.path:attribute` (e.g., `myapp.main:app`).
+- **"Failed to import module"**: The specified module couldn't be imported. Check that the module exists and is in the Python path.
+- **"Module has no attribute"**: The specified attribute doesn't exist in the module.
+- **"Not a Blazing instance"**: The specified attribute is not a Blazing app instance.
+- **"Warning: No steps, routes, or services found to publish"**: The app has no decorated functions. Make sure you've used `@app.route`, `@app.step`, or `@app.service` decorators.
+
+### `blazing deploy`
+
+Deploy a Blazing app from a file or directory. This is a convenience alias for `blazing publish --app`.
+
+**Arguments:**
+
+| Argument | Type | Description |
+|----------|------|-------------|
+| `path` | Path | File or directory containing the Blazing app (must exist) |
+
+**Behavior:**
+
+- If `path` is a **file** (e.g., `myapp.py`): Converts to `myapp:app` and calls publish
+- If `path` is a **directory**: Assumes `__init__.py:app` and calls publish
+
+**Examples:**
+
+```bash
+# Deploy from a Python file
+blazing deploy myapp.py
+
+# Deploy from a directory
+blazing deploy ./myproject
+
+# Deploy from current directory
+blazing deploy .
+```
+
+## App Auto-Discovery
+
+When you run `blazing publish` without the `--app` option, the CLI automatically searches for a Blazing app instance in common locations.
+
+**Search Order:**
+
+The CLI checks the following locations in order:
+
+1. `main.py:app`
+2. `app.py:app`
+3. `__init__.py:app`
+4. `main.py:application`
+5. `app.py:application`
+
+**How It Works:**
+
+For each location, the CLI:
+1. Attempts to import the module
+2. Checks if the attribute exists
+3. Verifies it's a Blazing instance
+4. Uses the first match found
+
+**When to Use `--app`:**
+
+Use the `--app` option instead of auto-discovery when:
+
+- Your app is in a custom location (e.g., `src/myapp/server.py`)
+- Your app uses a different attribute name (e.g., `workflow`, `flow`)
+- You have multiple apps in the same directory
+- You're in a different directory than your app
+
+**Example:**
+
+```python
+# myapp/server.py
+from blazing import Blazing
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.step
+async def process_data(data: dict, services=None):
+    return {"processed": True}
+```
+
+```bash
+# Auto-discovery won't find this
+blazing publish  # ✗ No app found
+
+# Specify explicitly
+blazing publish --app myapp.server:app  # ✓ Works
+```
+
+## Common Workflows
+
+### First Deployment
+
+Deploy your Blazing app for the first time:
+
+```bash
+# 1. Set up credentials
+export BLAZING_API_URL="https://api.blazing.example.com"
+export BLAZING_API_TOKEN="your-token-here"
+
+# 2. Navigate to your project
+cd my-blazing-project
+
+# 3. Publish your app
+blazing publish
+
+# Expected output:
+# ✓ Discovered app: main:app
+# Publishing to https://api.blazing.example.com:
+#   • 5 step(s)
+#   • 3 workflow(s)
+#   • 2 service(s)
+# ✓ Published successfully!
+```
+
+### CI/CD Integration
+
+Use environment variables for automated deployments:
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy Blazing App
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install blazing
+          pip install -r requirements.txt
+
+      - name: Publish to Blazing
+        env:
+          BLAZING_API_URL: ${{ secrets.BLAZING_API_URL }}
+          BLAZING_API_TOKEN: ${{ secrets.BLAZING_API_TOKEN }}
+        run: blazing publish --app myapp.main:app
+```
+
+**Key Points:**
+
+- Store credentials in GitHub Secrets (never commit tokens to git)
+- Use `--app` to explicitly specify the app location
+- Environment variables are automatically picked up by the CLI
+
+### Development Workflow
+
+Iterative development and testing:
+
+```bash
+# 1. Make changes to your app
+vim main.py
+
+# 2. Test locally (if you have local Blazing setup)
+python -m pytest tests/
+
+# 3. Publish to development environment
+export BLAZING_API_URL="https://dev-api.blazing.example.com"
+blazing publish --verbose
+
+# 4. Test the deployed app
+# (call your workflows via client SDK or REST API)
+
+# 5. Publish to production when ready
+export BLAZING_API_URL="https://api.blazing.example.com"
+blazing publish
+```
+
+### Multi-App Projects
+
+Deploy multiple apps from the same codebase:
+
+```bash
+# Project structure:
+# myproject/
+#   ├── workflows/
+#   │   ├── data_pipeline.py  (contains 'pipeline' app)
+#   │   └── notifications.py  (contains 'notifier' app)
+
+# Deploy data pipeline
+blazing publish --app workflows.data_pipeline:pipeline
+
+# Deploy notifications
+blazing publish --app workflows.notifications:notifier
+```
+
+### Using Orchestrator URL
+
+Configure job routing with orchestrator URL:
+
+```bash
+# Set orchestrator URL for job routing
+export BLAZING_ORCHESTRATOR_URL="https://orchestrator.example.com"
+
+# Publish app (orchestrator URL is included)
+blazing publish
+
+# Or override via CLI
+blazing publish --orchestrator-url https://custom-orchestrator.example.com
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+**Issue: "No Blazing app found in current directory"**
+
+**Solution:**
+```bash
+# Option 1: Use --app to specify location
+blazing publish --app myapp.main:app
+
+# Option 2: Create app in standard location (main.py or app.py)
+# main.py
+from blazing import Blazing
+app = Blazing(api_url="...", api_token="...")
+```
+
+**Issue: "Blazing API URL not provided"**
+
+**Solution:**
+```bash
+# Option 1: Set environment variable
+export BLAZING_API_URL="https://api.blazing.example.com"
+blazing publish
+
+# Option 2: Use --url option
+blazing publish --url https://api.blazing.example.com
+```
+
+**Issue: "Blazing API token not provided"**
+
+**Solution:**
+```bash
+# Option 1: Set environment variable
+export BLAZING_API_TOKEN="your-token-here"
+blazing publish
+
+# Option 2: Use --token option
+blazing publish --token your-token-here
+
+# For CI/CD: Use secrets management
+# Never commit tokens to version control
+```
+
+**Issue: "Failed to import module"**
+
+**Solution:**
+```bash
+# Make sure you're in the correct directory
+cd /path/to/your/project
+
+# Make sure dependencies are installed
+pip install -r requirements.txt
+
+# Check Python path includes current directory
+python -c "import sys; print(sys.path)"
+
+# If module is in subdirectory, use full path
+blazing publish --app myproject.submodule.main:app
+```
+
+**Issue: "Module has no attribute 'app'"**
+
+**Solution:**
+```bash
+# Check what attributes exist in your module
+python -c "import main; print(dir(main))"
+
+# Use the correct attribute name
+blazing publish --app main:workflow  # if it's called 'workflow'
+blazing publish --app main:application  # if it's called 'application'
+```
+
+**Issue: "No steps, routes, or services found to publish"**
+
+**Solution:**
+```python
+# Make sure you're using decorators on your app instance
+from blazing import Blazing
+
+app = Blazing(api_url="...", api_token="...")
+
+# ✓ Correct: Decorate functions
+@app.step
+async def process(data: dict, services=None):
+    return data
+
+# ✗ Wrong: Plain function without decorator
+async def process(data: dict):
+    return data
+```
+
+### Debugging Tips
+
+**Enable verbose mode** to see detailed error information:
+
+```bash
+blazing publish --verbose
+```
+
+**Check your app can be imported** before publishing:
+
+```bash
+# Test import
+python -c "from myapp.main import app; print(app)"
+
+# Check app structure
+python -c "from myapp.main import app; print(f'Steps: {len(app._pending_steps)}, Workflows: {len(app._pending_workflows)}')"
+```
+
+**Verify environment variables** are set correctly:
+
+```bash
+# Print current values
+echo $BLAZING_API_URL
+echo $BLAZING_API_TOKEN
+echo $BLAZING_ORCHESTRATOR_URL
+
+# Test connection (if you have curl)
+curl -H "Authorization: Bearer $BLAZING_API_TOKEN" $BLAZING_API_URL/health
+```
+
+## Exit Codes
+
+The CLI uses standard exit codes:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success |
+| `1` | Error (authentication failed, publish failed, etc.) |
+
+**Example:**
+
+```bash
+# Capture exit code
+blazing publish
+echo $?  # 0 if successful, 1 if failed
+
+# Use in scripts
+if blazing publish; then
+    echo "Deployment successful"
+else
+    echo "Deployment failed"
+    exit 1
+fi
+```
+
+## Next Steps
+
+- **[Getting Started Guide](/blazing-flow/getting-started/flow-quick-start)**: Learn how to build your first Blazing app
+- **[Deployment Guide](/blazing-flow/deployment/flow-deployment)**: Production deployment strategies
+- **[Core Examples](/blazing-flow/core-examples)**: 30+ workflow patterns and use cases
+- **[API Reference](/blazing-flow/api-reference)**: Complete SDK documentation
+
+## Related Topics
+
+- **[Authentication](/blazing-flow/security/authentication)**: Managing API tokens and credentials
+- **[Environments](/blazing-flow/deployment/environments)**: Multi-environment deployment patterns
+- **[CI/CD Integration](/blazing-flow/deployment/cicd)**: Automated deployment workflows
