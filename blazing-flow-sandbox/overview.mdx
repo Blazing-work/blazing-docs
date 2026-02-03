@@ -158,10 +158,10 @@ Blazing Flow automatically manages 4 types of workers:
 ## Quick Example
 
 ```python
-from blazing import Blazing
-from blazing.base import BaseService
+from blazing import Blazing, BaseService
+import asyncio
 
-app = Blazing()  # Uses Blazing SaaS by default
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
 
 # YOUR CODE (trusted) - runs on regular workers
 @app.service
@@ -187,6 +187,14 @@ async def calculate(x: int, services=None):
 async def process(value: int, services=None):
     # Calls sandboxed step safely
     return await calculate(value, services=services)
+
+async def main():
+    await app.publish()
+    result = await app.process(5)
+    print(f"Result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **Result:**
