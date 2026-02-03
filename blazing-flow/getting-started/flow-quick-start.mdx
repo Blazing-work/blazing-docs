@@ -156,10 +156,6 @@ async def main():
     run = await app.data_pipeline("source_123")
     result = await run.result()
 
-    # 3. Using run() method (by name)
-    run = await app.run("data_pipeline", "source_123")
-    result = await run.result()
-
     print(f"Pipeline result: {result}")
 
 if __name__ == "__main__":

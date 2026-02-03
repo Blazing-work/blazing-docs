@@ -66,21 +66,21 @@ app = Blazing()
 
 # Define processing steps
 @app.step
-async def fetch_data(source_id: str):
+async def fetch_data(source_id: str, services=None):
     # Fetch from API or database
     return {"id": source_id, "data": [1, 2, 3]}
 
 @app.step
-async def transform_data(data: dict):
+async def transform_data(data: dict, services=None):
     # Transform the data
     total = sum(data["data"])
     return {"id": data["id"], "result": total}
 
 # Orchestrate the pipeline
 @app.workflow
-async def data_pipeline(source_id: str):
-    data = await fetch_data(source_id)
-    result = await transform_data(data)
+async def data_pipeline(source_id: str, services=None):
+    data = await fetch_data(source_id, services=services)
+    result = await transform_data(data, services=services)
     return result
 
 # Publish and run the app
@@ -95,10 +95,6 @@ async def main():
 
     # Option 2: Two-liner with RemoteRun handle (useful when you need the run object)
     run = await app.data_pipeline(source_id="123")
-    result = await run.result()
-
-    # Option 3: By name (useful for dynamic workflow names)
-    run = await app.run("data_pipeline", source_id="123")
     result = await run.result()
 
     print(result)  # {"id": "123", "result": 6}
@@ -276,8 +272,6 @@ app.publish()
 result = app.process_number(5)  # Returns result directly!
 print(result)  # 20
 
-# Or use run() by name
-result = app.run("process_number", 5)
 print(result)  # 20
 ```
 
