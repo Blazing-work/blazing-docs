@@ -155,30 +155,15 @@ blazing sandbox debug test-workflow \
 **Programmatic Debugging:**
 
 ```python
-from blazing.testing import SandboxDebugger
+import asyncio
 
 async def debug_workflow():
-    debugger = SandboxDebugger("my-sandbox")
-
-    # Set breakpoints
-    debugger.breakpoint("process_data")
-    debugger.breakpoint("send_notification")
-
-    # Start execution
-    execution = await debugger.run("test-workflow")
-
-    # Wait for breakpoint
-    await debugger.wait_for_break()
-
-    # Inspect state
-    state = debugger.get_state()
-    print(f"Current state: {state}")
-
-    # Modify variables
-    debugger.set_variable("retry_count", 5)
-
-    # Continue
-    await debugger.continue_execution()
+    """
+    Note: Programmatic debugging via SandboxDebugger is a conceptual
+    feature currently in development. Use CLI debug commands above
+    for interactive debugging.
+    """
+    pass
 ```
 
 ### 5. Performance Profiling
@@ -275,14 +260,19 @@ sandbox:
 
 ```python
 # mocks/api-handler.py
-from blazing.mocks import MockHandler
+from datetime import datetime
+from uuid import uuid4
 
-handler = MockHandler()
+"""
+Note: Mock handlers are a conceptual feature. Use the YAML-based
+mock configuration above or standard Python mocking libraries
+(unittest.mock) for testing.
+"""
 
-@handler.route("POST", "/api/users")
+# Example structure for mock handler concept
 async def create_user(request):
     """Mock user creation"""
-    user_data = request.json()
+    user_data = await request.json()
 
     return {
         "id": f"mock-{uuid4()}",
@@ -290,12 +280,11 @@ async def create_user(request):
         "created_at": datetime.now().isoformat()
     }, 201
 
-@handler.route("GET", "/api/users/:id")
-async def get_user(request, id):
+async def get_user(request, user_id):
     """Mock user retrieval"""
     return {
-        "id": id,
-        "email": f"user-{id}@example.com"
+        "id": user_id,
+        "email": f"user-{user_id}@example.com"
     }
 ```
 
@@ -444,23 +433,39 @@ blazing sandbox metrics export \
 **Custom Metrics:**
 
 ```python
-from blazing import Flow, metrics
+import asyncio
+import logging
+from blazing import Blazing
 
-flow = Flow(name="test-workflow")
+# Configure logging for metrics tracking
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-@flow.task
-async def process_data(data):
-    # Record custom metric
-    metrics.counter("data_processed").inc()
+app = Blazing(api_url="http://localhost:8000", api_token="your-token")
 
-    # Record timing
-    with metrics.timer("processing_time"):
-        result = await process(data)
+@app.step
+async def process_data(data, services=None):
+    """
+    Note: Built-in metrics collection is conceptual. Use standard
+    Python logging or integrate with Prometheus exporters for production.
+    """
+    # Log custom metric
+    logger.info("data_processed", extra={"count": 1})
 
-    # Record gauge
-    metrics.gauge("queue_size").set(len(queue))
+    # Process data
+    result = {"processed": data}
+
+    # Log queue size
+    logger.info("queue_size", extra={"size": 10})
 
     return result
+
+async def main():
+    result = await process_data({"test": "data"})
+    print(result)
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 **Visualization:**
