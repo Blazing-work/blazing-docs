@@ -285,25 +285,25 @@ fetched_df = await fetch_from_arrow(
 
 ## Monitoring
 
-Arrow Flight operations emit Prometheus metrics:
+Arrow Flight operations emit Prometheus metrics for observability:
 
 ```bash
-# Histogram of Arrow Flight operation duration
-blazing_arrow_operation_duration_seconds{operation="do_get"} 0.045
-blazing_arrow_operation_duration_seconds{operation="do_put"} 0.052
-
-# Counter of Arrow Flight errors
-blazing_arrow_errors_total{error_type="unavailable"} 3
-blazing_arrow_errors_total{error_type="timeout"} 1
-
-# Gauge of active Arrow Flight connections
-blazing_arrow_active_connections{endpoint="localhost:8815"} 4
+# Histogram of Arrow Flight operation duration (in seconds)
+blazing_arrow_operation_duration_seconds{operation="do_get",app_id="my_app"} 0.045
+blazing_arrow_operation_duration_seconds{operation="do_put",app_id="my_app"} 0.052
 ```
 
-**Key Metrics to Monitor:**
-- **Operation duration** - Should stay <100ms for typical datasets
-- **Error rate** - Should be <0.1% in healthy deployments
-- **Active connections** - Should match configured pool size under load
+**Key Metrics:**
+- **`blazing_arrow_operation_duration_seconds`** - Histogram tracking Arrow Flight operation latency
+  - Labels: `operation` (do_get/do_put), `app_id` (tenant identifier)
+  - Buckets: 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
+  - **Target:** P95 latency <100ms for typical datasets (<10MB)
+
+**Monitoring Best Practices:**
+- Track P95/P99 latency trends to detect performance degradation
+- Alert on P95 >500ms for sustained periods (indicates connection pool exhaustion or network issues)
+- Monitor operation count by app_id to identify data-heavy tenants
+- Correlate with AIMD autoscaling metrics to understand worker load patterns
 
 ## Next Steps
 
