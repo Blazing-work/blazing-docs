@@ -1,43 +1,23 @@
 ---
-title: Services & Custom Connectors
+title: Services & Connectors
 label: Services & Connectors
-description: Build custom services and use built-in connectors for database, API, and infrastructure access
+description: Encapsulate business logic and access external systems
 position: 2
 ---
 
-# Services & Custom Connectors
-
-Services are the primary way to encapsulate business logic and access external resources (databases, APIs, storage) in Blazing Flow.
+Services are the primary way to organize business logic and interact with external resources in Blazing Flow.
 
 ## What Are Services?
 
-**Services** are classes that:
-1. Extend `BaseService`
-2. Are registered with `@app.service`
-3. Get serialized and sent to the server
-4. Execute in isolated executor sandboxes
-5. Are injected into steps via the `services` parameter
+A **service** is a class that:
 
-**Connectors** are the infrastructure layer:
-- Provide access to databases, caches, APIs, secrets
-- Manage connection pooling and lifecycle
-- Are passed to services during initialization
+- Extends `BaseService`
+- Is registered with `@app.service`
+- Is injected into steps and workflows via the `services` parameter
 
-## Why Use Services?
-
-Services solve several key problems:
-
-**Encapsulation**: Business logic lives in services, not scattered across steps
-**Reusability**: Multiple steps can use the same service
-**Testability**: Services can be unit tested independently
-**Security**: Connectors manage credentials, not user code
-**Separation of Concerns**: Steps focus on workflow orchestration, services handle data access
+Services help you keep steps focused on orchestration while centralizing data access, credentials, and domain logic.
 
 ## Service Basics
-
-### The @app.service Decorator
-
-Register a service with `@app.service`:
 
 ```python
 from blazing.base import BaseService
@@ -46,604 +26,68 @@ from blazing.base import BaseService
 class MathService(BaseService):
     async def add(self, a: float, b: float) -> float:
         return a + b
-
-    async def multiply(self, a: float, b: float) -> float:
-        return a * b
 ```
 
-### Service Lifecycle
-
-```
-1. Registration    → @app.service decorator marks class
-2. Serialization   → app.publish() sends to server
-3. Initialization  → Executor creates instance with connectors
-4. Injection       → Steps receive via services['ServiceName']
-5. Caching         → Instances are cached per executor until reload or worker restart
-```
-
-### Using Services in Steps
-
-Services are injected via the `services` parameter:
+Use a service inside a step:
 
 ```python
 @app.step
 async def calculate(x: float, y: float, services=None):
-    """Services are injected automatically."""
-    sum_result = await services['MathService'].add(x, y)
-    product_result = await services['MathService'].multiply(x, y)
-    return {"sum": sum_result, "product": product_result}
+    return await services["MathService"].add(x, y)
 ```
 
-**Key Pattern**: `services['ServiceName'].method_name(args)`
+## Connectors
 
-## Built-in Connectors
+Connectors provide access to external systems. They are injected into services during initialization.
 
-Blazing provides several built-in connectors for common infrastructure needs.
+Common connectors include:
 
-### Available Connectors
+- `secrets` for credentials
+- `dict` for shared key‑value storage
+- `queue` for distributed queues
+- `volume` for persistent files
+- `bucket_mount` for object storage
+- `llm` for LLM providers
+- `gpu` for GPU‑aware workloads
+- `scheduler` for scheduled execution patterns
 
-| Connector | Purpose | Example Use |
-|-----------|---------|-------------|
-| `secrets` | Encrypted secrets | API keys, credentials |
-| `dict` | Distributed key-value | Caching, shared state |
-| `queue` | Distributed queue | Work scheduling, buffering |
-| `volume` | Persistent filesystem | Model weights, artifacts |
-| `bucket_mount` | S3-compatible bucket mount | Object storage I/O |
-| `llm` | LLM providers/emulator | OpenAI/Anthropic, local mock |
-| `web_search` | Web search APIs | SerpAPI, Tavily, Brave |
-| `database` | SQL database access | Postgres/MySQL/SQLite |
-| `code_execution` | Isolated code execution | Run Python in Pyodide |
-| `rest` | Authenticated REST client | Third-party APIs |
-
-### Accessing Connectors in Services
-
-Connectors are passed to services during initialization:
+### Accessing Connectors
 
 ```python
 from blazing.base import BaseService
 
 @app.service
-class UserDatabase(BaseService):
+class UserStore(BaseService):
     def __init__(self, connectors):
-        # Get the database connector
-        self._db = connectors.get('database')
-        # Get the dict connector
-        self._cache = connectors.get('dict')
+        self._cache = connectors.get("dict")
+        self._secrets = connectors.get("secrets")
 
     async def get_user(self, user_id: int) -> dict:
-        # Try cache first
         cached = await self._cache.get(f"user:{user_id}")
         if cached:
-            return json.loads(cached)
-
-        # Fetch from database
-        from sqlalchemy import text
-        query = text("SELECT id, name, email FROM users WHERE id = :id")
-        result = await self._db.execute(query, {"id": user_id})
-        row = result.fetchone()
-
-        user = {"id": row[0], "name": row[1], "email": row[2]}
-
-        # Cache for 1 hour
-        await self._cache.set(f"user:{user_id}", json.dumps(user), ex=3600)
-        return user
+            return cached
+        return {"id": user_id}
 ```
 
-### Pure Compute Services (No Connectors)
+## Custom Connectors
 
-Services that don't need external resources can omit the `connectors` parameter:
+You can implement a custom connector by extending `BaseConnector` and registering it with your app. This is useful when you have a specialized service or need custom authentication logic.
 
 ```python
-@app.service
-class MathService(BaseService):
-    # No __init__ needed - no connectors required
+from blazing.base import BaseConnector
 
-    async def fibonacci(self, n: int) -> int:
-        """Pure computation - no external dependencies."""
-        if n <= 1:
-            return n
-        a, b = 0, 1
-        for _ in range(2, n + 1):
-            a, b = b, a + b
-        return b
+class MyAPIConnector(BaseConnector):
+    async def get(self, path: str) -> dict:
+        return {"path": path}
 ```
 
-## Creating Custom Services
-
-### Example: Cloud Bucket Mount
-
-```python
-from blazing.base import BaseService
-
-@app.service
-class DatasetService(BaseService):
-    def __init__(self, connectors):
-        self.bucket = connectors.get("bucket_mount")
-
-    async def list_inputs(self):
-        return await self.bucket.list_objects(prefix="inputs/")
-```
-
-### Example 1: Database Service with CRUD Operations
-
-```python
-from blazing.base import BaseService
-from sqlalchemy import text
-
-@app.service
-class UserDatabase(BaseService):
-    def __init__(self, connectors):
-        self._db = connectors.get('postgres')
-
-    async def get_user(self, user_id: int) -> dict:
-        """Fetch user by ID."""
-        query = text("SELECT id, name, email FROM users WHERE id = :id")
-        result = await self._db.execute(query, {"id": user_id})
-        row = result.fetchone()
-        return {"id": row[0], "name": row[1], "email": row[2]}
-
-    async def create_user(self, name: str, email: str) -> int:
-        """Create new user."""
-        query = text("INSERT INTO users (name, email) VALUES (:name, :email) RETURNING id")
-        result = await self._db.execute(query, {"name": name, "email": email})
-        return result.fetchone()[0]
-
-    async def update_user(self, user_id: int, name: str = None, email: str = None) -> dict:
-        """Update user fields."""
-        updates = []
-        params = {"id": user_id}
-
-        if name:
-            updates.append("name = :name")
-            params["name"] = name
-        if email:
-            updates.append("email = :email")
-            params["email"] = email
-
-        if not updates:
-            return await self.get_user(user_id)
-
-        query = text(f"UPDATE users SET {', '.join(updates)} WHERE id = :id RETURNING id, name, email")
-        result = await self._db.execute(query, params)
-        row = result.fetchone()
-        return {"id": row[0], "name": row[1], "email": row[2]}
-
-    async def delete_user(self, user_id: int) -> bool:
-        """Delete user."""
-        query = text("DELETE FROM users WHERE id = :id")
-        await self._db.execute(query, {"id": user_id})
-        return True
-
-@app.step
-async def register_user(name: str, email: str, services=None):
-    """Register new user (uses database service)."""
-    user_id = await services['UserDatabase'].create_user(name, email)
-    return {"user_id": user_id, "name": name, "email": email}
-```
-
-### Example 2: External API Service
-
-```python
-import httpx
-from blazing.base import BaseService
-
-@app.service
-class WeatherAPI(BaseService):
-    def __init__(self, connectors):
-        # Get API key from secrets connector
-        self._api_key = connectors.get('weather_api_key')
-        self._base_url = "https://api.weather.com/v1"
-
-    async def get_weather(self, city: str) -> dict:
-        """Fetch weather for city."""
-        # Input validation
-        if not city or len(city) > 100:
-            raise ValueError("Invalid city name")
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self._base_url}/current",
-                params={"city": city},
-                headers={"Authorization": f"Bearer {self._api_key}"}
-            )
-            response.raise_for_status()
-            return response.json()
-
-    async def get_forecast(self, city: str, days: int = 7) -> list:
-        """Fetch weather forecast."""
-        if days < 1 or days > 14:
-            raise ValueError("Days must be between 1 and 14")
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self._base_url}/forecast",
-                params={"city": city, "days": days},
-                headers={"Authorization": f"Bearer {self._api_key}"}
-            )
-            response.raise_for_status()
-            return response.json()['forecast']
-
-@app.step
-async def check_weather(city: str, services=None):
-    """Check weather for city."""
-    weather = await services['WeatherAPI'].get_weather(city)
-    return {
-        "city": city,
-        "temperature": weather['temp'],
-        "conditions": weather['conditions']
-    }
-```
-
-### Example 3: Cache Service
-
-```python
-import redis.asyncio as redis
-from blazing.base import BaseService
-
-@app.service
-class CacheService(BaseService):
-    def __init__(self, connectors):
-        self._redis = connectors.get('redis')
-
-    async def get(self, key: str) -> str:
-        """Get value from cache."""
-        value = await self._redis.get(key)
-        return value.decode() if value else None
-
-    async def set(self, key: str, value: str, ttl: int = 3600):
-        """Set value in cache with TTL."""
-        await self._redis.set(key, value, ex=ttl)
-
-    async def delete(self, key: str):
-        """Delete key from cache."""
-        await self._redis.delete(key)
-
-    async def exists(self, key: str) -> bool:
-        """Check if key exists."""
-        return bool(await self._redis.exists(key))
-
-@app.step
-async def cached_lookup(key: str, services=None):
-    """Lookup value with caching."""
-    cached = await services['CacheService'].get(key)
-    if cached:
-        return {"source": "cache", "value": cached}
-
-    # Simulate expensive operation
-    value = f"computed_value_for_{key}"
-    await services['CacheService'].set(key, value)
-    return {"source": "computed", "value": value}
-```
-
-### Example 4: Email Service
-
-```python
-from blazing.base import BaseService
-
-@app.service
-class EmailService(BaseService):
-    def __init__(self, connectors):
-        self._smtp = connectors.get('smtp')
-
-    async def send(self, to: str, subject: str, body: str):
-        """Send email."""
-        message = {
-            "to": to,
-            "subject": subject,
-            "body": body
-        }
-        await self._smtp.send(message)
-        return {"sent": True, "to": to}
-
-    async def send_template(self, to: str, template_name: str, variables: dict):
-        """Send templated email."""
-        # Fetch template from database or storage
-        template = self._load_template(template_name)
-        body = template.format(**variables)
-        return await self.send(to, template.subject, body)
-
-    def _load_template(self, name: str):
-        """Private helper - not exposed to user code."""
-        # Template loading logic
-        pass
-
-@app.workflow
-async def send_welcome_email(user_email: str, user_name: str, services=None):
-    """Send welcome email to new user."""
-    subject = f"Welcome, {user_name}!"
-    body = f"Hello {user_name},\n\nWelcome to our platform!"
-    result = await services['EmailService'].send(user_email, subject, body)
-    return result
-```
-
-> **Example:** See the complete [Custom Service example](/docs/custom_service) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/05_integrations/custom_service).
-
-## Connection Pooling
-
-Connectors automatically manage connection pools to optimize performance and resource usage.
-
-### How Connection Pooling Works
-
-```
-┌─────────────────────────────────────────┐
-│ Service Instance                        │
-│                                         │
-│ self._db = connectors.get('postgres')  │
-└────────────────┬────────────────────────┘
-                 │
-                 ↓
-┌─────────────────────────────────────────┐
-│ PostgreSQL Connector                    │
-│                                         │
-│ ┌─────────────────────────────────────┐ │
-│ │ Connection Pool                     │ │
-│ │ • min_size: 2                       │ │
-│ │ • max_size: 10                      │ │
-│ │ • idle_timeout: 300s                │ │
-│ │                                     │ │
-│ │ [conn1] [conn2] [conn3] ... [conn10]│ │
-│ └─────────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-```
-
-### Pool Configuration
-
-Each connector type has default pool settings that can be customized:
-
-**PostgreSQL**:
-- `min_size`: 2 (connections kept alive)
-- `max_size`: 10 (maximum concurrent connections)
-- `idle_timeout`: 300s (close idle connections after 5 minutes)
-
-**Redis**:
-- `max_connections`: 50
-- `socket_keepalive`: True
-- `socket_timeout`: 30s
-
-### Connection Lifecycle
-
-```python
-# 1. Connection is acquired from pool (or created if pool not full)
-result = await self._db.execute(query)
-
-# 2. Connection is automatically returned to pool after operation
-# (handled by connector, not your code)
-
-# 3. Idle connections are closed after timeout
-# (automatic cleanup by connector)
-
-# 4. Pool is destroyed when service instance is cleaned up
-# (automatic at end of execution)
-```
-
-### Best Practices for Connection Pooling
-
-**DO**:
-- Let connectors manage the pool (don't create your own connections)
-- Keep operations short to avoid holding connections
-- Use async/await properly to avoid blocking
-
-**DON'T**:
-- Store connection objects in service state
-- Keep transactions open longer than necessary
-- Create custom connection pools in services
-
-## Service Injection Pattern
-
-### How Injection Works
-
-When a step declares `services=None`, the executor injects a dictionary of all registered services:
-
-```python
-@app.step
-async def my_step(arg1: str, arg2: int, services=None):
-    # services = {
-    #     'UserDatabase': <UserDatabase instance>,
-    #     'WeatherAPI': <WeatherAPI instance>,
-    #     'CacheService': <CacheService instance>,
-    #     ...
-    # }
-    pass
-```
-
-### Accessing Services
-
-Use dictionary access with the service class name:
-
-```python
-@app.step
-async def multi_service_step(user_id: int, services=None):
-    # Access by class name
-    user = await services['UserDatabase'].get_user(user_id)
-
-    # Cache the result
-    await services['CacheService'].set(f"user:{user_id}", json.dumps(user))
-
-    # Send notification
-    await services['EmailService'].send(
-        to=user['email'],
-        subject="Account Updated",
-        body="Your account was accessed."
-    )
-
-    return user
-```
-
-### Type Hints for Services
-
-For better IDE support and type checking:
-
-```python
-from typing import Optional, Dict, Any
-
-@app.step
-async def typed_step(user_id: int, services: Optional[Dict[str, Any]] = None):
-    """Type hint services as Optional[Dict[str, Any]]."""
-    if services is None:
-        raise RuntimeError("Services not injected")
-
-    user = await services['UserDatabase'].get_user(user_id)
-    return user
-```
-
-## Testing Services
-
-### Unit Testing Service Methods
-
-Services can be unit tested independently by mocking connectors:
-
-```python
-import pytest
-from unittest.mock import AsyncMock, MagicMock
-
-@pytest.mark.asyncio
-async def test_user_database_get_user():
-    # Create mock connector
-    mock_db = AsyncMock()
-    mock_result = MagicMock()
-    mock_result.fetchone.return_value = (123, "Alice", "alice@example.com")
-    mock_db.execute.return_value = mock_result
-
-    # Create service with mock
-    connectors = {'postgres': mock_db}
-    service = UserDatabase(connectors)
-
-    # Test method
-    user = await service.get_user(123)
-
-    assert user['id'] == 123
-    assert user['name'] == "Alice"
-    assert user['email'] == "alice@example.com"
-
-    # Verify database was called correctly
-    mock_db.execute.assert_called_once()
-
-@pytest.mark.asyncio
-async def test_weather_api_get_weather():
-    # Mock API key
-    mock_api_key = "test_key_12345"
-    connectors = {'weather_api_key': mock_api_key}
-
-    # Create service
-    service = WeatherAPI(connectors)
-
-    # Mock httpx client (requires more complex mocking)
-    # ... mock setup ...
-
-    # Test method
-    weather = await service.get_weather("San Francisco")
-    assert 'temp' in weather
-    assert 'conditions' in weather
-```
-
-### Integration Testing with Real Connectors
-
-For integration tests, use real connector instances:
-
-```python
-import pytest
-from sqlalchemy import create_engine, text
-
-@pytest.mark.asyncio
-async def test_user_database_integration():
-    # Create test database
-    engine = create_engine("postgresql://test:test@localhost/testdb")
-
-    # Create connectors dict
-    connectors = {'postgres': engine}
-
-    # Create service
-    service = UserDatabase(connectors)
-
-    # Test create and retrieve
-    user_id = await service.create_user("Bob", "bob@example.com")
-    user = await service.get_user(user_id)
-
-    assert user['name'] == "Bob"
-    assert user['email'] == "bob@example.com"
-
-    # Cleanup
-    await service.delete_user(user_id)
-```
-
-## Advanced Patterns
-
-### Service Composition
-
-Services can use other services (but this requires manual instantiation, not injection):
-
-```python
-@app.service
-class NotificationService(BaseService):
-    def __init__(self, connectors):
-        # Create email service manually
-        self._email = EmailService(connectors)
-        self._sms = connectors.get('sms')
-
-    async def notify_user(self, user_id: int, message: str):
-        """Send notification via email and SMS."""
-        # Get user (would need database connector)
-        user = await self._get_user(user_id)
-
-        # Send email
-        await self._email.send(
-            to=user['email'],
-            subject="Notification",
-            body=message
-        )
-
-        # Send SMS
-        await self._sms.send(phone=user['phone'], text=message)
-```
-
-### Async Initialization
-
-Services can perform async initialization using the `_async_init` hook:
-
-```python
-@app.service
-class DataService(BaseService):
-    def __init__(self, connectors):
-        self._db = connectors.get('postgres')
-        self._cache = None
-
-    async def _async_init(self):
-        """Called automatically after __init__."""
-        # Pre-load cache
-        self._cache = await self._load_cache()
-
-    async def _load_cache(self):
-        """Load reference data into memory."""
-        query = text("SELECT id, name FROM reference_data")
-        result = await self._db.execute(query)
-        return {row[0]: row[1] for row in result.fetchall()}
-```
-
-### Private Methods
-
-Use underscore prefix for methods that shouldn't be exposed to user code:
-
-```python
-@app.service
-class SecureService(BaseService):
-    async def public_method(self, data: dict) -> dict:
-        """User can call this."""
-        validated = self._validate(data)
-        return self._process(validated)
-
-    def _validate(self, data: dict) -> dict:
-        """Private - user CANNOT call this."""
-        if 'required_field' not in data:
-            raise ValueError("Missing required_field")
-        return data
-
-    def _process(self, data: dict) -> dict:
-        """Private - user CANNOT call this."""
-        return {k.upper(): v for k, v in data.items()}
-```
+## Best Practices
+
+- Keep external I/O in services, not in steps.
+- Use services to centralize retries and validation.
+- Keep service methods small and composable.
 
 ## Next Steps
 
-- **[Core Examples](/blazing-flow/core-examples#services)** - See more service examples
-- **[Sandbox Services](/blazing-flow-sandbox/services)** - Service bridge pattern for sandboxed execution
-- **[Middleware](/blazing-flow/endpoints/middleware)** - Integrate services with HTTP endpoints
+- [Workers Overview](/docs/workers)
+- [Configuration](/docs/flow-configuration)

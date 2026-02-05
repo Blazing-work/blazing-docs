@@ -9,7 +9,7 @@ position: 1
 
 **Turn your Blazing Flow workflows into production-ready REST APIs in 3 lines of code.**
 
-Blazing Flow Endpoints wraps your internal workflows with a public-facing FastAPI layer, giving you:
+Blazing Flow Endpoints wraps your workflows with a FastAPI layer, giving you:
 
 - 🚀 Auto-generated HTTP/WebSocket endpoints
 - 🔒 Custom authentication
@@ -37,8 +37,8 @@ async def calculate(x: int, y: int, services=None):
 
 ```
 ┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
-│  External       │  HTTP   │  FastAPI Layer   │  gRPC   │  Blazing Flow   │
-│  Client         │ ──────> │  (Public)        │ ──────> │  Backend (VPC)  │
+│  External       │  HTTP   │  FastAPI Layer   │  HTTP   │  Blazing Flow   │
+│  Client         │ ──────> │  (Public)        │ ──────> │  Runtime        │
 │                 │         │  @app.endpoint   │         │                 │
 └─────────────────┘         └──────────────────┘         └─────────────────┘
 ```

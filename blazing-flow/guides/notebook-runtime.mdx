@@ -1,17 +1,13 @@
 ---
 title: Notebook Runtime
 label: Notebook Runtime
-description: Run Jupyter notebook sessions on the Blazing Pyodide runtime with checkpointing
+description: Run Jupyter notebook sessions on the Blazing runtime with checkpointing
 position: 1
 ---
 
-# Notebook Runtime
+Blazing provides a Jupyter kernel that proxies notebook cells to an isolated runtime with optional checkpointing.
 
-Blazing provides a Jupyter kernel that proxies notebook cells to a Pyodide-based
-runtime with isolated Python namespaces and checkpointing.
-
-This is a runtime layer, not a hosted notebook UI. You run Jupyter locally or
-in your own environment and connect using the Blazing kernel.
+This is a runtime layer, not a hosted notebook UI. You run Jupyter locally or in your own environment and connect using the Blazing kernel.
 
 ## Install the Kernel
 
@@ -24,36 +20,14 @@ In Jupyter, select **“Blazing Flow Sandbox”** as the kernel.
 ## Session Model
 
 Each notebook session has:
+
 - An isolated Python namespace
 - Cell execution and history
-- Optional checkpointing to Redis
+- Optional checkpointing to resume work
 
 ## Checkpointing
 
-Notebook sessions are checkpointed automatically and can be restored:
-
-- Checkpoints are stored in Redis
-- Max checkpoint size is enforced
-- Checkpoints expire after a TTL
-
-You can also trigger checkpoints via the API:
-
-```
-POST /v1/notebook/session/{session_id}/checkpoint
-GET  /v1/notebook/session/{session_id}/checkpoint
-GET  /v1/notebook/sessions
-```
-
-## API Endpoints (Coordinator)
-
-The coordinator exposes these endpoints:
-
-- `POST /v1/notebook/session` — create session
-- `POST /v1/notebook/session/{id}/execute` — execute code
-- `POST /v1/notebook/session/{id}/interrupt` — interrupt execution
-- `POST /v1/notebook/session/{id}/complete` — completions
-- `GET /v1/notebook/session/{id}` — session info
-- `DELETE /v1/notebook/session/{id}` — delete session
+Checkpointing lets you restore a session after disconnects or restarts. The runtime manages checkpoint storage and retention for you.
 
 ## Environment Notes
 
@@ -65,6 +39,7 @@ The coordinator exposes these endpoints:
 ## When to Use
 
 Use the notebook runtime for:
+
 - Interactive exploration with isolated execution
 - Rapid prototyping of Flow steps
 - Debugging logic that will later run in trusted executors

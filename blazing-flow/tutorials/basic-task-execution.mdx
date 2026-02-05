@@ -1,235 +1,43 @@
 ---
 title: Basic Task Execution
-label: Basic Task Execution
-description: Create and execute your first workflow with Blazing Flow
-position: 0
+label: Basic Execution
+description: Run your first workflow and retrieve results
+position: 1
 ---
 
-Learn how to create and execute workflows using Blazing Flow's decorator-based API.
+This tutorial shows the minimal workflow execution loop.
 
-## Prerequisites
-
-- Blazing Flow Python SDK installed (`pip install blazing`)
-- Python 3.8 or higher
-- Basic understanding of async/await in Python
-
-## Quick Start
-
-### 1. Initialize the App
+## 1. Define a Step and Workflow
 
 ```python
-from blazing import Blazing
 import asyncio
-
-async def main():
-    app = Blazing()  # Uses Blazing SaaS by default
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### 2. Define a Step
-
-Steps are the building blocks of workflows. Each step is a unit of computation.
-
-```python
 from blazing import Blazing
-import asyncio
 
 async def main():
     app = Blazing()
 
     @app.step
-    async def double(x: int, services=None):
-        """Double a number."""
-        return x * 2
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-**Key points:**
-- Use `@app.step` decorator
-- Function must be `async def`
-- Must accept `services=None` parameter for dependency injection
-
-### 3. Create a Workflow
-
-Workflows orchestrate multiple steps together.
-
-```python
-from blazing import Blazing
-import asyncio
-
-async def main():
-    app = Blazing()
-
-    @app.step
-    async def double(x: int, services=None):
-        """Double a number."""
-        return x * 2
-
-    @app.step
-    async def add_ten(x: int, services=None):
-        """Add 10 to a number."""
-        return x + 10
+    async def add(x: int, y: int, services=None):
+        return x + y
 
     @app.workflow
-    async def process_number(x: int, services=None):
-        """Workflow: double then add 10."""
-        doubled = await double(x, services=services)
-        result = await add_ten(doubled, services=services)
-        return result
+    async def add_flow(x: int, y: int, services=None):
+        return await add(x, y, services=services)
 
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-**Key points:**
-- Use `@app.workflow` decorator for orchestration
-- Call steps with `await` and forward `services` parameter
-- Steps execute in the order you call them
-
-### 4. Publish and Execute
-
-```python
-from blazing import Blazing
-import asyncio
-
-async def main():
-    app = Blazing()
-
-    @app.step
-    async def double(x: int, services=None):
-        return x * 2
-
-    @app.step
-    async def add_ten(x: int, services=None):
-        return x + 10
-
-    @app.workflow
-    async def process_number(x: int, services=None):
-        doubled = await double(x, services=services)
-        result = await add_ten(doubled, services=services)
-        return result
-
-    # Publish workflow to Blazing
     await app.publish()
 
-    # Execute and wait for result
-    result = await app.process_number(5).wait_result()
-    print(f"Result: {result}")  # Result: 20
+    result = await app.add_flow(2, 3).wait_result()
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## Complete Example
+## 2. Return Types
 
-Here's a complete working example:
+Return JSON‑serializable values: dicts, lists, strings, numbers, and booleans.
 
-```python
-import asyncio
-from blazing import Blazing
+## 3. Next Steps
 
-async def main():
-    # Initialize app
-    app = Blazing()
-
-    # Define steps
-    @app.step
-    async def fetch_data(symbol: str, services=None):
-        """Simulate fetching stock data."""
-        return {"symbol": symbol, "price": 150.25}
-
-    @app.step
-    async def calculate_value(data: dict, shares: int, services=None):
-        """Calculate total value."""
-        return data["price"] * shares
-
-    # Define workflow
-    @app.workflow
-    async def portfolio_value(symbol: str, shares: int, services=None):
-        """Calculate portfolio value for a stock."""
-        data = await fetch_data(symbol, services=services)
-        value = await calculate_value(data, shares, services=services)
-        return {
-            "symbol": symbol,
-            "shares": shares,
-            "value": value
-        }
-
-    # Publish workflow
-    await app.publish()
-
-    # Execute workflow
-    result = await app.portfolio_value("AAPL", 100).wait_result()
-    print(f"Portfolio: {result['symbol']}")
-    print(f"Shares: {result['shares']}")
-    print(f"Total Value: ${result['value']:.2f}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-**Output:**
-```
-Portfolio: AAPL
-Shares: 100
-Total Value: $15025.00
-```
-
-## Key Concepts
-
-### Steps vs Workflows
-
-| Aspect | Step | Workflow |
-|--------|------|----------|
-| Purpose | Single unit of work | Orchestrate multiple steps |
-| Decorator | `@app.step` | `@app.workflow` |
-| Calls other steps | No | Yes |
-| Callable from | Workflows only | External code or other workflows |
-
-### Services Parameter
-
-All steps and workflows must accept `services=None`:
-
-```python
-@app.step
-async def my_step(x: int, services=None):
-    # Access injected services if needed
-    if services and services.connectors:
-        db = services.connectors.postgres
-        # Use database...
-    return x * 2
-```
-
-The `services` parameter enables:
-- Database connector injection
-- External service access
-- Testing with mocked services
-
-### Execution Methods
-
-```python
-# wait_result() - Wait for completion and get result
-result = await app.my_workflow(5).wait_result()
-
-# wait() - Wait for completion without getting result
-await app.my_workflow(5).wait()
-
-# Direct call (for testing/development)
-result = await my_workflow(5, services=None)
-```
-
-## Next Steps
-
-- [Parallel Execution](/docs/tutorials/parallel-execution) - Run multiple workflows concurrently
-- [Error Handling](/docs/tutorials/error-handling) - Handle failures gracefully
-- [Service Injection](/docs/services/overview) - Use database connectors and external services
-
-## Related
-
-- [PATTERNS.md](https://github.com/digitalfrontier/blazing/blob/main/docs/examples/PATTERNS.md) - Canonical pattern reference
-- [Workflows Overview](/docs/workflows/overview) - Deep dive into workflow patterns
-- [Steps Reference](/docs/steps/overview) - Complete step documentation
+- [Error Handling](/docs/tutorials/error-handling)
+- [Parallel Execution](/docs/tutorials/parallel-execution)

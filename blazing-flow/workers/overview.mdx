@@ -1,478 +1,82 @@
 ---
-title: Worker Types & Configuration
+title: Workers
 label: Workers
-description: Understanding the 4 worker types, warm pools, and worker selection
+description: How Blazing Flow runs trusted and sandboxed code
 position: 6
 ---
 
-# Worker Types & Configuration
+Blazing Flow runs your code on two execution pools:
 
-Blazing uses **4 worker types** to separate trusted code (your services with full system access) from sandboxed code (user-provided functions running in WASM isolation).
+- **Trusted workers** for your services and infrastructure‑level logic.
+- **Sandboxed workers** for untrusted or user‑provided code.
 
-## Overview
+You do not need to pick worker types manually. Blazing routes work based on how you define the step or workflow.
 
-Workers are the execution units that process your steps and workflows. Blazing automatically routes operations to the correct worker type based on:
+## Trusted Workers
 
-1. **Trust level**: Trusted (your code) vs Sandboxed (user code)
-2. **Execution mode**: Blocking (sync) vs Non-blocking (async)
+Trusted workers run your code with full access to connectors and external systems.
 
-## The 4 Worker Types
+Use trusted workers for:
 
-```
-┌──────────────────┬──────────────────┬──────────────────────┐
-│                  │  BLOCKING (Sync) │  NON_BLOCKING (Async)│
-├──────────────────┼──────────────────┼──────────────────────┤
-│ TRUSTED          │  BLOCKING        │  NON_BLOCKING        │
-│ (Your code)      │                  │                      │
-│ Has connectors   │  Sync operations │  Async operations    │
-│ Real credentials │  Database calls  │  API calls           │
-│ Native Python    │  File I/O        │  Concurrent work     │
-├──────────────────┼──────────────────┼──────────────────────┤
-│ SANDBOXED        │  BLOCKING_       │  NON_BLOCKING_       │
-│ (User code)      │  SANDBOXED       │  SANDBOXED           │
-│ NO connectors    │                  │                      │
-│ NO credentials   │  Sync in WASM    │  Async in WASM       │
-│ WASM (Pyodide)   │  Pure Python     │  Service calls       │
-└──────────────────┴──────────────────┴──────────────────────┘
-```
+- Service classes that access databases, APIs, and third‑party systems.
+- Workflow orchestration logic.
+- Anything that requires network or filesystem access.
 
-### BLOCKING (Trusted, Sync)
+Example service:
 
-**Purpose:** Synchronous operations with full system access.
-
-**Queue Pattern:** `blazing:*:workflow_definition:Step:*:BlockingQueue:*`
-
-**Executor:** Docker executor (full Python runtime)
-
-**Use Cases:**
-- Synchronous database queries
-- Blocking file I/O operations
-- Legacy sync libraries
-- Single-threaded operations
-
-**Capabilities:**
-- Processes `SERVICE_INVOKE` queue (service method calls)
-- Processes `BLOCKING` queue (blocking steps)
-- 1 thread per worker (handles 1 operation at a time)
-
-**Example:**
 ```python
 from blazing.base import BaseService
 
 @app.service
 class DatabaseService(BaseService):
     def __init__(self, connectors):
-        self._db = connectors.get('postgres')
+        self._db = connectors.get("postgres")
 
     async def fetch_user(self, user_id: int) -> dict:
-        # Runs on BLOCKING worker
-        # Sync database call blocks the thread
-        result = self._db.execute(f"SELECT * FROM users WHERE id = {user_id}")
-        return dict(result.fetchone())
+        row = await self._db.fetch_one("SELECT * FROM users WHERE id = :id", {"id": user_id})
+        return dict(row)
 ```
 
----
+## Sandboxed Workers
 
-### NON_BLOCKING (Trusted, Async)
+Sandboxed workers run untrusted code in a restricted environment. They are designed for user‑submitted logic or code you do not fully trust.
 
-**Purpose:** Asynchronous operations with full system access.
+Use sandboxed workers for:
 
-**Queue Pattern:** `blazing:*:workflow_definition:Step:*:Queue:*`
+- User‑provided transformations.
+- Custom business rules defined by end users.
+- Multi‑tenant workloads where isolation is required.
 
-**Executor:** Docker executor (full Python runtime)
+Example sandboxed step:
 
-**Use Cases:**
-- Async HTTP requests (httpx, aiohttp)
-- Async database queries (asyncpg)
-- Concurrent API calls
-- Workflow orchestration
-
-**Capabilities:**
-- Processes `SERVICE_INVOKE` queue (service method calls)
-- Processes `NON-BLOCKING` queue (async steps)
-- Processes `ROUTE` queue (workflows)
-- N concurrent slots per worker (default: 3-8 slots)
-
-**Example:**
 ```python
-import httpx
-from blazing.base import BaseService
-
-@app.service
-class ExternalAPI(BaseService):
-    def __init__(self, connectors):
-        self._api_key = connectors.get('api_key')
-
-    async def fetch_weather(self, city: str) -> dict:
-        # Runs on NON_BLOCKING worker
-        # Async HTTP doesn't block the event loop
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"https://api.weather.com/v1/{city}",
-                headers={"Authorization": f"Bearer {self._api_key}"}
-            )
-            return response.json()
-```
-
----
-
-### BLOCKING_SANDBOXED (Untrusted, Sync in WASM)
-
-**Purpose:** Synchronous user code in complete isolation.
-
-**Queue Pattern:** `blazing:*:workflow_definition:Step:*:BlockingSandboxedQueue:*`
-
-**Executor:** Pyodide executor (WASM sandbox)
-
-**Use Cases:**
-- User-provided data transformations
-- Pure Python calculations
-- Sync business rules from users
-- Untrusted code that needs isolation
-
-**Capabilities:**
-- Processes `DYNAMIC_CODE` queue (ad-hoc user code)
-- Processes `BLOCKING_SANDBOXED` queue (sandboxed blocking steps)
-- 1 operation at a time (sync execution)
-
-**Security:**
-- ❌ NO network access
-- ❌ NO filesystem access
-- ❌ NO subprocess spawning
-- ✅ Can call service methods (executes on trusted workers)
-- ✅ Memory isolated (WASM)
-
-**Example:**
-```python
-@app.step
+@app.step(sandboxed=True)
 async def transform_data(data: list, services=None):
-    # Runs in WASM sandbox (BLOCKING_SANDBOXED)
-    # Pure Python transformation
     result = [x * 2 for x in data if x > 0]
 
-    # Can call service methods (executes on trusted worker)
-    await services['DatabaseService'].save_results(result)
+    # Calls to services still run on trusted workers
+    await services["DatabaseService"].save_results(result)
 
     return result
 ```
 
----
+## Routing Rules (Simplified)
 
-### NON_BLOCKING_SANDBOXED (Untrusted, Async in WASM)
+- **Trusted code** (services, non‑sandboxed steps) runs on trusted workers.
+- **Sandboxed code** (sandboxed steps or workflows) runs on sandboxed workers.
+- **Sync vs async** is inferred from your Python definitions.
 
-**Purpose:** Asynchronous user code in complete isolation.
+## Best Practices
 
-**Queue Pattern:** `blazing:*:workflow_definition:Step:*:SandboxedQueue:*`
+- Keep database/API access in services, not in sandboxed steps.
+- Use sandboxed steps for user‑defined logic; use trusted steps for platform logic.
+- Keep untrusted inputs out of trusted services unless explicitly validated.
 
-**Executor:** Pyodide executor (WASM sandbox)
+## Configuration
 
-**Use Cases:**
-- User-provided workflows
-- Concurrent service calls from user code
-- Multi-step user orchestration
-- Async data processing by users
-
-**Capabilities:**
-- Processes `DYNAMIC_CODE` queue (ad-hoc user code)
-- Processes `NON_BLOCKING_SANDBOXED` queue (sandboxed async steps)
-- Processes `SANDBOXED_ROUTE` queue (sandboxed workflows)
-- N concurrent slots per worker (default: 4 slots, lower than trusted due to WASM overhead)
-
-**Security:**
-- ❌ NO network access
-- ❌ NO filesystem access
-- ❌ NO subprocess spawning
-- ✅ Async/await supported
-- ✅ Can call service methods concurrently (executes on trusted workers)
-- ✅ Memory isolated (WASM)
-
-**Example:**
-```python
-@app.step
-async def process_users(user_ids: list, services=None):
-    # Runs in WASM sandbox (NON_BLOCKING_SANDBOXED)
-
-    # Concurrent service calls (executed on trusted workers)
-    tasks = [
-        services['DatabaseService'].fetch_user(user_id)
-        for user_id in user_ids
-    ]
-    users = await asyncio.gather(*tasks)
-
-    # Process in sandbox (no network/filesystem access)
-    results = []
-    for user in users:
-        score = len(user['name']) * 10
-        results.append({'user_id': user['id'], 'score': score})
-
-    return results
-```
-
----
-
-## Worker Selection Guide
-
-How do you choose which worker type to use? Blazing makes this decision automatically based on your code, but understanding the rules helps you write better workflows.
-
-| Your Code Type | Sync/Async | Trust Level | Worker Type Used |
-|----------------|------------|-------------|------------------|
-| Service method | sync | Trusted | BLOCKING |
-| Service method | async | Trusted | NON_BLOCKING |
-| Step (decorated function) | sync | Sandboxed | BLOCKING_SANDBOXED |
-| Step (decorated function) | async | Sandboxed | NON_BLOCKING_SANDBOXED |
-| Workflow | async | Sandboxed | NON_BLOCKING_SANDBOXED |
-
-**Routing Rules:**
-
-1. **Services** always run on trusted workers (BLOCKING or NON_BLOCKING)
-   - Services have access to connectors (databases, APIs, credentials)
-   - Use `def` for sync operations → BLOCKING
-   - Use `async def` for async operations → NON_BLOCKING
-
-2. **Steps** run on sandboxed workers by default (BLOCKING_SANDBOXED or NON_BLOCKING_SANDBOXED)
-   - Steps execute user-provided code in isolation
-   - Use `def` for sync functions → BLOCKING_SANDBOXED
-   - Use `async def` for async functions → NON_BLOCKING_SANDBOXED
-
-3. **Workflows** run on NON_BLOCKING_SANDBOXED workers
-   - Workflows orchestrate multiple steps
-   - Always async for coordination
-
----
-
-## Warm Pool Configuration
-
-Blazing maintains a **warm pool** of pre-started workers to eliminate cold start delays. The coordinator ensures minimum workers are always available when work exists.
-
-### How Warm Pools Work
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      COORDINATOR                             │
-│  • Monitors queue depths for all 4 worker types              │
-│  • Enforces minimum workers (warm pool)                      │
-│  • Scales up when backlog grows                              │
-│  • Scales down when idle                                     │
-└─────────────────────────────────────────────────────────────┘
-           │                              │
-           ↓                              ↓
-┌──────────────────────┐      ┌──────────────────────┐
-│  TRUSTED WORKERS     │      │  SANDBOXED WORKERS   │
-│                      │      │                      │
-│  Min 1 BLOCKING      │      │  Min 1 BLOCKING_     │
-│  Min 1 NON_BLOCKING  │      │      SANDBOXED       │
-│  (if work exists)    │      │  Min 2 NON_BLOCKING_ │
-│                      │      │      SANDBOXED       │
-│                      │      │  (if work exists)    │
-└──────────────────────┘      └──────────────────────┘
-```
-
-### Configuration Constants
-
-These constants control warm pool behavior. They are loaded from environment variables with fallback defaults:
-
-| Constant | Default | Env Var | Description |
-|----------|---------|---------|-------------|
-| `WARM_POOL_MIN_SYNC_WORKERS` | 1 | `PILOT_LIGHT_MIN_P` | Min trusted blocking workers |
-| `WARM_POOL_MIN_ASYNC_WORKERS` | 1 | `PILOT_LIGHT_MIN_A` | Min trusted async workers |
-| `WARM_POOL_MIN_ASYNC_CAPACITY` | 3 | `PILOT_LIGHT_ASYNC_SLOTS` | Min async slots (A × C) |
-| `WARM_POOL_MIN_SYNC_SANDBOXED_WORKERS` | 1 | `PILOT_LIGHT_MIN_P_SANDBOXED` | Min sandboxed sync workers |
-| `WARM_POOL_MIN_ASYNC_SANDBOXED_WORKERS` | 2 | `PILOT_LIGHT_MIN_A_SANDBOXED` | Min sandboxed async workers |
-| `WARM_POOL_MIN_ASYNC_SANDBOXED_CAPACITY` | 4 | `PILOT_LIGHT_ASYNC_SLOTS_SANDBOXED` | Min sandboxed async slots |
-
-**Example:** If you have 1 NON_BLOCKING worker with 3 async slots, total capacity = 1 × 3 = 3 concurrent operations.
-
-### Tuning Warm Pool for Cost vs Latency
-
-**Minimize cost (reduce idle workers):**
-```bash
-export PILOT_LIGHT_MIN_P=0          # No idle blocking workers
-export PILOT_LIGHT_MIN_A=0          # No idle async workers
-export PILOT_LIGHT_MIN_P_SANDBOXED=0
-export PILOT_LIGHT_MIN_A_SANDBOXED=0
-```
-
-Cold start penalty: ~500ms for first operation in each queue.
-
-**Minimize latency (keep workers ready):**
-```bash
-export PILOT_LIGHT_MIN_P=2          # 2 blocking workers always ready
-export PILOT_LIGHT_MIN_A=3          # 3 async workers always ready
-export PILOT_LIGHT_ASYNC_SLOTS=8    # 8 concurrent slots per worker
-export PILOT_LIGHT_MIN_P_SANDBOXED=1
-export PILOT_LIGHT_MIN_A_SANDBOXED=2
-```
-
-Benefit: Operations start immediately with <10ms delay.
-
-**Balanced (production default):**
-```bash
-export PILOT_LIGHT_MIN_P=1          # 1 of each type ready
-export PILOT_LIGHT_MIN_A=1
-export PILOT_LIGHT_ASYNC_SLOTS=3
-export PILOT_LIGHT_MIN_P_SANDBOXED=1
-export PILOT_LIGHT_MIN_A_SANDBOXED=2
-export PILOT_LIGHT_ASYNC_SLOTS_SANDBOXED=4
-```
-
-Good balance: ~100ms warm start for first operation, minimal idle cost.
-
----
-
-## Workflow Slot Limiting
-
-To prevent workflows from starving step processing, Blazing limits the number of concurrent workflows.
-
-### The Problem
-
-Without limits, many workflows can consume all NON_BLOCKING workers, leaving no capacity for steps:
-
-```
-┌────────────────────────────────────────┐
-│  10 NON_BLOCKING workers               │
-│                                        │
-│  [W] [W] [W] [W] [W] [W] [W] [W] [W]  │
-│   ^   ^   ^   ^   ^   ^   ^   ^   ^   │
-│   All processing workflows             │
-│                                        │
-│  Steps waiting in queue... STUCK!      │
-└────────────────────────────────────────┘
-```
-
-### The Solution: ROUTE_SLOTS_MAX_RATIO
-
-```python
-ROUTE_SLOTS_MAX_RATIO = 0.5  # Max 50% of workers can process workflows
-```
-
-With this limit, workflows can use at most 50% of workers:
-
-```
-┌────────────────────────────────────────┐
-│  10 NON_BLOCKING workers               │
-│                                        │
-│  [W] [W] [W] [W] [W] [S] [S] [S] [S]  │
-│   ^   ^   ^   ^   ^   ^   ^   ^   ^   │
-│   Workflows (max 5)    Steps (min 5)   │
-│                                        │
-│  Steps never starve!                   │
-└────────────────────────────────────────┘
-```
-
-**How it works:**
-1. Coordinator tracks active workflow slots in Redis: `blazing:execution:active_routes`
-2. When picking up a workflow, check: `active_routes < max_route_slots`
-3. If limit reached, workflow waits in queue
-4. When workflow completes, slot is released
-
-**Configuration:**
-```bash
-# Allow up to 70% of workers to process workflows
-export ROUTE_SLOTS_MAX_RATIO=0.7
-
-# Or be conservative (30%)
-export ROUTE_SLOTS_MAX_RATIO=0.3
-```
-
----
-
-## Advanced: Worker Subtypes
-
-For fine-grained control, Blazing uses worker **subtypes** with different capability levels.
-
-### Trusted Worker Subtypes
-
-**BLOCKING subtypes:**
-- `BLOCKING_SERVICE_ONLY`: Can only process service invokes
-- `BLOCKING_STEP`: Can process steps + service invokes (most capable)
-
-**NON_BLOCKING subtypes:**
-- `NON_BLOCKING_SERVICE_ONLY`: Can only process service invokes
-- `NON_BLOCKING_STEP`: Can process steps + service invokes (no workflows)
-- `NON_BLOCKING_WORKFLOW`: Can process workflows + steps + service invokes (most capable)
-
-### Sandboxed Worker Subtypes
-
-**Sandboxed subtypes:**
-- `BLOCKING_SANDBOXED`: Sandboxed blocking steps
-- `NON_BLOCKING_SANDBOXED_STEP`: Sandboxed async steps only (no workflows)
-- `NON_BLOCKING_SANDBOXED_WORKFLOW`: Sandboxed async steps + workflows (most capable)
-
-### Why Subtypes?
-
-Subtypes prevent workflow starvation by dedicating some workers to step-only processing:
-
-```python
-WORKER_CAPABILITIES = {
-    "NON_BLOCKING_SERVICE_ONLY": ["SERVICE_INVOKE"],
-    "NON_BLOCKING_STEP": ["SERVICE_INVOKE", "NON-BLOCKING"],
-    "NON_BLOCKING_WORKFLOW": ["SERVICE_INVOKE", "NON-BLOCKING", "ROUTE"],
-}
-```
-
-A worker with type `NON_BLOCKING_STEP` will **never** pick up workflows, ensuring steps can always make progress.
-
----
-
-## Performance Comparison
-
-| Metric | Trusted Workers | Sandboxed Workers |
-|--------|----------------|-------------------|
-| **Startup Time** | ~10ms | ~500ms (first run, cached after) |
-| **Execution Speed** | 1x (native Python) | ~2x slower (WASM overhead) |
-| **Memory Overhead** | Minimal | ~50MB per worker |
-| **Concurrency** | 3-8 slots per worker | 4 slots per worker |
-| **Network Access** | ✅ Full | ❌ None |
-| **Filesystem Access** | ✅ Full | ❌ None |
-| **Security** | Trusted code only | Complete isolation |
-
-**Best Practice:** Use trusted workers for YOUR code (services), sandboxed workers only for USER code (steps/workflows).
-
----
-
-## Configuration Example
-
-Here's a complete Docker Compose setup for all 4 worker types:
-
-```yaml
-version: '3.8'
-services:
-  coordinator:
-    image: blazing/coordinator:latest
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - PILOT_LIGHT_MIN_P=1
-      - PILOT_LIGHT_MIN_A=2
-      - PILOT_LIGHT_ASYNC_SLOTS=4
-      - PILOT_LIGHT_MIN_P_SANDBOXED=1
-      - PILOT_LIGHT_MIN_A_SANDBOXED=2
-      - PILOT_LIGHT_ASYNC_SLOTS_SANDBOXED=4
-      - ROUTE_SLOTS_MAX_RATIO=0.5
-      - EXECUTOR_URL=http://executor:8080
-      - PYODIDE_EXECUTOR_URL=http://pyodide-executor:8080
-
-  # Trusted worker executor
-  executor:
-    image: blazing/executor:latest
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - WORKER_TYPES=BLOCKING,NON_BLOCKING
-
-  # Sandboxed worker executor
-  pyodide-executor:
-    image: blazing/pyodide-executor:latest
-    environment:
-      - REDIS_URL=redis://redis:6379
-      - WORKER_TYPES=BLOCKING_SANDBOXED,NON_BLOCKING_SANDBOXED
-
-  redis:
-    image: redis:7-alpine
-```
-
----
+Worker scaling and infrastructure concerns are managed in **Blazing Core YAML**. Flow remains code‑first and focused on your application logic.
 
 ## Next Steps
 
-- [Security Model](/blazing-flow-sandbox/security) - Understanding trust boundaries and isolation
-- [Service Bridge](/blazing-flow-sandbox/services) - Connecting sandboxed code to trusted services
-- [Deployment](/blazing-flow-sandbox/deployment) - Production configuration and scaling
+- [Sandbox Overview](/docs/blazing-flow-sandbox/overview)
+- [Configuration](/docs/flow-configuration)

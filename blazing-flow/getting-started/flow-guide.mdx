@@ -1,7 +1,7 @@
 ---
 title: Blazing Flow Guide
 label: Guide
-description: Complete guide to building async pipelines with Blazing Flow
+description: Build resilient async pipelines with Blazing Flow
 position: 1
 ---
 
@@ -9,137 +9,55 @@ Learn how to build resilient, scalable async pipelines with Blazing Flow.
 
 ## What is Blazing Flow?
 
-Blazing Flow is a distributed task queue and pipeline orchestration engine that makes it easy to build complex, resilient data workflows. It's built on Redis and provides a simple Python API for defining asynchronous pipelines.
+Blazing Flow is a managed, developer‑first workflow engine. You define steps and workflows in Python, publish them, and execute runs from your application or API layer.
 
 ### Key Features
 
-- **🧭 Declarative Pipelines** - Define workflows using simple Python decorators
-- **⚡ Automatic Recovery** - Jobs automatically resume after interruptions
-- **🔄 Dynamic Optimization** - Worker mix automatically adjusts to workload
-- **🔌 Connection Pooling** - Long-lived database and SSH connections
-- **📊 Deep Observability** - Real-time metrics and execution history
-- **⚙️ Flexible Workers** - Mix async and blocking workers for optimal performance
-
-## When to Use Blazing Flow
-
-Blazing Flow excels at:
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
-    <div className="font-semibold mb-2">✅ Complex Workflows</div>
-    <div className="text-sm text-muted-foreground">
-      Multi-stage pipelines with branching logic and conditional execution
-    </div>
-  </div>
-
-  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
-    <div className="font-semibold mb-2">✅ Stateful Processing</div>
-    <div className="text-sm text-muted-foreground">
-      Long-lived services and pooled connectors for shared state
-    </div>
-  </div>
-
-  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
-    <div className="font-semibold mb-2">✅ Mixed Workloads</div>
-    <div className="text-sm text-muted-foreground">
-      Combination of I/O-bound and CPU-intensive tasks
-    </div>
-  </div>
-
-  <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
-    <div className="font-semibold mb-2">✅ Long-Running Jobs</div>
-    <div className="text-sm text-muted-foreground">
-      Pipelines that run for hours or days with automatic recovery
-    </div>
-  </div>
-</div>
+- **Declarative pipelines** with simple Python decorators
+- **Resilient execution** with retry‑friendly patterns
+- **Trusted + sandboxed execution** for safe multi‑tenant workloads
+- **Batching and scheduling** built into the workflow model
+- **Custom executor images** when you need system dependencies
 
 ## Quick Example
-
-Here's a simple data processing pipeline:
 
 ```python
 from blazing import Blazing
 
-# Create the app
 app = Blazing()
 
-# Define processing steps
 @app.step
 async def fetch_data(source_id: str, services=None):
-    # Fetch from API or database
     return {"id": source_id, "data": [1, 2, 3]}
 
 @app.step
 async def transform_data(data: dict, services=None):
-    # Transform the data
-    total = sum(data["data"])
-    return {"id": data["id"], "result": total}
+    return {"id": data["id"], "result": sum(data["data"])}
 
-# Orchestrate the pipeline
 @app.workflow
 async def data_pipeline(source_id: str, services=None):
     data = await fetch_data(source_id, services=services)
-    result = await transform_data(data, services=services)
-    return result
+    return await transform_data(data, services=services)
 
-# Publish and run the app
 async def main():
-    # Publish infrastructure (creates Redis indices, registers routes)
     await app.publish()
-
-    # Execute workflow - choose whichever style you prefer:
-
-    # Option 1: One-liner with wait_result()
     result = await app.data_pipeline(source_id="123").wait_result()
-
-    # Option 2: Two-liner with RemoteRun handle (useful when you need the run object)
-    run = await app.data_pipeline(source_id="123")
-    result = await run.result()
-
-    print(result)  # {"id": "123", "result": 6}
+    print(result)
 ```
 
 ## Core Concepts
 
-### Workflows
-
-Workflows are the entry points to your pipelines. They orchestrate the flow of data through multiple steps.
-
-```python
-@app.workflow
-async def process_order(order_id: str, services=None):
-    # Orchestrate multiple steps
-    order = await fetch_order(order_id, services=services)
-    validated = await validate_order(order, services=services)
-    payment = await process_payment(validated, services=services)
-    return payment
-```
-
 ### Steps
 
-Steps are individual processing units. They can optionally receive services to access shared business logic.
+Steps are single‑responsibility functions. Use them for reusable units of work.
 
-```python
-@app.step
-async def fetch_order(order_id: str, services=None):
-    # Use services if you need shared business logic
-    if services:
-        return await services['OrderService'].fetch(order_id)
-    # Or implement logic directly
-    return {"id": order_id, "status": "pending"}
-```
+### Workflows
+
+Workflows orchestrate steps. They are the entry points you call from your app or API layer.
 
 ### Services
 
-Services encapsulate your business logic and can be shared across steps.
-
-```python
-class OrderService(BaseService):
-    async def fetch(self, order_id: str):
-        # Your business logic here
-        return {"id": order_id, "status": "pending"}
-```
+Services encapsulate business logic and external I/O. They are injected into steps via the `services` parameter.
 
 ## Dynamic Batching
 
@@ -150,34 +68,25 @@ from blazing import batched, BatchConfig
 
 @batched(BatchConfig(max_batch_size=32, wait_ms=50))
 @app.step
-async def embed(texts: list[str], services=None) -> list[list[float]]:
-    # This function receives a batch of inputs
+async def embed(texts: list[str], services=None):
     return await services["EmbeddingService"].encode(texts)
 ```
 
-**Notes:**
-- Apply `@batched` before `@app.step`
-- Return a list with length >= batch size
-
 ## Scheduled Workflows
-
-Schedule workflows with `Cron` or `Period`:
 
 ```python
 from blazing import Cron, Period
 
-@app.workflow(schedule=Cron("0 2 * * *"))  # Daily at 2 AM
+@app.workflow(schedule=Cron("0 2 * * *"))
 async def nightly_report(services=None):
     ...
 
-@app.workflow(schedule=Period(minutes=30))  # Every 30 minutes
+@app.workflow(schedule=Period(minutes=30))
 async def sync_job(services=None):
     ...
 ```
 
 ## Custom Executor Images
-
-Customize the executor image per step or workflow:
 
 ```python
 from blazing import Image
@@ -196,251 +105,10 @@ async def process_video(url: str, services=None):
 
 ## Notebook Sessions (Jupyter Kernel)
 
-Blazing provides a Jupyter kernel that proxies cells to the notebook runtime.
-
 ```bash
 python -m blazing_kernel install
 ```
 
-Then select **“Blazing Flow Sandbox”** as the kernel in Jupyter. Notebook sessions
-run in an isolated Pyodide runtime and support checkpointing.
+Then select **“Blazing Flow Sandbox”** as the kernel in Jupyter.
 
-## Architecture
-
-Blazing Flow uses a hierarchical architecture:
-
-```
-    ┌────────┐
-    │ Foreman │  ← Worker management & optimization
-    └────┬────┘
-         │
-    ┌────┴───────────┐
-    │    Workers     │  ← Execute tasks
-    ├────────────────┤
-    │ Async Workers  │  ← I/O-bound tasks
-    │ Blocking Workers│  ← CPU-bound tasks
-    └────────────────┘
-```
-
-### Components
-
-- **Foreman**: Manages workers on each machine, optimizes worker mix
-- **Workers**: Execute tasks from workflows and steps
-  - **Async Workers**: Event-loop based, best for I/O operations
-  - **Blocking Workers**: Thread-based, best for CPU-intensive tasks
-
-## Worker Types
-
-### Async Workers
-
-Best for I/O-bound operations:
-
-- API calls
-- Database queries
-- File I/O
-- Network operations
-
-```python
-@app.step
-async def call_api(url: str, services=None):
-    # Runs on async worker (event loop)
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            return await response.json()
-```
-
-### Blocking Workers
-
-Best for CPU-intensive operations:
-
-- Data processing
-- Image/video processing
-- Cryptographic operations
-- Heavy computations
-
-```python
-@app.step
-def process_image(image_data: bytes, services=None):
-    # Automatically runs on blocking worker (note: not async)
-    return heavy_image_processing(image_data)
-```
-
-## Dynamic Worker Optimization
-
-The Foreman automatically adjusts the worker mix based on queue metrics:
-
-- Monitors queue depth and age
-- Calculates urgency scores
-- Increases/decreases async or blocking workers
-- Uses hysteresis to prevent thrashing
-
-You can configure optimization:
-
-```python
-app = Blazing(
-    worker_config={
-        'async_workers': 4,
-        'blocking_workers': 2,
-        'auto_optimize': True,  # Enable automatic optimization
-        'optimization_interval': 30  # Check every 30 seconds
-    }
-)
-```
-
-## State Management
-
-All operations are durably recorded in Redis:
-
-- **Units**: Represent workflow executions
-- **Operations**: Represent step calls
-- **Results**: Final outputs and intermediate data
-
-This enables:
-- Automatic recovery after failures
-- Audit trails for compliance
-- Performance analysis
-- Debugging with breadcrumbs
-
-## Synchronous API
-
-> **Note**: The sync API (`SyncBlazing`) is designed for **learning and prototyping**. For production workloads, we **strongly recommend using the async `Blazing` class** which provides better performance, proper resource management, and full support for concurrent operations.
-
-Blazing Flow provides a synchronous API for users who are learning or want a simpler getting-started experience.
-
-### Option 1: SyncBlazing Class (For Learning/Prototyping)
-
-The simplest sync experience - no async/await anywhere:
-
-```python
-from blazing import SyncBlazing
-
-# Create a sync app
-app = SyncBlazing()
-
-@app.step
-async def double(x: int, services=None):
-    return x * 2
-
-@app.step
-async def add_ten(x: int, services=None):
-    return x + 10
-
-@app.workflow
-async def process_number(x: int, services=None):
-    doubled = await double(x, services=services)
-    result = await add_ten(doubled, services=services)
-    return result
-
-# Everything is sync - no await, no asyncio.run()!
-app.publish()
-result = app.process_number(5)  # Returns result directly!
-print(result)  # 20
-
-print(result)  # 20
-```
-
-### Option 2: Sync Helper Methods
-
-If you have existing async code but need sync execution in some places:
-
-```python
-from blazing import Blazing
-
-app = Blazing()
-
-@app.step
-async def double(x: int, services=None):
-    return x * 2
-
-@app.workflow
-async def process_number(x: int, services=None):
-    return await double(x, services=services)
-
-# Use sync helpers on async Blazing
-app.publish_sync()                              # Sync publish
-result = app.process_number(5).wait_result_sync()  # Sync wait
-# Or: result = app.run_sync("process_number", 5)
-
-print(result)  # 10
-```
-
-### When to Use Each API
-
-| Use Case | API | Notes |
-|----------|-----|-------|
-| **Production workloads** | `Blazing` (async) | ⭐ Recommended - best performance |
-| FastAPI / async frameworks | `Blazing` (async) | Native async integration |
-| Learning Blazing Flow | `SyncBlazing` | Simpler to understand |
-| Prototyping | `SyncBlazing` | Quick iteration |
-| Jupyter notebooks | `SyncBlazing` | No asyncio hassle |
-| Django / Flask (learning) | `SyncBlazing` | Then migrate to async |
-| Django / Flask (production) | `Blazing` with sync helpers | Async inside sync views |
-
-## Error Handling
-
-Blazing Flow provides multiple levels of error handling:
-
-```python
-@app.step
-async def risky_operation(data: dict, services=None):
-    try:
-        if services:
-            result = await services['Service'].risky_call(data)
-            return result
-    except Exception as e:
-        # Log the error
-        logger.error(f"Operation failed: {e}")
-        # Return fallback or raise
-        return {"status": "failed", "error": str(e)}
-```
-
-## Monitoring
-
-Built-in monitoring tools:
-
-### btop - Real-time Dashboard
-
-```bash
-python -m blazing.monitoring.btop
-```
-
-Shows:
-- Queue depths
-- Worker states
-- Throughput metrics
-- Error rates
-
-### Foreman Charts
-
-```bash
-python -m blazing.monitoring.monitor_foreman_charts
-```
-
-Visualizes:
-- Worker mix over time
-- Queue trends
-- Optimization decisions
-
-## Next Steps
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-  <a href="/docs/flow-quick-start" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
-    <div className="font-semibold mb-1">Quick Start →</div>
-    <div className="text-sm text-muted-foreground">Build your first pipeline in 5 minutes</div>
-  </a>
-
-  <a href="/docs/flow-architecture" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
-    <div className="font-semibold mb-1">Architecture →</div>
-    <div className="text-sm text-muted-foreground">Deep dive into how it works</div>
-  </a>
-
-  <a href="/docs/index" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
-    <div className="font-semibold mb-1">Examples →</div>
-    <div className="text-sm text-muted-foreground">Learn from real-world use cases</div>
-  </a>
-
-  <a href="/docs/flow-overview" className="p-4 rounded-lg border border-gray-200 dark:border-dark-800 hover:border-primary transition-colors no-underline">
-    <div className="font-semibold mb-1">Best Practices →</div>
-    <div className="text-sm text-muted-foreground">Production deployment tips</div>
-  </a>
-</div>
+See the dedicated guide: [Notebook Runtime](/blazing-flow/guides/notebook-runtime).

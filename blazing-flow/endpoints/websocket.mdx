@@ -5,9 +5,7 @@ description: Real-time updates with WebSocket endpoints
 position: 4
 ---
 
-# WebSocket Support
-
-Enable real-time updates for your workflows with WebSocket endpoints.
+Enable real‑time updates for workflows with WebSocket endpoints.
 
 ## Enable WebSocket
 
@@ -18,427 +16,38 @@ async def calculate(x: int, y: int, services=None):
     return x + y
 ```
 
-**This creates TWO endpoints:**
-- `POST /calculate` - HTTP endpoint (job_id response)
-- `WS /calculate/ws` - WebSocket endpoint (real-time updates)
+This creates:
 
-## WebSocket Client (JavaScript)
+- `POST /calculate` for job creation
+- `WS /calculate/ws` for streaming job updates
 
-```javascript
-const ws = new WebSocket('ws://localhost:8080/calculate/ws');
-
-// Send workflow parameters
-ws.onopen = () => {
-    ws.send(JSON.stringify({x: 10, y: 20}));
-};
-
-// Receive real-time updates
-ws.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-
-    if (message.type === "job_created") {
-        console.log("Job created:", message.job_id);
-    }
-
-    if (message.type === "status_update") {
-        console.log("Status:", message.status);
-    }
-
-    if (message.type === "result") {
-        console.log("Result:", message.result);
-        ws.close();
-    }
-};
-
-ws.onerror = (error) => {
-    console.error("WebSocket error:", error);
-};
-```
-
-## Message Types
-
-### 1. job_created
-
-Sent immediately when job is created.
-
-```json
-{
-  "type": "job_created",
-  "job_id": "abc123",
-  "status": "pending"
-}
-```
-
-### 2. status_update
-
-Sent when job status changes.
-
-```json
-{
-  "type": "status_update",
-  "job_id": "abc123",
-  "status": "running"
-}
-```
-
-### 3. result
-
-Sent when job completes successfully.
-
-```json
-{
-  "type": "result",
-  "job_id": "abc123",
-  "status": "completed",
-  "result": 30
-}
-```
-
-### 4. error
-
-Sent when job fails.
-
-```json
-{
-  "type": "error",
-  "job_id": "abc123",
-  "status": "failed",
-  "error": "Division by zero"
-}
-```
-
-## WebSocket with Authentication
-
-```python
-from blazing.auth import AuthContext
-
-async def verify_ws_token(request) -> AuthContext | None:
-    """Custom auth handler for WebSocket."""
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.split(" ")[1]
-        if token == "valid-token":
-            return AuthContext(user_id="authenticated-user")
-    return None
-
-@app.endpoint(
-    path="/secure",
-    enable_websocket=True,
-    auth=verify_ws_token
-)
-@app.workflow
-async def secure_stream(value: int, services=None):
-    return value * 2
-```
-
-### Client with Auth
-
-```javascript
-const ws = new WebSocket('ws://localhost:8080/secure/ws', {
-    headers: {
-        'Authorization': 'Bearer valid-token'
-    }
-});
-```
-
-## Python WebSocket Client
-
-```python
-import asyncio
-import websockets
-import json
-
-async def call_workflow_ws():
-    uri = "ws://localhost:8080/calculate/ws"
-
-    async with websockets.connect(uri) as websocket:
-        # Send workflow parameters
-        await websocket.send(json.dumps({"x": 10, "y": 20}))
-
-        # Receive updates
-        async for message in websocket:
-            data = json.loads(message)
-
-            if data["type"] == "job_created":
-                print(f"Job created: {data['job_id']}")
-
-            elif data["type"] == "status_update":
-                print(f"Status: {data['status']}")
-
-            elif data["type"] == "result":
-                print(f"Result: {data['result']}")
-                break
-
-            elif data["type"] == "error":
-                print(f"Error: {data['error']}")
-                break
-
-# Run
-asyncio.run(call_workflow_ws())
-```
-
-## React Hook Example
-
-```typescript
-import { useEffect, useState } from 'react';
-
-interface WorkflowResult {
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  result?: any;
-  error?: string;
-}
-
-function useWorkflowWebSocket(endpoint: string, params: object) {
-  const [result, setResult] = useState<WorkflowResult>({
-    status: 'pending'
-  });
-
-  useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8080${endpoint}/ws`);
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify(params));
-    };
-
-    ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-
-      if (message.type === 'status_update') {
-        setResult({ status: message.status });
-      } else if (message.type === 'result') {
-        setResult({
-          status: 'completed',
-          result: message.result
-        });
-        ws.close();
-      } else if (message.type === 'error') {
-        setResult({
-          status: 'failed',
-          error: message.error
-        });
-        ws.close();
-      }
-    };
-
-    return () => ws.close();
-  }, [endpoint, params]);
-
-  return result;
-}
-
-// Usage
-function CalculatorComponent() {
-  const result = useWorkflowWebSocket('/calculate', { x: 10, y: 20 });
-
-  return (
-    <div>
-      <p>Status: {result.status}</p>
-      {result.result && <p>Result: {result.result}</p>}
-      {result.error && <p>Error: {result.error}</p>}
-    </div>
-  );
-}
-```
-
-## Error Handling
-
-### Connection Failures
+## Client Example (JavaScript)
 
 ```javascript
 const ws = new WebSocket('ws://localhost:8080/calculate/ws');
-
-ws.onerror = (error) => {
-    console.error("Connection failed:", error);
-    // Implement retry logic
-    setTimeout(() => {
-        // Reconnect
-    }, 5000);
-};
-
-ws.onclose = (event) => {
-    if (!event.wasClean) {
-        console.error("Connection closed unexpectedly");
-        // Implement reconnection
-    }
-};
-```
-
-### Invalid JSON
-
-```javascript
-ws.onmessage = (event) => {
-    try {
-        const message = JSON.parse(event.data);
-        // Handle message
-    } catch (error) {
-        console.error("Invalid JSON received:", event.data);
-    }
-};
-```
-
-## Multiple Concurrent Connections
-
-WebSocket endpoints support thousands of concurrent connections:
-
-```javascript
-// Client 1
-const ws1 = new WebSocket('ws://localhost:8080/calculate/ws');
-ws1.onopen = () => ws1.send(JSON.stringify({x: 1, y: 2}));
-
-// Client 2
-const ws2 = new WebSocket('ws://localhost:8080/calculate/ws');
-ws2.onopen = () => ws2.send(JSON.stringify({x: 3, y: 4}));
-
-// Each gets independent results
-```
-
-## Heartbeat / Keep-Alive
-
-```javascript
-const ws = new WebSocket('ws://localhost:8080/calculate/ws');
-let heartbeatInterval;
 
 ws.onopen = () => {
-    ws.send(JSON.stringify({x: 10, y: 20}));
-
-    // Send heartbeat every 30 seconds
-    heartbeatInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({type: 'ping'}));
-        }
-    }, 30000);
+  ws.send(JSON.stringify({x: 10, y: 20}));
 };
-
-ws.onclose = () => {
-    clearInterval(heartbeatInterval);
-};
-```
-
-## Long-Running Workflows
-
-For workflows that take minutes or hours:
-
-```javascript
-const ws = new WebSocket('ws://localhost:8080/long-workflow/ws');
-let lastUpdate = Date.now();
 
 ws.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-    lastUpdate = Date.now();
-
-    if (message.type === "status_update") {
-        console.log(`Progress: ${message.status}`);
-        // Update UI with progress
-    }
+  const msg = JSON.parse(event.data);
+  if (msg.type === "result") {
+    console.log("Result:", msg.result);
+    ws.close();
+  }
 };
-
-// Check for timeout (no updates for 5 minutes)
-setInterval(() => {
-    if (Date.now() - lastUpdate > 5 * 60 * 1000) {
-        console.error("No updates for 5 minutes - workflow may be stuck");
-        ws.close();
-    }
-}, 60000);
 ```
 
-## Testing WebSocket
+## Message Types (High Level)
 
-### Unit Test (Python)
+You will receive events such as:
 
-```python
-import pytest
-from fastapi.testclient import TestClient
+- `job_created`
+- `status_update`
+- `result`
+- `error`
 
-def test_websocket_endpoint(fastapi_app):
-    client = TestClient(fastapi_app)
+## Authentication
 
-    with client.websocket_connect("/calculate/ws") as websocket:
-        # Send parameters
-        websocket.send_json({"x": 10, "y": 20})
-
-        # Receive job_created
-        message = websocket.receive_json()
-        assert message["type"] == "job_created"
-        assert "job_id" in message
-
-        # Receive result
-        message = websocket.receive_json()
-        assert message["type"] == "result"
-        assert message["result"] == 30
-```
-
-### E2E Test (JavaScript)
-
-```javascript
-import { test, expect } from '@playwright/test';
-
-test('websocket workflow execution', async ({ page }) => {
-  const messages = [];
-
-  // Listen for WebSocket messages
-  page.on('websocket', ws => {
-    ws.on('framereceived', event => {
-      messages.push(JSON.parse(event.payload));
-    });
-  });
-
-  // Connect and send
-  await page.evaluate(() => {
-    const ws = new WebSocket('ws://localhost:8080/calculate/ws');
-    ws.onopen = () => ws.send(JSON.stringify({x: 10, y: 20}));
-  });
-
-  // Wait for result
-  await page.waitForTimeout(5000);
-
-  expect(messages).toContainEqual(
-    expect.objectContaining({
-      type: 'result',
-      result: 30
-    })
-  );
-});
-```
-
-## Best Practices
-
-### 1. Connection Management
-
-- Close connections when done
-- Implement reconnection logic
-- Use heartbeat for long connections
-
-### 2. Error Handling
-
-- Always handle `onerror` and `onclose` events
-- Validate JSON before parsing
-- Implement timeouts for stuck workflows
-
-### 3. Security
-
-- Always use WSS (WebSocket Secure) in production
-- Implement authentication
-- Validate all incoming messages
-
-### 4. Performance
-
-- Limit message frequency (avoid flooding)
-- Use compression for large messages
-- Monitor connection count
-
-## Comparison: HTTP vs WebSocket
-
-| Feature | HTTP Polling | WebSocket |
-|---------|--------------|-----------|
-| **Real-time** | No (poll every N seconds) | Yes (push immediately) |
-| **Overhead** | High (repeated requests) | Low (single connection) |
-| **Latency** | Seconds | Milliseconds |
-| **Server load** | High (N requests/sec) | Low (1 connection) |
-| **Client complexity** | Simple | Moderate |
-| **Use when** | Occasional updates | Real-time updates |
-
-## Next Steps
-
-- [API Reference](/blazing-flow/endpoints/api-reference) - WebSocket parameters
-- [Deployment](/blazing-flow/endpoints/deployment) - WebSocket in production
-- [Monitoring](/blazing-flow/endpoints/monitoring) - Track WebSocket connections
+Use the same auth strategies as HTTP endpoints. If you attach `auth=` to the endpoint, WebSocket connections are authenticated the same way.
