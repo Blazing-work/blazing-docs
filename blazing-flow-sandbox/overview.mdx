@@ -5,230 +5,28 @@ description: Execute untrusted user code safely with WASM isolation
 position: 1
 ---
 
-# Blazing Flow Sandbox
+Blazing Flow Sandbox lets you run **untrusted user code** safely while keeping your trusted services and credentials protected.
 
-**Run untrusted user code safely in WASM isolation while maintaining access to your trusted infrastructure.**
+## What It Is
 
-Blazing Flow Sandbox uses WebAssembly (WASM) via Pyodide to execute user-provided Python code in complete isolation, protecting your infrastructure from malicious code while still allowing controlled access to databases, APIs, and business logic through services.
+- User code runs in a **WASM/Pyodide** sandbox.
+- Trusted services run outside the sandbox.
+- User code can only interact with the outside world through approved service methods.
 
-## The Problem
+## When to Use
 
-You're building a platform where **end users write code**:
+- End users write custom transforms.
+- You run multi‑tenant workloads.
+- You need strong isolation guarantees.
 
-- Low-code tools where users write custom transforms
-- Data platforms where analysts write Python notebooks
-- Workflow builders where users add custom logic
-- Multi-tenant SaaS where customers bring their own code
+## How It Works (High Level)
 
-**The risk:** User code runs on your infrastructure. What if it:
-- Mines Bitcoin?
-- Exfiltrates data?
-- Crashes your servers?
-- Accesses other customers' data?
-
-## The Solution: Three-Layer Security
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        TRUST BOUNDARIES                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  YOUR INFRASTRUCTURE (fully trusted)                             │
-│  └── Coordinator / Foreman                                       │
-│      • Makes all decisions                                       │
-│      • Never runs user code                                      │
-│                                                                  │
-│  ════════════════════════════════════════════════════════       │
-│                                                                  │
-│  TENANT CODE (semi-trusted - you built it)                       │
-│  └── Services + Connectors                                     │
-│      • Your business logic                                       │
-│      • DB credentials, API keys                                  │
-│      • Runs on TRUSTED workers                                   │
-│                                                                  │
-│  ════════════════════════════════════════════════════════       │
-│                                                                  │
-│  USER CODE (untrusted - end users wrote it)                      │
-│  └── Steps in Pyodide WASM sandbox                              │
-│      • NO network access                                         │
-│      • NO file system access                                     │
-│      • CAN ONLY call approved service methods                   │
-│      • Runs on SANDBOXED workers                                 │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## What You Get
-
-### Complete Isolation
-
-```python
-# USER writes this (untrusted)
-@app.step
-async def user_transform(data: dict, services=None):
-    # Runs in WASM sandbox
-    # NO network, NO filesystem, NO escape
-
-    # Can ONLY call approved service methods
-    result = await services['DataProcessor'].clean(data)
-    return result
-```
-
-**Sandbox prevents:**
-- Network access (no data exfiltration)
-- File system access (can't read secrets)
-- Process spawning (no Bitcoin miners)
-- Memory attacks (WASM isolation)
-- Cross-tenant access (enforced boundaries)
-
-### Controlled Access via Services
-
-```python
-# YOU write this (trusted - runs outside sandbox)
-@app.service
-class DataProcessor(BaseService):
-    def __init__(self, connectors):
-        self._db = connectors.get('postgres')  # Real DB connection
-
-    async def clean(self, data: dict) -> dict:
-        # Has real database access
-        # Has API credentials
-        # User code can ONLY call this method
-        return self._process(data)
-```
-
-**User code calls service → Executes on trusted worker with real credentials**
-
-## 4 Worker Types
-
-Blazing Flow automatically manages 4 types of workers:
-
-| Worker Type | Trust | Execution | Use For |
-|-------------|-------|-----------|---------|
-| **BLOCKING** | Trusted | Sync | Your code, blocking operations |
-| **NON_BLOCKING** | Trusted | Async | Your code, async operations |
-| **BLOCKING_SANDBOXED** | Untrusted | Sync in WASM | User code, blocking |
-| **NON_BLOCKING_SANDBOXED** | Untrusted | Async in WASM | User code, async |
-
-**Blazing Flow automatically:**
-- Routes operations to the correct worker type
-- Scales each pool independently
-- Maintains minimum "pilot light" workers
-- Bridges service calls from sandbox to trusted workers
-
-## Architecture
-
-```
-┌─────────────────────┐
-│  User Code (WASM)   │  ← Sandboxed step
-│  Pyodide Worker     │
-└──────────┬──────────┘
-           │ Calls service method
-           ↓
-┌─────────────────────┐
-│  HTTP Bridge (JS)   │  ← Creates high-priority operation
-└──────────┬──────────┘
-           │
-           ↓
-┌─────────────────────┐
-│  Trusted Worker     │  ← Executes service method
-│  Real Connectors    │     with real credentials
-└──────────┬──────────┘
-           │
-           ↓
-      [Database/API]
-```
-
-## Use Cases
-
-### ✅ Perfect For
-
-- **Low-code platforms** - Users write custom transforms in Python
-- **Data platforms** - Analysts run notebooks with access to data APIs
-- **SaaS multi-tenancy** - Each customer brings custom business logic
-- **Workflow builders** - Users add conditional logic and calculations
-- **ETL platforms** - Custom data transformations per customer
-
-### ❌ Not For
-
-- **Trusted code only** - If all code is yours, use regular steps
-- **Heavy compute** - WASM has overhead (~2x slower than native)
-- **Native dependencies** - Can't use C extensions in WASM
-
-## Quick Example
-
-```python
-from blazing import Blazing, BaseService
-import asyncio
-
-app = Blazing(api_url="http://localhost:8000", api_token="your-token")
-
-# YOUR CODE (trusted) - runs on regular workers
-@app.service
-class MathAPI(BaseService):
-    async def factorial(self, n: int) -> int:
-        # Has access to everything
-        # Runs on trusted worker
-        result = 1
-        for i in range(1, n + 1):
-            result *= i
-        return result
-
-# USER CODE (untrusted) - runs in WASM sandbox
-@app.step
-async def calculate(x: int, services=None):
-    # NO network, NO filesystem
-    # CAN call service methods
-    result = await services['MathAPI'].factorial(x)
-    return result * 2
-
-# ORCHESTRATOR (your code)
-@app.workflow
-async def process(value: int, services=None):
-    # Calls sandboxed step safely
-    return await calculate(value, services=services)
-
-async def main():
-    await app.publish()
-    result = await app.process(5)
-    print(f"Result: {result}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-**Result:**
-- User code runs in complete isolation
-- Can only access approved service methods
-- Your infrastructure is protected
-- User gets powerful capabilities
-
-## Security Guarantees
-
-✅ **Network isolation** - User code cannot make HTTP requests
-✅ **Filesystem isolation** - Cannot read/write files
-✅ **Process isolation** - Cannot spawn processes
-✅ **Memory isolation** - WASM sandbox prevents memory attacks
-✅ **Cross-tenant isolation** - Each execution is completely separate
-✅ **Controlled access** - Only approved service methods available
-✅ **Resource limits** - CPU/memory limits enforced
-✅ **Audit trail** - All service calls logged
-
-## Performance
-
-| Metric | Native Python | WASM (Pyodide) |
-|--------|---------------|----------------|
-| **Startup time** | ~10ms | ~500ms (first run, cached after) |
-| **Execution speed** | 1x | ~2x slower |
-| **Memory overhead** | Minimal | ~50MB per worker |
-| **Good for** | All code | Untrusted code only |
-
-**Best practice:** Use regular steps for trusted code, sandboxed steps only for user code.
+1. User code executes in a restricted runtime.
+2. Service calls are forwarded to trusted workers.
+3. Results flow back to the sandboxed step.
 
 ## Next Steps
 
-- [Quick Start](/blazing-flow-sandbox/quick-start) - Run your first sandboxed step
-- [Security Model](/blazing-flow-sandbox/security) - Understanding trust boundaries
-- [Service Bridge](/blazing-flow-sandbox/services) - Connect sandbox to infrastructure
-- [Worker Types](/blazing-flow-sandbox/workers) - 4 worker types explained
-- [Deployment](/blazing-flow-sandbox/deployment) - Production deployment
+- [Quick Start](/docs/blazing-flow-sandbox/quick-start)
+- [Security Model](/docs/blazing-flow-sandbox/security)
+- [Services Bridge](/docs/blazing-flow-sandbox/services)
