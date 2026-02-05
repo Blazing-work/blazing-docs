@@ -146,43 +146,11 @@ You don't need to configure this - it happens automatically. You can monitor the
 
 ### Connector Types
 
-Blazing supports multiple connector types:
-
-#### SQL Connectors
-```python
-from blazing.connectors import SQLConnector
-
-db = SQLConnector(
-    type="postgresql",
-    host="db.example.com",
-    port=5432,
-    database="prod",
-    credentials_encrypted=True
-)
-```
-
-#### HTTP Connectors
-```python
-from blazing.connectors import HTTPConnector
-
-api = HTTPConnector(
-    base_url="https://api.example.com",
-    headers={"Authorization": "Bearer ..."},
-    timeout=30
-)
-```
-
-#### SSH Connectors
-```python
-from blazing.connectors import SSHConnector
-
-ssh = SSHConnector(
-    host="server.example.com",
-    port=22,
-    username="deploy",
-    key_path="/path/to/key"
-)
-```
+Connectors are injected into services by the runtime and expose access to
+external systems (databases, object storage, secrets, web APIs). In Blazing
+Flow, you access them via `connectors` inside a service or through the `services`
+parameter inside steps. Configuration for persistent infrastructure and
+connectors lives in Blazing Core YAML.
 
 ### Connection Pooling
 
@@ -272,4 +240,3 @@ app = Blazing(
 ```
 
 ## Next Steps
-

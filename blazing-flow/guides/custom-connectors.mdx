@@ -58,7 +58,7 @@ class MathService(BaseService):
 2. Serialization   → app.publish() sends to server
 3. Initialization  → Executor creates instance with connectors
 4. Injection       → Steps receive via services['ServiceName']
-5. Cleanup         → Automatic when execution completes
+5. Caching         → Instances are cached per executor until reload or worker restart
 ```
 
 ### Using Services in Steps
@@ -84,15 +84,16 @@ Blazing provides several built-in connectors for common infrastructure needs.
 
 | Connector | Purpose | Example Use |
 |-----------|---------|-------------|
-| `postgres` | PostgreSQL database | SQL queries, transactions |
-| `redis` | Redis cache/queue | Caching, pub/sub, rate limiting |
-| `smtp` | Email service | Sending transactional emails |
-| `s3` | S3-compatible storage | File upload/download |
 | `secrets` | Encrypted secrets | API keys, credentials |
+| `dict` | Distributed key-value | Caching, shared state |
+| `queue` | Distributed queue | Work scheduling, buffering |
+| `volume` | Persistent filesystem | Model weights, artifacts |
+| `bucket_mount` | S3-compatible bucket mount | Object storage I/O |
+| `llm` | LLM providers/emulator | OpenAI/Anthropic, local mock |
 | `web_search` | Web search APIs | SerpAPI, Tavily, Brave |
-| `database` | Generic SQL database | MySQL, SQLite, PostgreSQL |
+| `database` | SQL database access | Postgres/MySQL/SQLite |
 | `code_execution` | Isolated code execution | Run Python in Pyodide |
-| `rest` | Generic REST API | HTTP requests with auth |
+| `rest` | Authenticated REST client | Third-party APIs |
 
 ### Accessing Connectors in Services
 
@@ -104,10 +105,10 @@ from blazing.base import BaseService
 @app.service
 class UserDatabase(BaseService):
     def __init__(self, connectors):
-        # Get the postgres connector
-        self._db = connectors.get('postgres')
-        # Get the redis cache
-        self._cache = connectors.get('redis')
+        # Get the database connector
+        self._db = connectors.get('database')
+        # Get the dict connector
+        self._cache = connectors.get('dict')
 
     async def get_user(self, user_id: int) -> dict:
         # Try cache first
@@ -148,6 +149,20 @@ class MathService(BaseService):
 ```
 
 ## Creating Custom Services
+
+### Example: Cloud Bucket Mount
+
+```python
+from blazing.base import BaseService
+
+@app.service
+class DatasetService(BaseService):
+    def __init__(self, connectors):
+        self.bucket = connectors.get("bucket_mount")
+
+    async def list_inputs(self):
+        return await self.bucket.list_objects(prefix="inputs/")
+```
 
 ### Example 1: Database Service with CRUD Operations
 

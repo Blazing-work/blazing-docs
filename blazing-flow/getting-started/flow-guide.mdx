@@ -35,7 +35,7 @@ Blazing Flow excels at:
   <div className="p-4 rounded-lg border border-gray-200 dark:border-dark-800">
     <div className="font-semibold mb-2">✅ Stateful Processing</div>
     <div className="text-sm text-muted-foreground">
-      Workflows that need checkpointing and partial recovery
+      Long-lived services and pooled connectors for shared state
     </div>
   </div>
 
@@ -140,6 +140,70 @@ class OrderService(BaseService):
         # Your business logic here
         return {"id": order_id, "status": "pending"}
 ```
+
+## Dynamic Batching
+
+Use `@batched` to combine individual calls into a single batch execution.
+
+```python
+from blazing import batched, BatchConfig
+
+@batched(BatchConfig(max_batch_size=32, wait_ms=50))
+@app.step
+async def embed(texts: list[str], services=None) -> list[list[float]]:
+    # This function receives a batch of inputs
+    return await services["EmbeddingService"].encode(texts)
+```
+
+**Notes:**
+- Apply `@batched` before `@app.step`
+- Return a list with length >= batch size
+
+## Scheduled Workflows
+
+Schedule workflows with `Cron` or `Period`:
+
+```python
+from blazing import Cron, Period
+
+@app.workflow(schedule=Cron("0 2 * * *"))  # Daily at 2 AM
+async def nightly_report(services=None):
+    ...
+
+@app.workflow(schedule=Period(minutes=30))  # Every 30 minutes
+async def sync_job(services=None):
+    ...
+```
+
+## Custom Executor Images
+
+Customize the executor image per step or workflow:
+
+```python
+from blazing import Image
+
+video_image = (
+    Image.executor()
+    .apt_install("ffmpeg")
+    .pip_install("opencv-python")
+    .env(MODEL_PATH="/models")
+)
+
+@app.step(image=video_image)
+async def process_video(url: str, services=None):
+    ...
+```
+
+## Notebook Sessions (Jupyter Kernel)
+
+Blazing provides a Jupyter kernel that proxies cells to the notebook runtime.
+
+```bash
+python -m blazing_kernel install
+```
+
+Then select **“Blazing Flow Sandbox”** as the kernel in Jupyter. Notebook sessions
+run in an isolated Pyodide runtime and support checkpointing.
 
 ## Architecture
 

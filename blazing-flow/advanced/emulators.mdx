@@ -33,6 +33,7 @@ The LocalStack provides 8 emulated services with production-matching APIs:
 | Dict | Distributed key-value | Redis with CRDT | In-memory dict |
 | Queue | Distributed messaging | Redis with segments | In-memory queue |
 | LLM | AI model connectors | OpenAI/Anthropic APIs | Mock responses |
+| Bucket Mount | S3-compatible storage | Cloud object storage | Local filesystem |
 
 ## Quick Start
 
@@ -197,6 +198,37 @@ print(f"Tenants: {stats.tenants}")
 ## Local Build Service
 
 The build service creates Docker images from ImageSpec definitions.
+
+## Local Cloud Bucket Mounts
+
+Blazing includes an S3-compatible bucket mount emulator for local development.
+
+```python
+from blazing.local import LocalCloudBucketMountService
+
+bucket_service = LocalCloudBucketMountService(storage_path="/tmp/blazing-buckets")
+await bucket_service.start()
+
+bucket = await bucket_service.create_bucket("my-data", token="my-token")
+await bucket.put_object("inputs/file.txt", b"hello")
+keys = await bucket.list_objects(prefix="inputs/")
+
+await bucket_service.stop()
+```
+
+LocalStack also exposes convenience helpers:
+
+```python
+from blazing.local import LocalStack
+
+stack = LocalStack()
+await stack.start()
+
+bucket = await stack.create_bucket_mount("my-data", token="my-token")
+await bucket.put_object("inputs/file.txt", b"hello")
+
+await stack.stop()
+```
 
 ### Key Features
 - **Docker integration**: Uses local Docker daemon for real builds

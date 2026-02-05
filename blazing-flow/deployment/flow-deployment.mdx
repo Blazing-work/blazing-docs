@@ -212,6 +212,27 @@ deployment:
         error_rate: 0.05  # Rollback if >5% errors
 ```
 
+## Custom Executor Images
+
+You can customize the executor image per step or workflow using `Image.executor()`.
+
+```python
+from blazing import Image
+
+gpu_image = (
+    Image.executor()
+    .apt_install("ffmpeg")
+    .pip_install("torch", "transformers")
+)
+
+@app.step(image=gpu_image)
+async def embed(text: str, services=None):
+    ...
+```
+
+**Note:** `set_executor_image()` and `ExecutorImage` are deprecated in favor of
+`Image.executor()` and per‑step/per‑workflow `image=`.
+
 ## Production Best Practices
 
 ### Health Checks
@@ -268,7 +289,7 @@ async def main():
         # await cache.close()
 
         # Save state
-        # await save_checkpoint()
+        # Checkpointing is only available for notebook sessions (not workflows)
 
         return {"status": "cleanup_complete"}
 

@@ -151,7 +151,7 @@ async def user_code(x: int, y: int, services=None):
 
 ✅ **Complex multi-stage workflows** - Pipelines with branching logic and multiple steps
 
-✅ **Stateful computations** - Automatic checkpointing and partial recovery
+✅ **Stateful computations** - Long-lived services and connectors for pooled resources
 
 ✅ **Mixed workloads** - Combination of I/O-bound and CPU-bound tasks
 
@@ -207,13 +207,22 @@ if __name__ == "__main__":
 Define workflows using simple decorators - `@workflow` for pipelines, `@step` for steps.
 
 ### 🔄 Automatic Recovery
-Pipelines resume automatically after interruptions. No lost work, no manual intervention.
+Pipelines recover from transient failures with retries and durable job tracking.
 
 ### ⚡ Smart Workers
 System automatically balances async and blocking workers based on your workload patterns.
 
 ### 🔌 Persistent Connections
 Keep database and SSH connections alive across tasks for better performance.
+
+### 🧩 Dynamic Batching
+Batch individual calls into a single execution for GPU and throughput efficiency.
+
+### ⏰ Scheduled Workflows
+Run workflows on cron or periodic schedules with `Cron` and `Period`.
+
+### 📓 Notebook Runtime (Pyodide)
+Use the Blazing Jupyter kernel to run notebook sessions with isolated Python namespaces and checkpointing.
 
 ### 📊 Built-in Monitoring
 Real-time dashboard shows queue depths, worker states, and throughput metrics.

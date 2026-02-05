@@ -20,7 +20,12 @@ def endpoint(
     path: str,
     method: str = "POST",
     auth: Optional[Callable] = None,
-    enable_websocket: bool = False
+    enable_websocket: bool = False,
+    image: Any = None,
+    response_mode: str = "async",
+    timeout: Optional[int] = None,
+    middleware: Optional[List] = None,
+    rate_limit: Optional[Dict] = None
 ):
     """Decorator to expose a workflow as an HTTP/WebSocket endpoint."""
     pass
@@ -34,6 +39,11 @@ def endpoint(
 | `method` | `str` | No | `"POST"` | HTTP method: `"GET"`, `"POST"`, `"PUT"`, `"DELETE"` |
 | `auth` | `Callable` | No | `None` | Async function for authentication (see [Authentication](/blazing-flow/endpoints/authentication)) |
 | `enable_websocket` | `bool` | No | `False` | Create WebSocket endpoint at `{path}/ws` |
+| `image` | `Image` | No | `None` | Container image for endpoint deployment |
+| `response_mode` | `str` | No | `"async"` | `"async"`, `"sync"`, `"stream"`, or `"webhook"` |
+| `timeout` | `int` | No | `None` | Timeout (seconds) for sync mode |
+| `middleware` | `List` | No | `[]` | Middleware list (CORS, rate limit, cache, etc.) |
+| `rate_limit` | `Dict` | No | `None` | Rate limit configuration |
 
 ### Returns
 
@@ -123,7 +133,10 @@ async def create_asgi_app(
     title: str = "Blazing Workflow API",
     description: str = "",
     version: str = "1.0.0",
-    enable_cors: bool = True
+    enable_cors: bool = True,
+    framework: str = "fastapi",
+    cors_origins: Optional[List[str]] = None,
+    global_middleware: Optional[List] = None
 ) -> FastAPI:
     """Generate a FastAPI application from Blazing Flow workflows."""
     pass
@@ -138,6 +151,9 @@ async def create_asgi_app(
 | `description` | `str` | No | `""` | API description shown in OpenAPI docs |
 | `version` | `str` | No | `"1.0.0"` | API version shown in OpenAPI docs |
 | `enable_cors` | `bool` | No | `True` | Enable CORS middleware (allow all origins) |
+| `framework` | `str` | No | `"fastapi"` | Web framework adapter (`fastapi`, `flask`, `quart`, `sanic`, `falcon`, `django`, `litestar`) |
+| `cors_origins` | `List[str]` | No | `None` | Allowed CORS origins |
+| `global_middleware` | `List` | No | `None` | Middleware applied to all endpoints |
 
 ### Returns
 

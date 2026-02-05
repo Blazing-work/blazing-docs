@@ -51,6 +51,37 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+## Dynamic Batching
+
+Batch individual calls into a single execution with `@batched`:
+
+```python
+import asyncio
+from blazing import Blazing, batched, BatchConfig
+
+async def main():
+    app = Blazing()
+
+    @batched(BatchConfig(max_batch_size=16, wait_ms=25))
+    @app.step
+    async def classify(texts: list[str], services=None) -> list[str]:
+        return await services["Classifier"].predict(texts)
+
+    @app.workflow
+    async def run_batch(inputs: list[str], services=None):
+        tasks = [classify(t, services=services) for t in inputs]
+        return await asyncio.gather(*tasks)
+
+    await app.publish()
+
+    inputs = [f"item-{i}" for i in range(100)]
+    result = await app.run_batch(inputs).wait_result()
+    print(f"Processed {len(result)} items")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
 **Key points:**
 - Import `Semaphore` from `blazing` (NOT `asyncio.Semaphore`)
 - Use `async with sem:` to acquire/release automatically

@@ -7,9 +7,13 @@ position: 0
 
 Configure Blazing Flow workflows, executors, retries, concurrency, and runtime behavior.
 
+> **Note:** Most persistent infrastructure and scaling controls live in Blazing Core YAML.
+> This page documents the optional `flow.yaml` configuration for workflow runtime behavior.
+
 ## Configuration File
 
-Blazing Flow uses a `flow.yaml` configuration file:
+Blazing Flow can use a `flow.yaml` file for workflow-specific runtime behavior.
+Persistent infrastructure and scaling are configured in Blazing Core YAML.
 
 ```yaml
 version: 1
@@ -226,7 +230,7 @@ state:
     enabled: true
 
     # Checkpoint frequency
-    checkpoint_interval: 1m
+    # Note: Workflow checkpointing is not a Flow config option.
 
     # Snapshot configuration
     snapshots:
