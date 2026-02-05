@@ -3,5 +3,9 @@
   "description": "Command-line interface for Blazing Flow deployment and management",
   "position": 8,
   "product": "blazing-flow",
-  "category": "reference"
+  "category": "reference",
+  "tags": [
+    "blazing-flow",
+    "cli"
+  ]
 }

@@ -3,5 +3,9 @@
   "position": 5,
   "description": "Understand governance features and compliance controls",
   "product": "blazing-core",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-core",
+    "governance"
+  ]
 }

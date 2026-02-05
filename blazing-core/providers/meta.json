@@ -3,5 +3,9 @@
   "position": 2,
   "description": "Configure cloud providers and infrastructure preferences",
   "product": "blazing-core",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-core",
+    "providers"
+  ]
 }

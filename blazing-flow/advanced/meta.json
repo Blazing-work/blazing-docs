@@ -3,5 +3,9 @@
   "description": "Advanced Blazing Flow features: Arrow Flight, autoscaling, emulators",
   "position": 7,
   "product": "blazing-flow",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-flow",
+    "advanced"
+  ]
 }

@@ -3,5 +3,9 @@
   "description": "Guides for connectors, notebooks, and framework comparison",
   "position": 9,
   "product": "blazing-flow",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-flow",
+    "guides"
+  ]
 }

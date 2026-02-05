@@ -12,5 +12,9 @@
     "deployment",
     "examples",
     "examples-expanded"
+  ],
+  "tags": [
+    "blazing-flow",
+    "endpoints"
   ]
 }
