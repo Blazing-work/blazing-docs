@@ -1,51 +1,24 @@
 ---
 title: Local Development Emulators
 label: Local Dev
-description: Develop and test Blazing applications locally without external dependencies
+description: Local development experience for Blazing Flow
 position: 3
 ---
 
-Blazing ships local emulators so you can develop and test without cloud infrastructure.
+Blazing provides local emulators so developers can iterate without touching production infrastructure.
 
-## What You Get
+## What It Provides
 
-Local emulators let you spin up a lightweight development stack with the same APIs you use in production.
+- Local substitutes for common services (volumes, secrets, queues, etc.).
+- Fast iteration with minimal setup.
+- Safe testing without cloud costs.
 
-Common emulators include:
+## Why It Matters
 
-- Registry (image storage)
-- Build (image builds)
-- Volume (persistent files)
-- Secrets (credentials)
-- Scheduler (cron/periodic)
-- Dict (key‑value)
-- Queue (jobs)
-- LLM (mock responses)
-- Bucket mount (object storage)
+- Faster feedback loops.
+- Fewer production dependencies during development.
+- Safer testing of workflows and services.
 
-## Quick Start
+## How To Use
 
-```python
-from blazing.local import LocalStack
-
-stack = LocalStack()
-await stack.start()
-
-# Example: create a volume
-volume = await stack.create_volume("my-data", token="my-token")
-await volume.put_file("/config.json", b'{}')
-await volume.commit()
-
-await stack.stop()
-```
-
-## Best Practices
-
-- Use emulators for unit and integration tests.
-- Keep production credentials out of local configs.
-- Treat emulator data as ephemeral.
-
-## Next Steps
-
-- [Core Examples](/docs/blazing-flow/core-examples)
-- [Services & Connectors](/docs/blazing-flow/guides/custom-connectors)
+Use the `LocalStack` APIs in development. Your platform team can provide recommended local setups.

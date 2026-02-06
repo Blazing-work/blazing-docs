@@ -1,19 +1,19 @@
 ---
 title: Deployment
 label: Deployment
-description: Deploy sandboxed workloads safely
+description: How sandboxed execution is delivered in production
 position: 6
 ---
 
-Sandboxed execution is managed by Blazing Core. You do not need to deploy or operate sandbox workers directly.
+Sandboxed execution is delivered as a **managed capability**. Your platform team configures the runtime through Blazing Core; developers just mark steps as `sandboxed=True`.
 
-## What You Do
+## What the Platform Provides
 
-- Mark steps or workflows as `sandboxed=True`.
-- Configure scaling policies in Blazing Core YAML if needed.
+- Isolated runtimes for untrusted code
+- Managed scaling and lifecycle
+- Secure routing between sandboxed steps and trusted services
 
-## What the Platform Does
+## What Developers Do
 
-- Runs sandboxed code in isolated workers.
-- Routes service calls to trusted workers.
-- Manages scaling and lifecycle.
+- Use `sandboxed=True` for user code
+- Keep external access in services

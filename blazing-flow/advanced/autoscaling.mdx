@@ -1,35 +1,24 @@
 ---
 title: Autoscaling
 label: Autoscaling
-description: How autoscaling works in Blazing Flow at a high level
+description: How Blazing Flow scales under load
 position: 2
 ---
 
-Blazing Flow autoscaling is managed by **Blazing Core**. This page describes the behavior you can rely on as a developer without exposing internal control logic.
+Blazing Flow uses adaptive autoscaling to keep latency low while controlling cost.
 
-## What Autoscaling Does
+## What It Does
 
-- Scales worker capacity up when demand increases.
-- Scales down during idle periods to control cost.
-- Protects the system during overload by applying backpressure.
+- Scales worker capacity up when demand rises.
+- Scales down when the system is idle.
+- Applies backpressure when downstream services are saturated.
+
+## Why It Matters
+
+- Faster response times during spikes.
+- Lower cost during quiet periods.
+- More predictable performance for end users.
 
 ## What You Control
 
-Autoscaling policies are configured in Blazing Core YAML. Typical controls include:
-
-- Minimum and maximum worker counts.
-- Scale‑to‑zero behavior and warm pools.
-- Separate policies for trusted vs sandboxed execution.
-
-If you need advanced tuning, use Core YAML or talk to your platform team.
-
-## Best Practices
-
-- Keep steps idempotent so scaling does not affect correctness.
-- Use retries only when a step can be safely replayed.
-- Keep cold‑start work minimal.
-
-## Next Steps
-
-- [Deployment Guide](/docs/blazing-flow/deployment/flow-deployment)
-- [Workers Overview](/docs/blazing-flow/workers/overview)
+Autoscaling policies are managed by **Blazing Core**. Application developers do not need to tune scaling directly.

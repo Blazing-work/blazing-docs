@@ -1,20 +1,20 @@
 ---
 title: Workers
 label: Workers
-description: Trusted vs sandboxed execution
+description: Trusted and sandboxed execution layers
 position: 5
 ---
 
-Blazing Flow routes work to trusted or sandboxed workers automatically.
+Blazing Flow separates trusted and sandboxed execution to keep user code isolated.
 
-## Trusted Workers
+## Trusted Execution
 
-- Run your services and workflow orchestration.
-- Have network and filesystem access.
+- Runs services and orchestration
+- Holds credentials and external connections
 
-## Sandboxed Workers
+## Sandboxed Execution
 
-- Run user‑provided code in a restricted runtime.
-- No direct network or filesystem access.
+- Runs user‑provided code in WASM
+- No direct network or filesystem access
 
-You do not need to configure routing manually.
+Blazing routes work automatically based on how you define the step.

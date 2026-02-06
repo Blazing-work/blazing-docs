@@ -1,24 +1,24 @@
 ---
 title: Large Data Transfers
 label: Large Data
-description: Handling large datasets in Blazing Flow
+description: Fast transfer of large datasets in Blazing Flow
 position: 1
 ---
 
-Blazing Flow automatically optimizes large payloads (DataFrames, arrays, and columnar data) during execution. You do not need to configure anything to benefit from this.
+Blazing Flow automatically optimizes large payloads like DataFrames and arrays to keep pipelines fast.
 
-## What You Should Do
+## What It Does
 
-- Keep payloads serializable (pandas, NumPy, PyArrow, or basic Python types).
-- Prefer references (IDs/paths) over massive inline payloads when possible.
-- Use volumes or bucket mounts for large artifacts.
+- Detects large columnar payloads.
+- Uses an optimized transfer path under the hood.
+- Minimizes serialization overhead.
 
-## Best Practices
+## Why It Matters
 
-- For large datasets, write intermediate results to a volume or bucket and pass references between steps.
-- Keep step results reasonably sized to avoid network overhead.
+- Faster end‑to‑end pipeline times.
+- Less memory pressure on workers.
+- Smooth handling of large datasets.
 
-## Next Steps
+## How To Use
 
-- [Core Examples](/docs/blazing-flow/core-examples)
-- [Volume & Bucket Mounts](/docs/blazing-flow/guides/custom-connectors)
+You don’t need to configure anything. Just pass supported types (pandas, NumPy, PyArrow) and Blazing handles the transfer path automatically.

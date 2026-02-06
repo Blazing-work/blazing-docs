@@ -5,15 +5,17 @@ description: Flow Sandbox capabilities at a glance
 position: 0
 ---
 
-Flow Sandbox provides a safe environment for running untrusted code.
+Flow Sandbox provides strong isolation for untrusted code while preserving access to trusted services.
 
-## Core Capabilities
+## Key Capabilities
 
-- Isolated execution
-- Safe service bridge to trusted systems
-- Optional checkpointing and session recovery
-- Predictable resource limits
+- WASM isolation for user‑provided code
+- Explicit service bridge to trusted systems
+- Optional checkpointing for session recovery
+- Predictable resource limits and quotas
 
-## How to Use
+## Why It Matters
 
-Mark steps or workflows as `sandboxed=True` and move sensitive logic into services.
+- Protects your infrastructure from user code
+- Makes multi‑tenant workloads safe by default
+- Keeps platform controls centralized in Blazing Core

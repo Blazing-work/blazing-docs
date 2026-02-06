@@ -1,10 +1,16 @@
 ---
-title: Autoscaling Configuration
+title: Autoscaling
 label: Autoscaling
-description: Configure horizontal autoscaling for your services
+description: Platform‑level autoscaling in Blazing Core
 position: 1
 ---
 
-Autoscaling in Blazing Core is configured in Core YAML.
+Blazing Core manages autoscaling for platform services and workloads.
 
-Define minimum/maximum capacity and scaling triggers appropriate to your workload. Your platform team owns these settings.
+## What It Does
+
+- Scales services up during demand spikes
+- Scales down to reduce cost
+- Maintains minimum availability
+
+Autoscaling is controlled via Core YAML and operated by your platform team.
