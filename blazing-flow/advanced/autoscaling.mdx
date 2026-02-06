@@ -1,0 +1,24 @@
+---
+title: Autoscaling
+label: Autoscaling
+description: How Blazing Flow scales under load
+position: 2
+---
+
+Blazing Flow uses adaptive autoscaling to keep latency low while controlling cost.
+
+## What It Does
+
+- Scales worker capacity up when demand rises.
+- Scales down when the system is idle.
+- Applies backpressure when downstream services are saturated.
+
+## Why It Matters
+
+- Faster response times during spikes.
+- Lower cost during quiet periods.
+- More predictable performance for end users.
+
+## What You Control
+
+Autoscaling policies are managed by **Blazing Core**. Application developers do not need to tune scaling directly.

@@ -5,330 +5,92 @@ description: Monitor and observe Blazing Flow workflows
 position: 0
 ---
 
-Monitor Blazing Flow workflows with metrics, logs, traces, and alerts to ensure healthy operation.
-
-## Metrics
-
-### Built-in Metrics
-
-Blazing Flow automatically tracks:
-
-```
-# Execution metrics
-flow_executions_total{status, workflow}
-flow_execution_duration_seconds{workflow}
-flow_task_duration_seconds{task, workflow}
-
-# Resource metrics
-flow_cpu_usage{workflow}
-flow_memory_usage{workflow}
-flow_active_executions{workflow}
-
-# Error metrics
-flow_errors_total{error_type, workflow}
-flow_retries_total{task, workflow}
-```
-
-### View Metrics
-
-```bash
-# Real-time metrics
-blazing flow metrics production-workflow --live
-
-# Export metrics
-blazing flow metrics export \
-  --format prometheus \
-  --output metrics.txt
-```
-
-### Custom Metrics
-
-Track custom metrics in your workflow:
-
-```python
-from blazing import Flow, metrics
-
-flow = Flow(name="production-workflow")
-
-@flow.task
-async def process_data(data):
-    # Counter
-    metrics.counter("data_processed").inc()
-
-    # Histogram
-    metrics.histogram("data_size").observe(len(data))
-
-    # Gauge
-    metrics.gauge("queue_size").set(get_queue_size())
-
-    # Timer
-    with metrics.timer("processing_duration"):
-        result = await process(data)
-
-    return result
-```
+This guide focuses on developer‑level observability that works today without exposing platform internals. Use standard Python tooling for logs, metrics, tracing, and profiling, and keep deployment concerns in Blazing Core.
 
 ## Logging
 
-### Structured Logging
+Blazing Flow captures your standard Python logs. Use structured logging so you can filter and analyze events later.
 
 ```python
-from blazing import Flow, logger
+import asyncio
+import logging
+from blazing import Blazing
 
-flow = Flow(name="production-workflow")
+logger = logging.getLogger(__name__)
 
-@flow.task
-async def process_order(order_id: str):
-    # Structured logging
-    logger.info("Processing order", extra={
-        "order_id": order_id,
-        "status": "started"
-    })
+async def main():
+    app = Blazing()
 
-    try:
-        result = await process(order_id)
+    @app.step
+    async def process_order(order_id: str, services=None):
+        logger.info("processing order", extra={"order_id": order_id})
+        result = await handle(order_id)
+        logger.info("order completed", extra={"order_id": order_id})
+        return result
 
-        logger.info("Order processed", extra={
-            "order_id": order_id,
-            "status": "completed",
-            "result": result
-        })
+    await app.publish()
 
-    except Exception as e:
-        logger.error("Order processing failed", extra={
-            "order_id": order_id,
-            "error": str(e)
-        }, exc_info=True)
+async def handle(order_id: str):
+    return {"order_id": order_id, "status": "completed"}
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Log Aggregation
+## Metrics
 
-Configure log shipping:
+For custom metrics, instrument your code with the library your team already uses (Prometheus, OpenTelemetry, StatsD, Datadog, etc.). Keep the metrics export configuration in Blazing Core or your observability stack.
 
-```yaml
-monitoring:
-  logging:
-    outputs:
-      # CloudWatch
-      - type: cloudwatch
-        log_group: /blazing/flow
-        log_stream: production-workflow
+Practical guidance:
 
-      # Datadog
-      - type: datadog
-        api_key: "${DATADOG_API_KEY}"
+- Track business metrics in steps and workflows (e.g., throughput, latency, error rate).
+- Emit counters/histograms where you already handle exceptions.
+- Avoid high‑cardinality labels for workflow inputs.
 
-      # Elasticsearch
-      - type: elasticsearch
-        hosts: ["es.example.com:9200"]
-        index: flow-logs
-```
+## Tracing
 
-## Distributed Tracing
-
-### Enable Tracing
-
-```yaml
-monitoring:
-  tracing:
-    enabled: true
-    sampling:
-      rate: 0.1  # Sample 10% of traces
-
-    exporters:
-      - type: jaeger
-        endpoint: "http://jaeger:14268"
-```
-
-### Custom Spans
-
-Add custom tracing spans:
+If you need traces, add OpenTelemetry (or your tracing SDK) in your workflow code. This keeps your instrumentation portable and avoids platform coupling.
 
 ```python
-from blazing import Flow
+import asyncio
 from opentelemetry import trace
+from blazing import Blazing
 
-flow = Flow(name="production-workflow")
 tracer = trace.get_tracer(__name__)
 
-@flow.task
-async def process_data(data):
-    # Create custom span
-    with tracer.start_as_current_span("process_data") as span:
-        span.set_attribute("data_size", len(data))
+async def main():
+    app = Blazing()
 
-        # Nested span
-        with tracer.start_as_current_span("validate"):
-            await validate_data(data)
+    @app.step
+    async def transform(data, services=None):
+        with tracer.start_as_current_span("transform") as span:
+            span.set_attribute("data_size", len(data))
+            return data
 
-        with tracer.start_as_current_span("transform"):
-            result = await transform_data(data)
+    await app.publish()
 
-        span.set_attribute("result_size", len(result))
-        return result
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Alerts
 
-### Configure Alerts
+Set alerts in your existing monitoring system (Datadog, PagerDuty, Grafana, CloudWatch, etc.). A reliable pattern is to alert on:
 
-```yaml
-monitoring:
-  alerts:
-    enabled: true
+- error rate (percentage of failed executions)
+- p95/p99 latency
+- queue backlog or input rate spikes
 
-    rules:
-      # High error rate
-      - name: high_error_rate
-        condition: error_rate > 0.05
-        duration: 5m
-        severity: critical
-        message: "Error rate above 5% for 5 minutes"
+## Profiling
 
-      # High latency
-      - name: high_latency
-        condition: p95_latency > 1000ms
-        duration: 10m
-        severity: warning
-
-      # Low success rate
-      - name: low_success_rate
-        condition: success_rate < 0.95
-        duration: 5m
-        severity: warning
-
-    # Notification channels
-    notifications:
-      - type: pagerduty
-        integration_key: "${PAGERDUTY_KEY}"
-        severity: [critical]
-
-      - type: slack
-        webhook: "${SLACK_WEBHOOK}"
-        severity: [critical, warning]
-
-      - type: email
-        addresses: [ops@example.com]
-        severity: [critical]
-```
-
-### Alert on Custom Metrics
-
-```python
-from blazing import Flow, metrics, alerts
-
-flow = Flow(name="production-workflow")
-
-@flow.task
-async def monitor_queue(queue_name: str):
-    queue_size = await get_queue_size(queue_name)
-
-    # Set metric
-    metrics.gauge("queue_size").set(queue_size)
-
-    # Alert if queue too large
-    if queue_size > 1000:
-        alerts.trigger(
-            name="large_queue",
-            severity="warning",
-            message=f"Queue {queue_name} has {queue_size} items"
-        )
-```
-
-## Dashboards
-
-### Grafana Dashboard
-
-```json
-{
-  "dashboard": {
-    "title": "Blazing Flow - Production Workflow",
-    "panels": [
-      {
-        "title": "Execution Rate",
-        "targets": [
-          {
-            "expr": "rate(flow_executions_total[5m])"
-          }
-        ]
-      },
-      {
-        "title": "Error Rate",
-        "targets": [
-          {
-            "expr": "rate(flow_errors_total[5m])"
-          }
-        ]
-      },
-      {
-        "title": "P95 Latency",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, flow_execution_duration_seconds)"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-## Performance Profiling
-
-### Enable Profiling
+For performance investigations, use Python’s built‑in profiler locally first, then promote hot‑path fixes to production.
 
 ```bash
-# Run with profiling
-blazing flow run production-workflow \
-  --profile \
-  --profile-output profile.json
-
-# Analyze profile
-blazing flow analyze profile.json
-```
-
-### Continuous Profiling
-
-```yaml
-monitoring:
-  profiling:
-    enabled: true
-    sample_rate: 0.01  # Profile 1% of executions
-
-    exporters:
-      - type: pprof
-        endpoint: "http://pprof:8080"
-```
-
-## Troubleshooting
-
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-blazing flow run production-workflow \
-  --log-level debug \
-  --trace
-```
-
-### Execution Traces
-
-View execution trace:
-
-```bash
-# Get execution ID
-blazing flow list --recent
-
-# View trace
-blazing flow trace <execution-id>
-
-# Export trace
-blazing flow trace <execution-id> --export trace.json
+python -m cProfile -o profile.out workflows/workflow.py
+python -m pstats profile.out
 ```
 
 ## Next Steps
 
-- [Review deployment guide](/docs/flow-deployment)
-- [Configure your workflows](/docs/flow-configuration)
-- [Join our community](https://discord.gg/blazing)
+- [Review deployment guide](/docs/blazing-flow/deployment/flow-deployment)
+- [Configure your workflows](/docs/blazing-flow/configuration/flow-configuration)

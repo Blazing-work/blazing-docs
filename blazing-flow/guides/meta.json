@@ -1,0 +1,11 @@
+{
+  "title": "Guides",
+  "description": "Guides for connectors, notebooks, and framework comparison",
+  "position": 9,
+  "product": "blazing-flow",
+  "category": "guide",
+  "tags": [
+    "blazing-flow",
+    "guides"
+  ]
+}

@@ -1,0 +1,93 @@
+---
+title: Services & Connectors
+label: Services & Connectors
+description: Encapsulate business logic and access external systems
+position: 2
+---
+
+Services are the primary way to organize business logic and interact with external resources in Blazing Flow.
+
+## What Are Services?
+
+A **service** is a class that:
+
+- Extends `BaseService`
+- Is registered with `@app.service`
+- Is injected into steps and workflows via the `services` parameter
+
+Services help you keep steps focused on orchestration while centralizing data access, credentials, and domain logic.
+
+## Service Basics
+
+```python
+from blazing.base import BaseService
+
+@app.service
+class MathService(BaseService):
+    async def add(self, a: float, b: float) -> float:
+        return a + b
+```
+
+Use a service inside a step:
+
+```python
+@app.step
+async def calculate(x: float, y: float, services=None):
+    return await services["MathService"].add(x, y)
+```
+
+## Connectors
+
+Connectors provide access to external systems. They are injected into services during initialization.
+
+Common connectors include:
+
+- `secrets` for credentials
+- `dict` for shared key‑value storage
+- `queue` for distributed queues
+- `volume` for persistent files
+- `bucket_mount` for object storage
+- `llm` for LLM providers
+- `gpu` for GPU‑aware workloads
+- `scheduler` for scheduled execution patterns
+
+### Accessing Connectors
+
+```python
+from blazing.base import BaseService
+
+@app.service
+class UserStore(BaseService):
+    def __init__(self, connectors):
+        self._cache = connectors.get("dict")
+        self._secrets = connectors.get("secrets")
+
+    async def get_user(self, user_id: int) -> dict:
+        cached = await self._cache.get(f"user:{user_id}")
+        if cached:
+            return cached
+        return {"id": user_id}
+```
+
+## Custom Connectors
+
+You can implement a custom connector by extending `BaseConnector` and registering it with your app. This is useful when you have a specialized service or need custom authentication logic.
+
+```python
+from blazing.base import BaseConnector
+
+class MyAPIConnector(BaseConnector):
+    async def get(self, path: str) -> dict:
+        return {"path": path}
+```
+
+## Best Practices
+
+- Keep external I/O in services, not in steps.
+- Use services to centralize retries and validation.
+- Keep service methods small and composable.
+
+## Next Steps
+
+- [Workers Overview](/docs/blazing-flow/workers/overview)
+- [Configuration](/docs/blazing-flow/configuration/flow-configuration)

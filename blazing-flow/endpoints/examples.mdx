@@ -1,686 +1,123 @@
 ---
 title: Examples
 label: Examples
-description: Real-world examples of Blazing Flow Endpoints
+description: Practical examples of Blazing Flow Endpoints
 position: 7
 ---
 
-# Blazing Flow Endpoints Examples
+Use these patterns to expose workflows as APIs without duplicating orchestration logic.
 
-Production-ready examples showing how to use Blazing Flow Endpoints in real applications.
-
-## Why Blazing Flow Endpoints?
-
-Blazing Flow Endpoints turns your workflows into production REST APIs with zero boilerplate. Instead of writing FastAPI routes, request handlers, and orchestration logic separately, you define workflows once and expose them as HTTP/WebSocket endpoints automatically.
-
-**Use Blazing Flow Endpoints when you need to:**
-- Expose internal workflows as public APIs for external clients
-- Build REST APIs that orchestrate complex multi-step operations
-- Provide real-time updates via WebSocket connections
-- Scale API endpoints independently from core business logic
-- Add authentication/authorization to workflow execution
-
-## How These Examples Are Organized
-
-The examples below progress from simple to complex:
-
-1. **Basic Patterns** (Examples 1-3): Single endpoint, multi-step pipelines, authentication
-2. **Real-Time Communication** (Example 4): WebSocket support for streaming updates
-3. **Production Patterns** (Examples 5-8): Error handling, batch processing, multiple endpoints, deployment
-
-**Quick Navigation:**
-- New to Blazing Flow? Start with **Example 1** (Basic Calculator)
-- Need authentication? See **Example 3** (API with Authentication)
-- Want real-time updates? Check **Example 4** (WebSocket)
-- Building production APIs? Review **Examples 6-8** (Error Handling, Multiple Endpoints, Deployment)
-
-## When to Use Endpoints vs Core Blazing Flow
-
-| Use Case | Use Endpoints | Use Core Blazing Flow |
-|----------|---------------|----------------------|
-| Public API for external clients | ✅ Yes | ❌ No |
-| Internal microservice communication | ✅ Yes | ✅ Yes |
-| Scheduled background jobs | ❌ No | ✅ Yes |
-| Direct Python function calls | ❌ No | ✅ Yes |
-| Need HTTP/WebSocket protocol | ✅ Yes | ❌ No |
-
----
-
-## Basic Calculator API
-
-The simplest possible endpoint: expose a workflow as a public HTTP API.
+## Example 1: Basic HTTP Endpoint
 
 ```python
+import asyncio
 from blazing import Blazing
 from blazing.web import create_asgi_app
 import uvicorn
 
 app = Blazing(
-    ,
-    api_token="your-api-token"
+    api_url="https://api.blazingflow.com",
+    api_token="<your-api-token>",
 )
 
 @app.endpoint(path="/calculate")
 @app.workflow
 async def calculate(x: int, y: int, services=None):
-    """Add two numbers together."""
     return x + y
 
-# Publish and create FastAPI app
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+async def main():
+    await app.publish()
+    return await create_asgi_app(app)
 
-# Run server
+fastapi_app = asyncio.run(main())
 uvicorn.run(fastapi_app, host="0.0.0.0", port=8080)
 ```
 
-**Test it:**
-```bash
-# Create job
-curl -X POST http://localhost:8080/calculate \
-  -H "Content-Type: application/json" \
-  -d '{"x": 10, "y": 20}'
-# Returns: {"job_id": "abc123", "status": "pending", ...}
-
-# Check status
-curl http://localhost:8080/jobs/abc123
-# Returns: {"job_id": "abc123", "status": "completed", "result": 30}
-```
-
----
-
-## Multi-Step Data Pipeline
-
-Expose a multi-step workflow that processes data through several stages.
+## Example 2: Multi‑Step Pipeline
 
 ```python
 from blazing import Blazing
 from blazing.web import create_asgi_app
+import asyncio
 
-app = Blazing(, api_token="your-token")
-
-# Internal steps (not exposed directly)
-@app.step
-async def validate_data(data: dict, services=None):
-    """Validate input data."""
-    if not data.get("values"):
-        raise ValueError("Missing 'values' field")
-    return data
+app = Blazing(api_url="https://api.blazingflow.com", api_token="<token>")
 
 @app.step
-async def compute_statistics(data: dict, services=None):
-    """Compute basic statistics."""
-    values = data["values"]
-    return {
-        "count": len(values),
-        "sum": sum(values),
-        "average": sum(values) / len(values) if values else 0,
-        "min": min(values) if values else 0,
-        "max": max(values) if values else 0
-    }
+async def validate(payload: dict, services=None):
+    if "values" not in payload:
+        raise ValueError("Missing values")
+    return payload
 
 @app.step
-async def format_report(stats: dict, services=None):
-    """Format statistics as a report."""
-    return {
-        "summary": f"Analyzed {stats['count']} values",
-        "statistics": stats,
-        "status": "completed"
-    }
+async def summarize(payload: dict, services=None):
+    values = payload["values"]
+    return {"count": len(values), "sum": sum(values)}
 
-# Public endpoint (exposes the workflow)
 @app.endpoint(path="/analyze")
 @app.workflow
-async def analyze_data(data: dict, services=None):
-    """
-    Public API: Analyze data and return statistics.
+async def analyze(payload: dict, services=None):
+    payload = await validate(payload, services=services)
+    return await summarize(payload, services=services)
 
-    POST /analyze
-    Body: {"data": {"values": [1, 2, 3, 4, 5]}}
-    """
-    validated = await validate_data(data, services=services)
-    stats = await compute_statistics(validated, services=services)
-    report = await format_report(stats, services=services)
-    return report
+async def main():
+    await app.publish()
+    return await create_asgi_app(app, title="Analysis API")
 
-await app.publish()
-fastapi_app = await create_asgi_app(app, title="Data Analysis API")
+fastapi_app = asyncio.run(main())
 ```
 
-**Test it:**
-```bash
-curl -X POST http://localhost:8080/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"data": {"values": [1, 2, 3, 4, 5]}}'
-```
-
----
-
-## API with Authentication
-
-Protect endpoints with custom authentication (JWT, API keys, OAuth).
+## Example 3: Authenticated Endpoint
 
 ```python
+import asyncio
 from blazing import Blazing
 from blazing.web import create_asgi_app
 from fastapi.security import HTTPAuthorizationCredentials
-import jwt
 
-app = Blazing(, api_token="your-token")
-
-SECRET_KEY = "your-jwt-secret"
-
-# Authentication handlers
-async def verify_jwt(credentials: HTTPAuthorizationCredentials) -> bool:
-    """Verify JWT token."""
-    if not credentials:
-        return False
-    try:
-        token = credentials.credentials
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return payload.get("user_id") is not None
-    except jwt.InvalidTokenError:
-        return False
+app = Blazing(api_url="https://api.blazingflow.com", api_token="<token>")
 
 async def verify_api_key(credentials: HTTPAuthorizationCredentials) -> bool:
-    """Verify API key (simpler authentication)."""
     if not credentials:
         return False
-    # In production: check against database
-    return credentials.credentials == "secret-api-key"
+    return credentials.credentials == "<expected-api-key>"
 
-# Public endpoint (no auth)
-@app.endpoint(path="/health")
-@app.workflow
-async def health_check(services=None):
-    """Public health check endpoint."""
-    return {"status": "healthy", "version": "1.0.0"}
-
-# Protected endpoint (JWT required)
-@app.endpoint(path="/secure/data", auth_handler=verify_jwt)
+@app.endpoint(path="/secure/data", auth=verify_api_key)
 @app.workflow
 async def get_secure_data(user_id: int, services=None):
-    """
-    Protected endpoint requiring JWT authentication.
+    return {"user_id": user_id, "data": "sensitive"}
 
-    Header: Authorization: Bearer <jwt-token>
-    """
-    return {"user_id": user_id, "data": "sensitive data"}
+async def main():
+    await app.publish()
+    return await create_asgi_app(app)
 
-# Protected endpoint (API key required)
-@app.endpoint(path="/admin/stats", auth_handler=verify_api_key)
-@app.workflow
-async def get_admin_stats(services=None):
-    """
-    Admin endpoint requiring API key.
-
-    Header: Authorization: Bearer secret-api-key
-    """
-    return {"total_users": 1000, "active_jobs": 42}
-
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+fastapi_app = asyncio.run(main())
 ```
 
-**Test it:**
-```bash
-# Public endpoint (no auth)
-curl http://localhost:8080/health
+## Example 4: Streaming Results
 
-# Protected endpoint (JWT)
-curl -X POST http://localhost:8080/secure/data \
-  -H "Authorization: Bearer <your-jwt-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": 123}'
+Use streaming when results are long‑running or you want incremental progress.
 
-# Admin endpoint (API key)
-curl -X POST http://localhost:8080/admin/stats \
-  -H "Authorization: Bearer secret-api-key"
-```
-
----
-
-## WebSocket Real-Time Updates
-
-Enable WebSocket for real-time progress updates from long-running workflows.
-
-```python
-from blazing import Blazing
-from blazing.web import create_asgi_app
-import asyncio
-
-app = Blazing(, api_token="your-token")
-
-@app.step
-async def process_batch(batch_id: int, services=None):
-    """Simulate processing a batch."""
-    await asyncio.sleep(2)  # Simulate work
-    return {"batch_id": batch_id, "status": "completed"}
-
-# Enable WebSocket with enable_websocket=True
-@app.endpoint(path="/process", enable_websocket=True)
-@app.workflow
-async def process_data(num_batches: int, services=None):
-    """
-    Long-running workflow with progress updates.
-
-    WebSocket endpoint: ws://localhost:8080/process/ws
-    """
-    results = []
-    for i in range(num_batches):
-        result = await process_batch(i, services=services)
-        results.append(result)
-    return {"processed": len(results), "results": results}
-
-await app.publish()
-fastapi_app = await create_asgi_app(app)
-```
-
-**JavaScript client:**
-```javascript
-// Connect to WebSocket
-const ws = new WebSocket('ws://localhost:8080/process/ws');
-
-ws.onopen = () => {
-    console.log('Connected');
-    // Send request
-    ws.send(JSON.stringify({num_batches: 5}));
-};
-
-ws.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-
-    if (message.type === "job_created") {
-        console.log("Job ID:", message.job_id);
-    }
-
-    if (message.type === "progress") {
-        console.log("Progress:", message.percent_complete + "%");
-    }
-
-    if (message.type === "result") {
-        console.log("Result:", message.result);
-        ws.close();
-    }
-
-    if (message.type === "error") {
-        console.error("Error:", message.error);
-        ws.close();
-    }
-};
-
-ws.onerror = (error) => {
-    console.error("WebSocket error:", error);
-};
-```
-
-**Python client with websockets:**
 ```python
 import asyncio
-import websockets
-import json
-
-async def test_websocket():
-    uri = "ws://localhost:8080/process/ws"
-
-    async with websockets.connect(uri) as websocket:
-        # Send request
-        await websocket.send(json.dumps({"num_batches": 5}))
-
-        # Receive messages
-        async for message in websocket:
-            data = json.loads(message)
-
-            if data["type"] == "job_created":
-                print(f"Job ID: {data['job_id']}")
-
-            elif data["type"] == "progress":
-                print(f"Progress: {data['percent_complete']}%")
-
-            elif data["type"] == "result":
-                print(f"Result: {data['result']}")
-                break
-
-            elif data["type"] == "error":
-                print(f"Error: {data['error']}")
-                break
-
-asyncio.run(test_websocket())
-```
-
----
-
-## Batch Processing API
-
-Process multiple items concurrently with result aggregation.
-
-```python
-from blazing import Blazing
-from blazing.web import create_asgi_app
-import asyncio
-
-app = Blazing(, api_token="your-token")
-
-@app.step
-async def fetch_user(user_id: int, services=None):
-    """Fetch user data."""
-    # Simulate database query
-    await asyncio.sleep(0.5)
-    return {"user_id": user_id, "name": f"User {user_id}", "score": user_id * 10}
-
-@app.step
-async def process_user(user: dict, multiplier: float, services=None):
-    """Process user data."""
-    return {
-        "user_id": user["user_id"],
-        "name": user["name"],
-        "original_score": user["score"],
-        "final_score": int(user["score"] * multiplier)
-    }
-
-@app.endpoint(path="/batch/users")
-@app.workflow
-async def process_users_batch(user_ids: list, multiplier: float, services=None):
-    """
-    Process multiple users concurrently.
-
-    POST /batch/users
-    Body: {"user_ids": [1, 2, 3], "multiplier": 1.5}
-    """
-    # Fetch all users concurrently
-    fetch_tasks = [
-        fetch_user(user_id, services=services)
-        for user_id in user_ids
-    ]
-    users = await asyncio.gather(*fetch_tasks)
-
-    # Process all users concurrently
-    process_tasks = [
-        process_user(user, multiplier, services=services)
-        for user in users
-    ]
-    results = await asyncio.gather(*process_tasks)
-
-    return {
-        "processed_count": len(results),
-        "results": results
-    }
-
-await app.publish()
-fastapi_app = await create_asgi_app(app)
-```
-
-**Test it:**
-```bash
-curl -X POST http://localhost:8080/batch/users \
-  -H "Content-Type: application/json" \
-  -d '{"user_ids": [1, 2, 3, 4, 5], "multiplier": 1.5}'
-```
-
----
-
-## Error Handling
-
-Proper error handling with custom error responses.
-
-```python
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(, api_token="your-token")
+app = Blazing(api_url="https://api.blazingflow.com", api_token="<token>")
 
-@app.step
-async def validate_input(amount: float, services=None):
-    """Validate input parameters."""
-    if amount <= 0:
-        raise ValueError("Amount must be positive")
-    if amount > 1000000:
-        raise ValueError("Amount exceeds maximum limit")
-    return amount
-
-@app.step
-async def calculate_fee(amount: float, services=None):
-    """Calculate transaction fee."""
-    if amount < 100:
-        return amount * 0.05  # 5% for small amounts
-    elif amount < 1000:
-        return amount * 0.03  # 3% for medium amounts
-    else:
-        return amount * 0.01  # 1% for large amounts
-
-@app.endpoint(path="/transaction/calculate")
+@app.endpoint(path="/stream", mode="stream")
 @app.workflow
-async def calculate_transaction(amount: float, services=None):
-    """
-    Calculate transaction fee with validation.
+async def stream_numbers(n: int, services=None):
+    for i in range(n):
+        yield {"value": i}
+        await asyncio.sleep(0.1)
 
-    POST /transaction/calculate
-    Body: {"amount": 500}
-    """
-    try:
-        validated_amount = await validate_input(amount, services=services)
-        fee = await calculate_fee(validated_amount, services=services)
+async def main():
+    await app.publish()
+    return await create_asgi_app(app)
 
-        return {
-            "amount": validated_amount,
-            "fee": fee,
-            "total": validated_amount + fee,
-            "status": "success"
-        }
-    except ValueError as e:
-        # Errors are automatically caught and returned in job status
-        raise e
-
-await app.publish()
-fastapi_app = await create_asgi_app(app)
+fastapi_app = asyncio.run(main())
 ```
 
-**Test error handling:**
-```bash
-# Valid request
-curl -X POST http://localhost:8080/transaction/calculate \
-  -H "Content-Type: application/json" \
-  -d '{"amount": 500}'
-# Returns: {"job_id": "...", "status": "pending", ...}
+## When to Use Endpoints vs Core Flow
 
-# Invalid request (negative amount)
-curl -X POST http://localhost:8080/transaction/calculate \
-  -H "Content-Type: application/json" \
-  -d '{"amount": -10}'
-# Job completes with status="error", error message in result
-
-# Check error in job status
-curl http://localhost:8080/jobs/{job_id}
-# Returns: {"job_id": "...", "status": "error", "error": "Amount must be positive"}
-```
-
----
-
-## Multiple Endpoints with Different Paths
-
-Organize multiple endpoints with different paths and versions.
-
-```python
-from blazing import Blazing
-from blazing.web import create_asgi_app
-
-app = Blazing(, api_token="your-token")
-
-# V1 Endpoints
-@app.endpoint(path="/v1/users/create")
-@app.workflow
-async def create_user_v1(name: str, email: str, services=None):
-    """V1: Create user (simple)."""
-    return {"id": 1, "name": name, "email": email, "version": "v1"}
-
-@app.endpoint(path="/v1/users/list")
-@app.workflow
-async def list_users_v1(services=None):
-    """V1: List all users."""
-    return {"users": [], "count": 0, "version": "v1"}
-
-# V2 Endpoints (with enhanced features)
-@app.endpoint(path="/v2/users/create")
-@app.workflow
-async def create_user_v2(name: str, email: str, metadata: dict, services=None):
-    """V2: Create user with metadata."""
-    return {
-        "id": 1,
-        "name": name,
-        "email": email,
-        "metadata": metadata,
-        "version": "v2",
-        "created_at": "2025-12-09T10:00:00Z"
-    }
-
-@app.endpoint(path="/v2/users/list")
-@app.workflow
-async def list_users_v2(limit: int = 10, offset: int = 0, services=None):
-    """V2: List users with pagination."""
-    return {
-        "users": [],
-        "count": 0,
-        "limit": limit,
-        "offset": offset,
-        "version": "v2"
-    }
-
-# Admin endpoints
-@app.endpoint(path="/admin/stats")
-@app.workflow
-async def admin_stats(services=None):
-    """Admin: System statistics."""
-    return {
-        "total_users": 1000,
-        "active_jobs": 42,
-        "uptime_seconds": 86400
-    }
-
-await app.publish()
-fastapi_app = await create_asgi_app(
-    app,
-    title="User Management API",
-    description="Multi-version user management API",
-    version="2.0.0"
-)
-```
-
-**Available endpoints:**
-```
-POST /v1/users/create     - Create user (v1)
-POST /v1/users/list       - List users (v1)
-POST /v2/users/create     - Create user with metadata (v2)
-POST /v2/users/list       - List users with pagination (v2)
-POST /admin/stats         - System statistics
-GET  /jobs/{job_id}       - Get job status
-GET  /health              - Health check
-GET  /docs                - OpenAPI docs
-```
-
----
-
-## Production Deployment Example
-
-Complete production setup with Docker, Kubernetes, and monitoring.
-
-**docker-compose.yml:**
-```yaml
-version: '3.8'
-
-services:
-  # Blazing backend (internal)
-  blazing-redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-
-  blazing-api:
-    image: your-org/blazing-api:latest
-    environment:
-      - REDIS_URL=redis://blazing-redis:6379
-      - API_TOKEN=${BLAZING_API_TOKEN}
-    ports:
-      - "8000:8000"
-    depends_on:
-      - blazing-redis
-
-  blazing-foreman:
-    image: your-org/blazing-foreman:latest
-    environment:
-      - REDIS_URL=redis://blazing-redis:6379
-    depends_on:
-      - blazing-redis
-
-  # Public API (exposed)
-  public-api:
-    build: .
-    environment:
-      - BLAZING_API_URL=http://blazing-api:8000
-      - BLAZING_API_TOKEN=${BLAZING_API_TOKEN}
-      - JWT_SECRET=${JWT_SECRET}
-    ports:
-      - "8080:8080"
-    depends_on:
-      - blazing-api
-```
-
-**Dockerfile:**
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY main.py .
-
-CMD ["uvicorn", "main:fastapi_app", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-**main.py:**
-```python
-import os
-from blazing import Blazing
-from blazing.web import create_asgi_app
-
-# Initialize
-app = Blazing(
-    api_url=os.getenv("BLAZING_API_URL"),
-    api_token=os.getenv("BLAZING_API_TOKEN")
-)
-
-# Define workflows
-@app.endpoint(path="/api/process")
-@app.workflow
-async def process_data(data: dict, services=None):
-    return {"processed": True, "data": data}
-
-# Publish
-import asyncio
-asyncio.run(app.publish())
-
-# Create FastAPI app
-fastapi_app = asyncio.run(create_asgi_app(app))
-```
-
-**Deploy:**
-```bash
-# Set environment variables
-export BLAZING_API_TOKEN="your-token"
-export JWT_SECRET="your-jwt-secret"
-
-# Start services
-docker-compose up -d
-
-# Check health
-curl http://localhost:8080/health
-```
-
----
-
-## Next Steps
-
-- [API Reference](/blazing-flow/endpoints/api-reference) - All parameters documented
-- [Deployment](/blazing-flow/endpoints/deployment) - Production deployment guides
-- [Authentication](/blazing-flow/endpoints/authentication) - Security patterns
+Use Endpoints when you need HTTP/WebSocket interfaces. Use Core Flow when you only need direct Python calls or scheduled workflows.

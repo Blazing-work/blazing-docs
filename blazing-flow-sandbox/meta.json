@@ -10,5 +10,8 @@
     "workers",
     "deployment",
     "examples"
+  ],
+  "tags": [
+    "blazing-flow-sandbox"
   ]
 }

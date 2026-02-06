@@ -1,309 +1,43 @@
 ---
 title: Error Handling
 label: Error Handling
-description: Handle task failures and edge cases gracefully
-position: 2
+description: Handle failures safely in workflows
+position: 3
 ---
 
-Learn how to handle errors, validate inputs, and ensure your batch pipelines are resilient.
+Design your steps to be safe to retry and fail fast when inputs are invalid.
 
-## Common Error Scenarios
-
-### 1. Invalid Workflow Name
+## Basic Pattern
 
 ```python
+import asyncio
 from blazing import Blazing
 
-app = Blazing()
-
-# Try to use a workflow that doesn't exist
-unit = await app.create_workflow_task(
-    "nonexistent_workflow_12345",
-    symbol="AAPL"
-)
-
-# The task is created but fails on execution
-try:
-    result = await unit.result()
-except Exception as e:
-    if "not registered" in str(e).lower():
-        print("✗ Workflow not found")
-```
-
-### 2. Missing Required Parameters
-
-```python
-# Missing 'symbol' parameter
-unit = await app.create_workflow_task(
-    "fetch_timeseries",
-    points=100,
-    delay=0
-    # symbol is missing!
-)
-
-# Task created but will fail at execution time
-# Framework validates at runtime, not creation time
-```
-
-### 3. Invalid Parameter Types
-
-```python
-# Invalid type for 'points' (should be int)
-try:
-    unit = await app.create_workflow_task(
-        "fetch_timeseries",
-        symbol="AAPL",
-        points="not_a_number",  # Wrong type!
-        delay=0
-    )
-
-    results = await app.gather([unit])
-except (TypeError, ValueError) as e:
-    print(f"✗ Parameter validation failed: {e}")
-```
-
-## Handling Task Failures
-
-### Try-Except Pattern
-
-```python
-import asyncio
-
-app = Blazing()
-
-try:
-    unit = await app.create_workflow_task(
-        "risky_operation",
-        data=large_dataset
-    )
-
-    # Set timeout to prevent hanging
-    result = await asyncio.wait_for(
-        unit.result(),
-        timeout=30.0
-    )
-
-    print(f"✓ Task completed: {result}")
-
-except asyncio.TimeoutError:
-    print("✗ Task timed out after 30 seconds")
-except Exception as e:
-    print(f"✗ Task failed: {type(e).__name__}: {e}")
-```
-
-### Graceful Degradation
-
-```python
-async def fetch_with_fallback(symbol: str):
-    """Fetch data with fallback to cached value."""
+async def main():
     app = Blazing()
 
-    try:
-        unit = await app.create_workflow_task(
-            "fetch_timeseries",
-            symbol=symbol,
-            points=100
-        )
-        result = await unit.result()
-        return result
+    @app.step
+    async def risky(x: int, services=None):
+        if x < 0:
+            raise ValueError("x must be non-negative")
+        return x * 2
 
-    except Exception as e:
-        logger.warning(f"Failed to fetch {symbol}: {e}")
-        # Return cached or default value
-        return get_cached_data(symbol)
-```
-
-## Edge Cases
-
-### Empty Task Lists
-
-```python
-# Blazing handles empty lists gracefully
-results = await app.gather([])
-# Returns: []
-
-await app.wait([])
-# No-op, doesn't crash
-```
-
-### Large Payloads
-
-```python
-# Test with very large datasets
-unit = await app.create_workflow_task(
-    "fetch_timeseries",
-    symbol="HUGE",
-    points=50000  # 50k data points
-)
-
-results = await app.gather([unit])
-result = results[0]
-
-assert result['count'] == 50000
-print(f"✓ Large payload handled: {result['count']:,} points")
-```
-
-### Multiple Concurrent Tasks from Same App
-
-```python
-# Safe: Multiple tasks can share the same app instance
-app = Blazing()
-
-unit1 = await app.create_workflow_task(
-    "fetch_timeseries",
-    symbol="TEST1",
-    points=10
-)
-unit2 = await app.create_workflow_task(
-    "fetch_timeseries",
-    symbol="TEST2",
-    points=10
-)
-
-# Gather with timeout
-try:
-    results = await asyncio.wait_for(
-        app.gather([unit1, unit2]),
-        timeout=30
-    )
-    assert results[0]['symbol'] == 'TEST1'
-    assert results[1]['symbol'] == 'TEST2'
-except asyncio.TimeoutError:
-    print("✗ Timeout: workers may not be processing tasks")
-```
-
-## Resource Management
-
-### Proper Cleanup
-
-```python
-async def process_batch():
-    app = Blazing()
-
-    try:
-        # Your processing logic
-        units = [
-            await app.create_workflow_task(...)
-            for _ in range(100)
-        ]
-        results = await app.gather(units)
-
-        return results
-
-    finally:
-        # Always clean up, even on error
-        await app.close()
-```
-
-### Idempotent Close
-
-```python
-# Multiple close() calls are safe
-app = Blazing()
-
-await app.close()
-await app.close()  # Safe - no error
-await app.close()  # Still safe
-```
-
-### Using After Close
-
-```python
-app = Blazing()
-await app.close()
-
-# Attempting to use closed app
-try:
-    unit = await app.create_workflow_task("quick_lookup", symbol="TEST")
-except Exception as e:
-    print(f"Expected error: {type(e).__name__}")
-```
-
-## Retry Patterns
-
-### Automatic Retry
-
-```python
-import asyncio
-
-async def execute_with_retry(
-    workflow: str,
-    params: dict,
-    max_retries: int = 3
-):
-    """Execute task with automatic retry on failure."""
-    app = Blazing()
-
-    for attempt in range(max_retries):
+    @app.workflow
+    async def safe_workflow(x: int, services=None):
         try:
-            unit = await app.create_workflow_task(workflow, **params)
-            result = await asyncio.wait_for(
-                unit.result(),
-                timeout=30
-            )
-            return result
+            return {"ok": True, "result": await risky(x, services=services)}
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
 
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise  # Final attempt failed
+    await app.publish()
+    print(await app.safe_workflow(-1).wait_result())
 
-            wait_time = 2 ** attempt  # Exponential backoff
-            print(f"Retry {attempt + 1}/{max_retries} after {wait_time}s")
-            await asyncio.sleep(wait_time)
-
-    await app.close()
-```
-
-### Partial Failure Handling
-
-```python
-async def process_with_partial_failures(symbols: list[str]):
-    """Process all symbols, track failures."""
-    app = Blazing()
-
-    tasks = []
-    for symbol in symbols:
-        unit = await app.create_workflow_task(
-            "fetch_timeseries",
-            symbol=symbol,
-            points=100
-        )
-        tasks.append((symbol, unit))
-
-    successes = []
-    failures = []
-
-    for symbol, unit in tasks:
-        try:
-            result = await unit.result()
-            successes.append(result)
-        except Exception as e:
-            failures.append((symbol, str(e)))
-
-    print(f"✓ Completed: {len(successes)}")
-    print(f"✗ Failed: {len(failures)}")
-
-    await app.close()
-    return successes, failures
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Best Practices
 
-1. **Always use timeouts** for production workloads
-2. **Handle empty collections** gracefully
-3. **Validate parameters** before task creation when possible
-4. **Clean up resources** in `finally` blocks
-5. **Log errors** for debugging and monitoring
-6. **Implement retries** for transient failures
-7. **Track partial failures** in batch operations
-
-## Next Steps
-
-- [Concurrency Patterns](/docs/tutorials/concurrency-patterns) - Advanced parallelization
-- [Flow Monitoring](/docs/flow-monitoring) - Track task health
-- [Parallel Execution](/docs/tutorials/parallel-execution) - Scale your workflows
-
-## Source
-
-Based on test suite examples:
-- `tests/test_error_handling.py` - Comprehensive error scenarios
+- Validate inputs early.
+- Keep steps idempotent so retries are safe.
+- Surface clear errors to callers.

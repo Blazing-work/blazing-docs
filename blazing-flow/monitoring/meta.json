@@ -3,5 +3,9 @@
   "position": 4,
   "description": "Monitor, observe, and troubleshoot Blazing Flow workflows",
   "product": "blazing-flow",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-flow",
+    "monitoring"
+  ]
 }

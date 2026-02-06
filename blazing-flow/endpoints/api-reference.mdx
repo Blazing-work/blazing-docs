@@ -1,45 +1,38 @@
 ---
 title: API Reference
 label: API Reference
-description: Complete reference for all Blazing Flow Endpoints decorators and functions
+description: Reference for Blazing Flow Endpoints decorators and helpers
 position: 5
 ---
 
-# API Reference
-
-Complete reference for Blazing Flow Endpoints decorators and functions.
-
 ## `@app.endpoint()`
 
-Expose a Blazing Flow workflow as an HTTP/WebSocket endpoint.
-
-### Signature
+Expose a workflow as an HTTP/WebSocket endpoint.
 
 ```python
-@app.endpoint(
+def endpoint(
     path: str,
     method: str = "POST",
-    auth_handler: Optional[Callable] = None,
-    enable_websocket: bool = False
-)
+    auth: Optional[Callable] = None,
+    enable_websocket: bool = False,
+    response_mode: str = "async",
+    timeout: Optional[int] = None,
+    middleware: Optional[List] = None,
+):
+    ...
 ```
 
-### Parameters
+### Key Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `path` | `str` | ✅ Yes | - | URL path for the endpoint (e.g., `"/calculate"`, `"/v1/users"`) |
-| `method` | `str` | No | `"POST"` | HTTP method: `"GET"`, `"POST"`, `"PUT"`, `"DELETE"` |
-| `auth_handler` | `Callable` | No | `None` | Async function for authentication (see [Authentication](/blazing-flow/endpoints/authentication)) |
-| `enable_websocket` | `bool` | No | `False` | Create WebSocket endpoint at `{path}/ws` |
+- `path`: URL path (e.g., `/calculate`)
+- `method`: HTTP method (default `POST`)
+- `auth`: Auth handler or strategy
+- `enable_websocket`: Adds `{path}/ws`
+- `response_mode`: `async`, `sync`, `stream`, or `webhook`
+- `timeout`: Sync‑mode timeout in seconds
+- `middleware`: Per‑endpoint middleware list
 
-### Returns
-
-Decorator function that marks a workflow for HTTP/WebSocket exposure.
-
-### Examples
-
-#### Basic POST Endpoint
+### Example
 
 ```python
 @app.endpoint(path="/calculate")
@@ -48,72 +41,9 @@ async def calculate(x: int, y: int, services=None):
     return x + y
 ```
 
-Creates endpoint: `POST /calculate`
-
-#### GET Endpoint
-
-```python
-@app.endpoint(path="/users/{user_id}", method="GET")
-@app.workflow
-async def get_user(user_id: int, services=None):
-    return {"id": user_id, "name": "John"}
-```
-
-Creates endpoint: `GET /users/{user_id}`
-
-#### With Authentication
-
-```python
-async def verify_api_key(credentials):
-    return credentials.credentials == "secret"
-
-@app.endpoint(path="/secure", auth_handler=verify_api_key)
-@app.workflow
-async def secure_action(data: str, services=None):
-    return data.upper()
-```
-
-#### With WebSocket
-
-```python
-@app.endpoint(path="/stream", enable_websocket=True)
-@app.workflow
-async def stream_data(value: int, services=None):
-    return value * 2
-```
-
-Creates endpoints:
-- `POST /stream` (HTTP)
-- `WS /stream/ws` (WebSocket)
-
-#### Multiple Decorators
-
-```python
-@app.endpoint(path="/v1/calculate")
-@app.endpoint(path="/v2/calculate")
-@app.workflow
-async def calculate(x: int, y: int, services=None):
-    return x + y
-```
-
-Creates both:
-- `POST /v1/calculate`
-- `POST /v2/calculate`
-
-### Notes
-
-- Must be stacked with `@app.workflow` decorator
-- Parameters from function signature become request body fields
-- `services` parameter is automatically excluded from request model
-- Request validation handled automatically by Pydantic
-
----
-
 ## `create_asgi_app()`
 
-Generate a FastAPI application from Blazing Flow workflows.
-
-### Signature
+Create a FastAPI app from your endpoints.
 
 ```python
 async def create_asgi_app(
@@ -121,331 +51,22 @@ async def create_asgi_app(
     title: str = "Blazing Workflow API",
     description: str = "",
     version: str = "1.0.0",
-    enable_cors: bool = True
-) -> FastAPI
+    enable_cors: bool = True,
+    framework: str = "fastapi",
+    cors_origins: Optional[List[str]] = None,
+    global_middleware: Optional[List] = None,
+) -> FastAPI:
+    ...
 ```
-
-### Parameters
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `blazing_app` | `Blazing` | ✅ Yes | - | Blazing instance with `@endpoint` decorated workflows |
-| `title` | `str` | No | `"Blazing Workflow API"` | API title shown in OpenAPI docs |
-| `description` | `str` | No | `""` | API description shown in OpenAPI docs |
-| `version` | `str` | No | `"1.0.0"` | API version shown in OpenAPI docs |
-| `enable_cors` | `bool` | No | `True` | Enable CORS middleware (allow all origins) |
-
-### Returns
-
-FastAPI application instance ready for deployment.
-
-### Examples
-
-#### Basic Usage
-
-```python
-from blazing import Blazing
-from blazing.web import create_asgi_app
-
-app = Blazing(, api_token="token")
-
-@app.endpoint(path="/calculate")
-@app.workflow
-async def calculate(x: int, y: int, services=None):
-    return x + y
-
-await app.publish()
-fastapi_app = await create_asgi_app(app)
-```
-
-#### Custom Metadata
-
-```python
-fastapi_app = await create_asgi_app(
-    app,
-    title="My Workflow API",
-    description="Production workflows as REST endpoints",
-    version="2.0.0"
-)
-```
-
-#### Disable CORS
-
-```python
-fastapi_app = await create_asgi_app(
-    app,
-    enable_cors=False  # Disable default CORS
-)
-
-# Add custom CORS configuration
-from fastapi.middleware.cors import CORSMiddleware
-
-fastapi_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["https://example.com"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
-### Notes
-
-- Must be called after `await app.publish()`
-- Returns standard FastAPI app (can be extended with middleware, etc.)
-- Built-in endpoints added automatically (`/health`, `/jobs/{id}`, etc.)
-
----
-
-## Built-in Endpoints
-
-Every Blazing Flow Endpoints app includes these automatically.
-
-### `GET /jobs/{job_id}`
-
-Get status and result of a job.
-
-**Path Parameters:**
-- `job_id` (str): Job identifier returned from workflow submission
-
-**Response (pending):**
-```json
-{
-  "job_id": "abc123",
-  "status": "pending"
-}
-```
-
-**Response (completed):**
-```json
-{
-  "job_id": "abc123",
-  "status": "completed",
-  "result": 30
-}
-```
-
-**Response (failed):**
-```json
-{
-  "job_id": "abc123",
-  "status": "failed",
-  "error": "Division by zero"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Job found
-- `404 Not Found`: Job doesn't exist
-
----
-
-### `POST /jobs/{job_id}/cancel`
-
-Cancel a running job.
-
-**Path Parameters:**
-- `job_id` (str): Job identifier to cancel
-
-**Response:**
-```json
-{
-  "message": "Job abc123 cancellation requested"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Cancellation requested
-- `404 Not Found`: Job doesn't exist
-
-**Notes:**
-- Cancellation is asynchronous (may take time to complete)
-- Job status will change to "cancelled" when complete
-
----
-
-### `GET /health`
-
-Health check endpoint.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "blazing-web"
-}
-```
-
-**Status Codes:**
-- `200 OK`: Service is healthy
-
-**Use case:** Load balancer health checks, monitoring
-
----
-
-### `GET /docs`
-
-Interactive Swagger UI documentation.
-
-**Features:**
-- Test endpoints interactively
-- See request/response schemas
-- Try authentication
-- View all endpoints
-
-**Access:** Open `http://your-api:port/docs` in browser
-
----
-
-### `GET /openapi.json`
-
-OpenAPI 3.0 schema (machine-readable).
-
-**Response:** JSON schema of all endpoints
-
-**Use case:**
-- Client code generation
-- API documentation tools
-- Contract testing
-
----
-
-## Type Mappings
-
-Blazing Flow Endpoints auto-generates Pydantic models from function signatures.
-
-### Primitive Types
-
-| Python Type | OpenAPI Type | Example |
-|-------------|--------------|---------|
-| `int` | `integer` | `42` |
-| `float` | `number` | `3.14` |
-| `str` | `string` | `"hello"` |
-| `bool` | `boolean` | `true` |
-
-### Complex Types
-
-| Python Type | OpenAPI Type | Example |
-|-------------|--------------|---------|
-| `List[int]` | `array` of integers | `[1, 2, 3]` |
-| `Dict[str, int]` | `object` | `{"a": 1, "b": 2}` |
-| `Optional[str]` | `string` or `null` | `"value"` or `null` |
 
 ### Example
 
 ```python
-from typing import List, Dict, Optional
-
-@app.endpoint(path="/process")
-@app.workflow
-async def process_data(
-    items: List[int],
-    config: Dict[str, str],
-    optional_param: Optional[str] = None,
-    services=None
-):
-    return sum(items)
+fastapi_app = await create_asgi_app(app, title="My API")
 ```
 
-**Generated Request Model:**
-```json
-{
-  "items": [1, 2, 3],
-  "config": {"mode": "fast"},
-  "optional_param": "debug"
-}
-```
+## Notes
 
----
-
-## Authentication Handler Signature
-
-```python
-async def auth_handler(
-    credentials: HTTPAuthorizationCredentials
-) -> bool:
-    """
-    Return True if authenticated, False otherwise.
-
-    Args:
-        credentials: Parsed Authorization header
-                    (None if header missing)
-
-    Returns:
-        True if authenticated, False to reject with 401
-    """
-    pass
-```
-
-### HTTPAuthorizationCredentials
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `scheme` | `str` | Auth scheme (e.g., "Bearer") |
-| `credentials` | `str` | Token value |
-
-### Example
-
-```python
-async def verify_token(credentials: HTTPAuthorizationCredentials) -> bool:
-    if not credentials:
-        return False
-    return credentials.credentials == "valid-token"
-```
-
----
-
-## Response Models
-
-### Job Creation Response
-
-```python
-{
-    "job_id": str,
-    "status": Literal["pending", "running", "completed", "failed"],
-    "created_at": str  # ISO 8601 timestamp
-}
-```
-
-### Job Status Response
-
-```python
-{
-    "job_id": str,
-    "status": Literal["pending", "running", "completed", "failed"],
-    "result": Any,  # Present when status="completed"
-    "error": str    # Present when status="failed"
-}
-```
-
----
-
-## Error Responses
-
-All errors follow this format:
-
-```json
-{
-  "detail": "Error message here"
-}
-```
-
-### Common Status Codes
-
-| Code | Meaning | When |
-|------|---------|------|
-| `200 OK` | Success | Request succeeded |
-| `400 Bad Request` | Invalid request | Malformed JSON, etc. |
-| `401 Unauthorized` | Not authenticated | Auth handler returned False |
-| `403 Forbidden` | Insufficient permissions | Auth handler raised HTTPException(403) |
-| `404 Not Found` | Resource not found | Job doesn't exist |
-| `422 Unprocessable Entity` | Validation error | Request body doesn't match schema |
-| `500 Internal Server Error` | Server error | Workflow execution failed |
-
----
-
-## Next Steps
-
-- [Authentication](/blazing-flow/endpoints/authentication) - Implement auth handlers
-- [WebSocket](/blazing-flow/endpoints/websocket) - Real-time updates
-- [Deployment](/blazing-flow/endpoints/deployment) - Production deployment
+- `@app.endpoint` must wrap `@app.workflow`.
+- Request fields are inferred from the workflow signature.
+- The `services` parameter is excluded from request models.

@@ -4,5 +4,9 @@
   "description": "Configure Blazing Gateway routing, security, and advanced features",
   "product": "blazing-gateway",
   "parentProduct": "blazing-core",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-gateway",
+    "configuration"
+  ]
 }

@@ -4,5 +4,9 @@
   "description": "Get started with Blazing Gateway and deploy your first edge gateway",
   "product": "blazing-gateway",
   "parentProduct": "blazing-core",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-gateway",
+    "getting-started"
+  ]
 }

@@ -4,5 +4,9 @@
   "description": "Real-world use cases and implementation examples for Blazing Gateway",
   "product": "blazing-gateway",
   "parentProduct": "blazing-core",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-gateway",
+    "use-cases"
+  ]
 }

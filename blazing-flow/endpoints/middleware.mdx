@@ -1,0 +1,60 @@
+---
+title: Middleware
+label: Middleware
+description: Add cross-cutting behavior to your endpoints
+position: 4
+---
+
+Middleware lets you add cross‑cutting behavior (CORS, rate limiting, caching, retries, timeouts, logging) without cluttering your business logic.
+
+## Global Middleware
+
+```python
+from blazing import Blazing
+from blazing.web import create_asgi_app
+from blazing.middleware import CORSMiddleware, LoggingMiddleware
+
+app = Blazing()
+
+fastapi_app = await create_asgi_app(
+    app,
+    global_middleware=[
+        CORSMiddleware(allow_origins=["*"]),
+        LoggingMiddleware(),
+    ],
+)
+```
+
+## Per‑Endpoint Middleware
+
+```python
+from blazing.middleware import RateLimitMiddleware, CacheMiddleware
+
+@app.endpoint(
+    "/api",
+    middleware=[
+        RateLimitMiddleware(requests_per_minute=100),
+        CacheMiddleware(ttl=60),
+    ],
+)
+@app.workflow
+async def api_handler(services=None):
+    return {"status": "ok"}
+```
+
+## Available Middleware (Common)
+
+- `CORSMiddleware`
+- `RateLimitMiddleware`
+- `CacheMiddleware`
+- `TimeoutMiddleware`
+- `RetryMiddleware`
+- `CircuitBreakerMiddleware`
+- `CompressionMiddleware`
+- `LoggingMiddleware`
+
+## Best Practices
+
+- Keep global middleware minimal.
+- Apply rate limits and caching per endpoint.
+- Use timeouts for sync endpoints.

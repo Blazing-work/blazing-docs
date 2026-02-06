@@ -5,14 +5,14 @@ description: Build your first Blazing Flow pipeline in minutes
 position: 2
 ---
 
-Get started with Blazing Flow and build your first asynchronous pipeline in just a few minutes.
+Build your first Blazing Flow pipeline in a few minutes.
 
 ## Prerequisites
 
 - Python 3.11 or higher
 - Basic understanding of Python async/await
 
-**That's it!** Blazing Flow uses our managed SaaS infrastructure - no Redis, Docker, or infrastructure setup required.
+**That's it!** Blazing Flow uses our managed SaaS infrastructure - no local infrastructure setup required.
 
 ## Installation
 
@@ -77,6 +77,7 @@ Initialize your Blazing application - it uses our SaaS infrastructure by default
 
 ```python
 from blazing import Blazing
+from blazing.base import BaseService
 
 # Create the app (uses Blazing SaaS by default)
 app = Blazing()
@@ -84,7 +85,8 @@ app = Blazing()
 # Register your service
 @app.service
 class DataProcessor(BaseService):
-    # ... your service implementation
+    async def fetch_data(self, source_id: str):
+        return {"id": source_id, "data": [1, 2, 3, 4, 5]}
 ```
 
 ### Step 3: Define Steps
@@ -154,15 +156,17 @@ async def main():
     run = await app.data_pipeline("source_123")
     result = await run.result()
 
-    # 3. Using run() method (by name)
-    run = await app.run("data_pipeline", "source_123")
-    result = await run.result()
-
     print(f"Pipeline result: {result}")
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+## Next Steps
+
+- Add **dynamic batching** with `@batched` for throughput gains.
+- Schedule workflows with `Cron` / `Period`.
+- Customize executor images with `Image.executor()` when you need system deps.
 
 ## Complete Example
 

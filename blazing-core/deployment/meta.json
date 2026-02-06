@@ -3,5 +3,9 @@
   "position": 4,
   "description": "Deploy, manage, and monitor your infrastructure",
   "product": "blazing-core",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-core",
+    "deployment"
+  ]
 }

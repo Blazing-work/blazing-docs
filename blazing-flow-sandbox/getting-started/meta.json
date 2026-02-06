@@ -4,5 +4,9 @@
   "description": "Isolated workflow orchestration environment for testing and development",
   "product": "blazing-flow-sandbox",
   "parentProduct": "blazing-flow",
-  "category": "guide"
+  "category": "guide",
+  "tags": [
+    "blazing-flow-sandbox",
+    "getting-started"
+  ]
 }

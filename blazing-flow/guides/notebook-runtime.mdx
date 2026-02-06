@@ -1,0 +1,45 @@
+---
+title: Notebook Runtime
+label: Notebook Runtime
+description: Run Jupyter notebook sessions on the Blazing runtime with checkpointing
+position: 1
+---
+
+Blazing provides a Jupyter kernel that proxies notebook cells to an isolated runtime with optional checkpointing.
+
+This is a runtime layer, not a hosted notebook UI. You run Jupyter locally or in your own environment and connect using the Blazing kernel.
+
+## Install the Kernel
+
+```bash
+python -m blazing_kernel install
+```
+
+In Jupyter, select **“Blazing Flow Sandbox”** as the kernel.
+
+## Session Model
+
+Each notebook session has:
+
+- An isolated Python namespace
+- Cell execution and history
+- Optional checkpointing to resume work
+
+## Checkpointing
+
+Checkpointing lets you restore a session after disconnects or restarts. The runtime manages checkpoint storage and retention for you.
+
+## Environment Notes
+
+- The runtime is **Pyodide/WASM**, not a full Linux environment.
+- Pure‑Python packages are supported; native wheels are not.
+- Network access is restricted and mediated by services.
+- GPU access is not available in the Pyodide runtime.
+
+## When to Use
+
+Use the notebook runtime for:
+
+- Interactive exploration with isolated execution
+- Rapid prototyping of Flow steps
+- Debugging logic that will later run in trusted executors

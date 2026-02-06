@@ -1,37 +1,37 @@
 ---
-title: Examples Overview
-label: Examples
-description: Real-world examples from Blazing Batch's production test suite
+title: Tutorials Overview
+label: Tutorials
+description: Learn Blazing Flow through step-by-step tutorials
 position: 0
 ---
 
-Learn Blazing Batch through real-world examples extracted from our production test suite of **100+ unit tests**.
+Learn Blazing Flow through practical, step-by-step tutorials.
 
 ## Getting Started
 
-### [Basic Task Execution](/docs/tutorials/basic-task-execution)
+### [Basic Task Execution](/docs/blazing-flow/tutorials/basic-task-execution)
 
-Create and execute your first distributed task.
+Create your first workflow with steps and execute it.
 
 **You'll learn:**
-- Initialize a Blazing app
-- Create tasks with `create_workflow_task()`
-- Retrieve results with `gather()`
-- Proper resource cleanup
+- Define steps with `@app.step`
+- Create workflows with `@app.workflow`
+- Publish and execute workflows
+- Handle results
 
 **Time:** 5 minutes
 
 ---
 
-### [Parallel Execution](/docs/tutorials/parallel-execution)
+### [Parallel Execution](/docs/blazing-flow/tutorials/parallel-execution)
 
-Execute multiple tasks concurrently for maximum throughput.
+Execute multiple workflow instances concurrently for maximum throughput.
 
 **You'll learn:**
-- Create batch tasks efficiently
-- Achieve 4-10x speedup with parallelization
+- Run multiple workflow instances in parallel
+- Control concurrency with Semaphore
 - Optimize for different workload sizes
-- Monitor concurrency levels
+- Monitor parallel execution
 
 **Time:** 10 minutes
 
@@ -39,29 +39,29 @@ Execute multiple tasks concurrently for maximum throughput.
 
 ## Advanced Topics
 
-### [Error Handling](/docs/tutorials/error-handling)
+### [Error Handling](/docs/blazing-flow/tutorials/error-handling)
 
-Handle failures, edge cases, and ensure pipeline resilience.
+Handle failures, edge cases, and ensure workflow resilience.
 
 **You'll learn:**
-- Validate parameters and workflows
-- Handle timeouts and network failures
-- Implement retry logic with exponential backoff
-- Manage partial failures in batch operations
+- Validate parameters in steps
+- Handle exceptions in workflows
+- Implement retry logic
+- Manage failures gracefully
 
 **Time:** 15 minutes
 
 ---
 
-### [Concurrency Patterns](/docs/tutorials/concurrency-patterns)
+### [Concurrency Patterns](/docs/blazing-flow/tutorials/concurrency-patterns)
 
-Master CRDT queue operations and multi-node coordination.
+Master concurrency control and rate limiting patterns.
 
 **You'll learn:**
-- CRDT-based queue architecture
-- Lock-free distributed operations
-- Multi-app isolation patterns
-- Network resilience strategies
+- Use Semaphore for concurrency control
+- Implement rate limiting
+- Coordinate across workflow instances
+- Optimize resource usage
 
 **Time:** 20 minutes
 
@@ -69,243 +69,109 @@ Master CRDT queue operations and multi-node coordination.
 
 ## Quick Reference
 
-### Task Lifecycle
+### Basic Workflow Pattern
 
 ```python
+import asyncio
 from blazing import Blazing
 
-# 1. Initialize
-app = Blazing()
+async def main():
+    app = Blazing()
 
-# 2. Create task
-unit = await app.create_workflow_task("workflow_name", param=value)
+    @app.step
+    async def process(x: int, services=None):
+        """Process a single value."""
+        return x * 2
 
-# 3. Execute & gather results
-results = await app.gather([unit])
+    @app.workflow
+    async def my_workflow(value: int, services=None):
+        """Complete workflow orchestration."""
+        result = await process(value, services=services)
+        return result
 
-# 4. Cleanup
-await app.close()
+    await app.publish()
+
+    # Execute workflow
+    result = await app.my_workflow(5).wait_result()
+    print(f"Result: {result}")  # Result: 10
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-### Parallel Pattern
+### Parallel Execution Pattern
 
 ```python
-# Create all tasks first
-tasks = [
-    await app.create_workflow_task("workflow", id=i)
-    for i in range(100)
-]
+import asyncio
+from blazing import Blazing
 
-# Execute in parallel
-results = await app.gather(tasks)
+async def main():
+    app = Blazing()
+
+    @app.step
+    async def process(x: int, services=None):
+        return x * 2
+
+    @app.workflow
+    async def my_workflow(value: int, services=None):
+        result = await process(value, services=services)
+        return result
+
+    await app.publish()
+
+    # Execute multiple workflows in parallel
+    tasks = [
+        app.my_workflow(i).wait_result()
+        for i in range(10)
+    ]
+    results = await asyncio.gather(*tasks)
+    print(f"Processed {len(results)} workflows")
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ### Error Handling Pattern
 
 ```python
 import asyncio
+from blazing import Blazing
 
-try:
-    unit = await app.create_workflow_task("workflow", param=value)
-    result = await asyncio.wait_for(
-        unit.result(),
-        timeout=30
-    )
-except asyncio.TimeoutError:
-    print("Task timed out")
-except Exception as e:
-    print(f"Task failed: {e}")
+async def main():
+    app = Blazing()
+
+    @app.step
+    async def risky_operation(x: int, services=None):
+        if x < 0:
+            raise ValueError("Value must be non-negative")
+        return x * 2
+
+    @app.workflow
+    async def safe_workflow(value: int, services=None):
+        try:
+            result = await risky_operation(value, services=services)
+            return {"success": True, "result": result}
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+
+    await app.publish()
+
+    # Handle both success and failure
+    result = await app.safe_workflow(-5).wait_result()
+    print(result)  # {'success': False, 'error': 'Value must be non-negative'}
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
-
-## Test Suite
-
-All examples are based on our production test suite:
-
-- **Location:** `/Users/jonathanborduas/code/blazing/tests`
-- **Test Count:** 100+ comprehensive tests
-- **Coverage:** Infrastructure, performance, concurrency, security
-- **Real-world:** Validated in production workloads
-
-### Key Test Modules
-
-<table>
-  <thead>
-    <tr>
-      <th>Module</th>
-      <th>Focus</th>
-      <th>Examples</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>test_infrastructure.py</code></td>
-      <td>Basic operations</td>
-      <td>Task creation, parallel execution</td>
-    </tr>
-    <tr>
-      <td><code>test_error_handling.py</code></td>
-      <td>Edge cases</td>
-      <td>Failures, validation, cleanup</td>
-    </tr>
-    <tr>
-      <td><code>test_concurrency.py</code></td>
-      <td>CRDT queues</td>
-      <td>Lock-free ops, race conditions</td>
-    </tr>
-    <tr>
-      <td><code>test_performance.py</code></td>
-      <td>Throughput</td>
-      <td>Benchmarks, framework comparisons</td>
-    </tr>
-    <tr>
-      <td><code>test_security.py</code></td>
-      <td>Multi-tenancy</td>
-      <td>Isolation, attestation</td>
-    </tr>
-  </tbody>
-</table>
-
-### Running the Tests
-
-```bash
-# Prerequisites
-docker run -d --name redis-test -p 6380:6379 redislabs/redismod
-
-# Run all tests
-uv run pytest tests -v
-
-# Run specific module
-uv run pytest tests/test_infrastructure.py -v
-
-# Run single test
-uv run pytest tests/test_infrastructure.py::test_simple_timeseries_fetch -v
-```
-
-See [`tests/README.md`](https://github.com/digitalfrontier/blazing/blob/main/tests/README.md) for complete testing guide.
-
-## Performance Benchmarks
-
-Real-world performance from our test suite:
-
-### Throughput
-
-<table>
-  <thead>
-    <tr>
-      <th>Workers</th>
-      <th>Tasks</th>
-      <th>Time</th>
-      <th>Throughput</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>4</td>
-      <td>100</td>
-      <td>2.5s</td>
-      <td>40 tasks/s</td>
-    </tr>
-    <tr>
-      <td>10</td>
-      <td>1000</td>
-      <td>10s</td>
-      <td>100 tasks/s</td>
-    </tr>
-    <tr>
-      <td>20</td>
-      <td>5000</td>
-      <td>25s</td>
-      <td>200 tasks/s</td>
-    </tr>
-  </tbody>
-</table>
-
-### Parallelization Speedup
-
-<table>
-  <thead>
-    <tr>
-      <th>Sequential</th>
-      <th>Parallel</th>
-      <th>Workers</th>
-      <th>Speedup</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>100s</td>
-      <td>10s</td>
-      <td>10</td>
-      <td>10x</td>
-    </tr>
-    <tr>
-      <td>100s</td>
-      <td>5s</td>
-      <td>20</td>
-      <td>20x</td>
-    </tr>
-    <tr>
-      <td>100s</td>
-      <td>2.5s</td>
-      <td>40</td>
-      <td>40x</td>
-    </tr>
-  </tbody>
-</table>
-
-### Latency (p50/p95/p99)
-
-<table>
-  <thead>
-    <tr>
-      <th>Operation</th>
-      <th>p50</th>
-      <th>p95</th>
-      <th>p99</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Task creation</td>
-      <td>5ms</td>
-      <td>15ms</td>
-      <td>30ms</td>
-    </tr>
-    <tr>
-      <td>Queue operations</td>
-      <td>2ms</td>
-      <td>8ms</td>
-      <td>20ms</td>
-    </tr>
-    <tr>
-      <td>Result retrieval</td>
-      <td>10ms</td>
-      <td>50ms</td>
-      <td>100ms</td>
-    </tr>
-  </tbody>
-</table>
 
 ## Next Steps
 
-### Documentation
-
-- [Blazing Flow Overview](/docs/flow-overview) - Architecture overview
-- [Flow Configuration](/docs/flow-configuration) - Configuration guide
-- [Flow Deployment](/docs/flow-deployment) - Deployment strategies
-
-### Getting Started
-
-- [Quick Start Guide](/docs/flow-quick-start)
-- [Flow Architecture](/docs/flow-architecture)
-- [Flow Monitoring](/docs/flow-monitoring)
-
-### Community
-
-- [GitHub Repository](https://github.com/digitalfrontier/blazing)
-- [Issue Tracker](https://github.com/digitalfrontier/blazing/issues)
-- [Contributing Guide](https://github.com/digitalfrontier/blazing/blob/main/CONTRIBUTING.md)
+- [Flow Guide](/docs/blazing-flow/getting-started/flow-guide)
+- [Endpoints Overview](/docs/blazing-flow/endpoints/overview)
+- [Services & Connectors](/docs/blazing-flow/guides/custom-connectors)
+- [Deployment Guide](/docs/blazing-flow/deployment/flow-deployment)
+- [Monitoring](/docs/blazing-flow/monitoring/flow-monitoring)
 
 ---
 
-**All examples are battle-tested** - extracted from our production test suite with 100+ tests covering infrastructure, performance, concurrency, and security scenarios.
+**All tutorials use current Blazing Flow patterns**.

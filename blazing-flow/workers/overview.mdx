@@ -1,0 +1,82 @@
+---
+title: Workers
+label: Workers
+description: How Blazing Flow runs trusted and sandboxed code
+position: 6
+---
+
+Blazing Flow runs your code on two execution pools:
+
+- **Trusted workers** for your services and infrastructure‑level logic.
+- **Sandboxed workers** for untrusted or user‑provided code.
+
+You do not need to pick worker types manually. Blazing routes work based on how you define the step or workflow.
+
+## Trusted Workers
+
+Trusted workers run your code with full access to connectors and external systems.
+
+Use trusted workers for:
+
+- Service classes that access databases, APIs, and third‑party systems.
+- Workflow orchestration logic.
+- Anything that requires network or filesystem access.
+
+Example service:
+
+```python
+from blazing.base import BaseService
+
+@app.service
+class DatabaseService(BaseService):
+    def __init__(self, connectors):
+        self._db = connectors.get("postgres")
+
+    async def fetch_user(self, user_id: int) -> dict:
+        row = await self._db.fetch_one("SELECT * FROM users WHERE id = :id", {"id": user_id})
+        return dict(row)
+```
+
+## Sandboxed Workers
+
+Sandboxed workers run untrusted code in a restricted environment. They are designed for user‑submitted logic or code you do not fully trust.
+
+Use sandboxed workers for:
+
+- User‑provided transformations.
+- Custom business rules defined by end users.
+- Multi‑tenant workloads where isolation is required.
+
+Example sandboxed step:
+
+```python
+@app.step(sandboxed=True)
+async def transform_data(data: list, services=None):
+    result = [x * 2 for x in data if x > 0]
+
+    # Calls to services still run on trusted workers
+    await services["DatabaseService"].save_results(result)
+
+    return result
+```
+
+## Routing Rules (Simplified)
+
+- **Trusted code** (services, non‑sandboxed steps) runs on trusted workers.
+- **Sandboxed code** (sandboxed steps or workflows) runs on sandboxed workers.
+- **Sync vs async** is inferred from your Python definitions.
+
+## Best Practices
+
+- Keep database/API access in services, not in sandboxed steps.
+- Use sandboxed steps for user‑defined logic; use trusted steps for platform logic.
+- Keep untrusted inputs out of trusted services unless explicitly validated.
+
+## Configuration
+
+Worker scaling and infrastructure concerns are managed in **Blazing Core YAML**. Flow remains code‑first and focused on your application logic.
+
+## Next Steps
+
+- [Sandbox Overview](/docs/blazing-flow-sandbox/overview)
+- [Configuration](/docs/blazing-flow/configuration/flow-configuration)

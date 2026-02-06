@@ -1,180 +1,43 @@
 ---
-title: Parallel Task Execution
+title: Parallel Execution
 label: Parallel Execution
-description: Execute multiple tasks concurrently for maximum throughput
-position: 1
+description: Fan‑out and fan‑in with asyncio
+position: 2
 ---
 
-Blazing Batch automatically parallelizes task execution across distributed workers. Learn how to leverage this for maximum performance.
+Parallelize work by launching multiple steps and awaiting them together.
 
-## Basic Parallel Execution
-
-### Execute Multiple Tasks
-
-```python
-from blazing import Blazing
-
-app = Blazing()
-
-# Create multiple tasks
-symbols = ["AAPL", "TSLA", "GOOGL", "MSFT", "AMZN"]
-tasks = []
-
-for symbol in symbols:
-    unit = await app.create_workflow_task(
-        "fetch_timeseries",
-        symbol=symbol,
-        points=50,
-        delay=0
-    )
-    tasks.append(unit)
-
-# Execute all tasks in parallel
-results = await app.gather(tasks)
-
-# Process results
-for i, result in enumerate(results):
-    print(f"{result['symbol']}: {result['count']} points")
-```
-
-## Parallelization Benefits
-
-### Sequential vs Parallel
-
-**Sequential execution** (4 tasks × 1s each = ~4 seconds):
-```python
-# DON'T DO THIS - runs one at a time
-for symbol in symbols:
-    unit = await app.create_workflow_task(...)
-    result = await app.gather([unit])  # Waits before next iteration
-```
-
-**Parallel execution** (4 tasks × 1s each = ~1 second):
-```python
-# DO THIS - creates all tasks first, then waits
-tasks = []
-for symbol in symbols:
-    tasks.append(await app.create_workflow_task(...))
-
-# All tasks execute concurrently
-results = await app.gather(tasks)
-```
-
-### Real-World Example
+## Fan‑Out / Fan‑In
 
 ```python
 import asyncio
-import time
 from blazing import Blazing
 
-async def parallel_data_pipeline():
+async def main():
     app = Blazing()
 
-    start_time = time.time()
+    @app.step
+    async def square(x: int, services=None):
+        return x * x
 
-    # Create 100 parallel tasks
-    tasks = []
-    for i in range(100):
-        unit = await app.create_workflow_task(
-            "fetch_timeseries",
-            symbol=f"STOCK{i}",
-            points=1000,
-            delay=0
-        )
-        tasks.append(unit)
+    @app.workflow
+    async def squares(nums: list[int], services=None):
+        runs = [square(n, services=services) for n in nums]
+        results = await asyncio.gather(*[r.result() for r in runs])
+        return results
 
-    # Execute all in parallel
-    results = await app.gather(tasks)
+    await app.publish()
+    print(await app.squares([1, 2, 3, 4]).wait_result())
 
-    elapsed = time.time() - start_time
-    print(f"✓ Processed {len(results)} tasks in {elapsed:.2f}s")
-
-    await app.close()
-
-asyncio.run(parallel_data_pipeline())
-```
-
-## Task with Delays
-
-Even tasks with delays benefit from parallelization:
-
-```python
-import time
-
-app = Blazing()
-start_time = time.time()
-
-# Create 4 tasks with 1-second delay each
-tasks = []
-for i in range(4):
-    unit = await app.create_workflow_task(
-        "fetch_timeseries",
-        symbol=f"SYM{i}",
-        points=10,
-        delay=1  # 1 second delay per task
-    )
-    tasks.append(unit)
-
-# Parallel: completes in ~1-2 seconds (not 4!)
-await app.wait(tasks)
-
-elapsed = time.time() - start_time
-print(f"Parallel execution: {elapsed:.2f}s")
-# Output: ~1.5s instead of 4s
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Best Practices
 
-### 1. Batch Task Creation
-
-```python
-# Good: Create all tasks first
-tasks = [
-    await app.create_workflow_task("workflow", param=i)
-    for i in range(100)
-]
-results = await app.gather(tasks)
-```
-
-### 2. Use gather() for Results
-
-```python
-# Efficient: Single gather call
-results = await app.gather(tasks)
-
-# Inefficient: Multiple individual gathers
-results = [await app.gather([task]) for task in tasks]
-```
-
-### 3. Monitor Concurrency
-
-```python
-# Create tasks in batches for very large workloads
-batch_size = 50
-
-for i in range(0, len(all_tasks), batch_size):
-    batch = all_tasks[i:i + batch_size]
-    results = await app.gather(batch)
-    process_results(results)
-```
-
-## Performance Characteristics
-
-| Workers | Tasks | Sequential Time | Parallel Time | Speedup |
-|---------|-------|----------------|---------------|---------|
-| 4       | 4     | 4s             | ~1s           | 4x      |
-| 4       | 8     | 8s             | ~2s           | 4x      |
-| 4       | 100   | 100s           | ~25s          | 4x      |
-| 10      | 100   | 100s           | ~10s          | 10x     |
+- Keep steps small and idempotent.
+- Prefer fan‑out for I/O‑bound workloads.
 
 ## Next Steps
 
-- [Error Handling](/docs/tutorials/error-handling) - Handle task failures
-- [Concurrency Patterns](/docs/tutorials/concurrency-patterns) - Advanced patterns
-- [Basic Task Execution](/docs/tutorials/basic-task-execution) - Fundamentals
-
-## Source
-
-Based on test suite examples:
-- `tests/test_infrastructure.py::test_parallel_fetches`
-- `tests/test_infrastructure.py::test_parallel_with_delays`
+- [Concurrency Patterns](/docs/blazing-flow/tutorials/concurrency-patterns)

@@ -41,7 +41,7 @@ Workers execute tasks from workflows and steps:
 
 ```python
 # Configure worker mix
-app = Blazing(,
+app = Blazing(
     worker_config={
         'async_workers': 4,
         'blocking_workers': 2,
@@ -72,18 +72,18 @@ app = Blazing(,
 
 ```python
 @app.workflow
-async def process_order(order_id: str):
+async def process_order(order_id: str, services=None):
     # Step 1: Fetch order details
-    order = await fetch_order(order_id)
+    order = await fetch_order(order_id, services=services)
 
     # Step 2: Validate inventory
-    validated = await validate_inventory(order)
+    validated = await validate_inventory(order, services=services)
 
     # Step 3: Process payment
-    payment = await process_payment(validated)
+    payment = await process_payment(validated, services=services)
 
     # Step 4: Ship order
-    shipment = await ship_order(payment)
+    shipment = await ship_order(payment, services=services)
 
     return shipment
 ```
@@ -146,43 +146,11 @@ You don't need to configure this - it happens automatically. You can monitor the
 
 ### Connector Types
 
-Blazing supports multiple connector types:
-
-#### SQL Connectors
-```python
-from blazing.connectors import SQLConnector
-
-db = SQLConnector(
-    type="postgresql",
-    host="db.example.com",
-    port=5432,
-    database="prod",
-    credentials_encrypted=True
-)
-```
-
-#### HTTP Connectors
-```python
-from blazing.connectors import HTTPConnector
-
-api = HTTPConnector(
-    base_url="https://api.example.com",
-    headers={"Authorization": "Bearer ..."},
-    timeout=30
-)
-```
-
-#### SSH Connectors
-```python
-from blazing.connectors import SSHConnector
-
-ssh = SSHConnector(
-    host="server.example.com",
-    port=22,
-    username="deploy",
-    key_path="/path/to/key"
-)
-```
+Connectors are injected into services by the runtime and expose access to
+external systems (databases, object storage, secrets, web APIs). In Blazing
+Flow, you access them via `connectors` inside a service or through the `services`
+parameter inside steps. Configuration for persistent infrastructure and
+connectors lives in Blazing Core YAML.
 
 ### Connection Pooling
 
@@ -263,7 +231,7 @@ All Foremen process tasks cooperatively.
 Increase workers per Foreman:
 
 ```python
-app = Blazing(,
+app = Blazing(
     worker_config={
         'async_workers': 16,  # Scale up for I/O workloads
         'blocking_workers': 8  # Scale up for CPU workloads
@@ -272,4 +240,3 @@ app = Blazing(,
 ```
 
 ## Next Steps
-

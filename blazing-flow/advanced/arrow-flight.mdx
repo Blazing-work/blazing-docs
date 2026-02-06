@@ -1,0 +1,24 @@
+---
+title: Large Data Transfers
+label: Large Data
+description: Fast transfer of large datasets in Blazing Flow
+position: 1
+---
+
+Blazing Flow automatically optimizes large payloads like DataFrames and arrays to keep pipelines fast.
+
+## What It Does
+
+- Detects large columnar payloads.
+- Uses an optimized transfer path under the hood.
+- Minimizes serialization overhead.
+
+## Why It Matters
+
+- Faster end‑to‑end pipeline times.
+- Less memory pressure on workers.
+- Smooth handling of large datasets.
+
+## How To Use
+
+You don’t need to configure anything. Just pass supported types (pandas, NumPy, PyArrow) and Blazing handles the transfer path automatically.

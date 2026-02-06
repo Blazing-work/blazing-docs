@@ -1,224 +1,58 @@
 ---
 title: Blazing Flow Documentation
 label: Blazing Flow
-description: Build resilient async pipelines with automatic recovery and dynamic optimization
+description: Build resilient async pipelines with steps, workflows, and services
 position: 1
 ---
 
-**Serverless, Persistent** async pipelines with the power that Lambda can't provide.
-
-<div className="my-8 rounded-lg border border-primary/20 bg-primary/5 p-6">
-  <div className="flex items-start gap-4">
-    <div className="text-3xl">⚡</div>
-    <div>
-      <h3 className="text-lg font-semibold mb-2">Full Python. Full Reusability. Full Security. Full Scalability. Full Sovereignty.</h3>
-      <div className="text-muted-foreground">
-        Write real Python with if statements and loops. Pool connections across thousands of tasks.
-        Run untrusted code safely. Scale infinitely. Control your infrastructure completely.
-      </div>
-    </div>
-  </div>
-</div>
+Blazing Flow is a workflow engine for Python. You define **steps**, **workflows**, and **services** with simple decorators, publish them, and execute runs from your application or API layer.
 
 ## Get Started
 
-- **[Quick Start](/docs/flow-quick-start)** 🚀 - Build your first async pipeline in 5 minutes
-- **[Guide](/docs/flow-guide)** 📚 - Complete guide with examples
+- **[Quick Start](/docs/blazing-flow/getting-started/flow-quick-start)** – Build your first pipeline in minutes
+- **[Guide](/docs/blazing-flow/getting-started/flow-guide)** – Core concepts and practical patterns
 
-## Serverless, Persistent: The Full Stack
+## Why Blazing Flow
 
-Lambda gives you serverless. Blazing Flow gives you serverless **and** persistence. The workflow/step/service architecture unlocks capabilities that traditional serverless cannot provide:
-
-### ⚡ Full Python
-
-**Lambda/Cloud Run**: Rigid DAGs, Step Functions, JSON state machines. No if statements, no loops, no real programming.
-
-**Blazing Flow**: Write real Python. If statements, loops, dynamic branching. Unlimited complexity.
-
-```python
-@app.workflow
-async def pipeline(user_id: str):
-    user = await fetch_user(user_id)
-
-    # Real Python - if statements, loops, everything
-    if user['premium']:
-        result = await premium_processing(user)
-    else:
-        result = await standard_processing(user)
-
-    for item in result['items']:
-        await process_item(item)
-
-    return result
-```
-
-### 🔄 Full Reusability
-
-**Lambda/Cloud Run**: Cold starts every time. Connections rebuilt. State lost. 50-200ms overhead per invocation.
-
-**Blazing Flow**: Connections pooled. State cached. Warmup once, reuse forever. 5ms per task.
-
-```python
-class DatabaseService(BaseService):
-    def __init__(self, connector_instances):
-        # Created ONCE - persists across thousands of tasks
-        self.db_pool = connector_instances['postgres']
-        self.cache = {}
-
-    async def query(self, sql: str):
-        # Connection already warm - no cold start
-        return await self.db_pool.execute(sql)
-```
-
-### 🔒 Full Security
-
-**Lambda/Cloud Run**: All code has full access. User code can steal credentials, access databases, leak secrets.
-
-**Blazing Flow**: Sandboxed steps run isolated. Service calls automatically execute in trusted environment. Credentials never leak - architecture prevents it.
-
-```python
-@app.step(sandboxed=True)
-async def user_code(x: int, y: int, services=None):
-    # Runs isolated - no credential access
-
-    # Service call → executes in TRUSTED environment
-    result = await services['Database'].query(f"SELECT {x} + {y}")
-    # Credentials never enter sandbox
-
-    return result
-```
-
-**Architecture**: `Sandboxed code → Service call → Trusted execution → Safe result`
-
-### 📈 Full Scalability
-
-**Lambda/Cloud Run**: Limited concurrency, timeout limits, regional restrictions.
-
-**Blazing Flow**: Unlimited workers, no timeouts, scale to millions of tasks.
-
-### 🏛️ Full Sovereignty
-
-**Lambda/Cloud Run**: Locked to AWS/GCP. No control over where code runs.
-
-**Blazing Flow**: Deploy on GCP, Akash Network, or hybrid. Your infrastructure, your control, your data residency.
-
-### ⚡ The Comparison
-
-<table>
-  <thead>
-    <tr>
-      <th></th>
-      <th>AWS Lambda</th>
-      <th>Cloud Run</th>
-      <th>Blazing Flow</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><strong>Python</strong></td>
-      <td>❌ DAGs only</td>
-      <td>❌ Step Functions</td>
-      <td>✅ <strong>Full Python</strong></td>
-    </tr>
-    <tr>
-      <td><strong>Reusability</strong></td>
-      <td>❌ Cold starts</td>
-      <td>❌ Per request</td>
-      <td>✅ <strong>Pool & Cache</strong></td>
-    </tr>
-    <tr>
-      <td><strong>Security</strong></td>
-      <td>❌ Full access</td>
-      <td>❌ Full access</td>
-      <td>✅ <strong>Sandboxed</strong></td>
-    </tr>
-    <tr>
-      <td><strong>Scalability</strong></td>
-      <td>⚠️ Limited</td>
-      <td>⚠️ Limited</td>
-      <td>✅ <strong>Unlimited</strong></td>
-    </tr>
-    <tr>
-      <td><strong>Sovereignty</strong></td>
-      <td>❌ AWS only</td>
-      <td>❌ GCP only</td>
-      <td>✅ <strong>Multi-cloud</strong></td>
-    </tr>
-  </tbody>
-</table>
+- **Real Python control flow** – loops, conditionals, dynamic branching
+- **Reusable services** – shared logic and pooled external connections
+- **Trusted + sandboxed execution** – safe multi‑tenant workloads
+- **Batching and scheduling** – built into the workflow model
+- **Custom images** – system dependencies when you need them
 
 ## When to Use Blazing Flow
 
-✅ **Complex multi-stage workflows** - Pipelines with branching logic and multiple steps
-
-✅ **Stateful computations** - Automatic checkpointing and partial recovery
-
-✅ **Mixed workloads** - Combination of I/O-bound and CPU-bound tasks
-
-✅ **Long-running pipelines** - Workflows that run for hours or days with automatic recovery
-
-✅ **Dynamic routing** - Pipeline structure that changes based on data
+- Multi‑step pipelines with branching logic
+- Long‑running or fan‑out workloads
+- Stateful services that manage external resources
+- Multi‑tenant systems where isolation matters
 
 ## Quick Example
 
 ```python
+import asyncio
 from blazing import Blazing
 
-# Create your app
 app = Blazing()
 
-# Define processing steps with @step
 @app.step
-async def fetch_data(source_id: str):
-    # Fetch from database or API
+async def fetch_data(source_id: str, services=None):
     return {"id": source_id, "data": [1, 2, 3]}
 
 @app.step
-async def transform_data(raw_data: dict):
-    # Transform the data
-    total = sum(raw_data["data"])
-    return {"id": raw_data["id"], "result": total}
+async def transform_data(raw_data: dict, services=None):
+    return {"id": raw_data["id"], "result": sum(raw_data["data"])}
 
-# Define the pipeline with @route
 @app.workflow
-async def data_pipeline(source_id: str):
-    # Orchestrate the workflow
-    data = await fetch_data(source_id)
-    result = await transform_data(data)
-    return result
+async def data_pipeline(source_id: str, services=None):
+    data = await fetch_data(source_id, services=services)
+    return await transform_data(data, services=services)
 
-# Publish and start
 async def main():
-    # Publish infrastructure (creates Redis indices, registers routes)
     await app.publish()
+    result = await app.data_pipeline(source_id="123").wait_result()
+    print(result)
 
-    # Start the app (makes routes available to workers)
-    await app.start()
-
-    # Submit a task
-    unit = await app.create_workflow_task("data_pipeline", source_id="123")
-    result = await unit.result()
-    print(result)  # {"id": "123", "result": 6}
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
-
-## Key Features
-
-### 📝 Declarative Pipelines
-Define workflows using simple decorators - `@workflow` for pipelines, `@step` for steps.
-
-### 🔄 Automatic Recovery
-Pipelines resume automatically after interruptions. No lost work, no manual intervention.
-
-### ⚡ Smart Workers
-System automatically balances async and blocking workers based on your workload patterns.
-
-### 🔌 Persistent Connections
-Keep database and SSH connections alive across tasks for better performance.
-
-### 📊 Built-in Monitoring
-Real-time dashboard shows queue depths, worker states, and throughput metrics.
-
-## Learn More
-
-- **[Quick Start Guide](/docs/flow-quick-start)** - Build your first pipeline in 5 minutes
-- **[Complete Guide](/docs/flow-guide)** - In-depth examples and patterns

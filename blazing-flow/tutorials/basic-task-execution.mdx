@@ -1,123 +1,43 @@
 ---
 title: Basic Task Execution
-label: Basic Task Execution
-description: Create and execute your first distributed task with Blazing Batch
-position: 0
+label: Basic Execution
+description: Run your first workflow and retrieve results
+position: 1
 ---
 
-Learn how to create and execute distributed tasks using Blazing Batch's async API.
+This tutorial shows the minimal workflow execution loop.
 
-## Prerequisites
-
-- Blazing Batch Python SDK installed
-- Redis running (default: `localhost:6380`)
-- Access to Blazing Batch API endpoint
-
-## Quick Start
-
-### 1. Initialize the App
-
-```python
-from blazing import Blazing
-
-# Create a Blazing app instance
-app = Blazing()
-```
-
-### 2. Create a Simple Task
-
-```python
-# Create a task to execute a workflow
-unit = await app.create_workflow_task(
-    "fetch_timeseries",
-    symbol="AAPL",
-    points=100,
-    delay=0
-)
-```
-
-### 3. Wait for Results
-
-```python
-# Gather results from the task
-results = await app.gather([unit])
-result = results[0]
-
-print(f"Symbol: {result['symbol']}")
-print(f"Data points: {result['count']}")
-```
-
-## Complete Example
-
-Here's a complete working example:
+## 1. Define a Step and Workflow
 
 ```python
 import asyncio
 from blazing import Blazing
 
 async def main():
-    # Initialize app
     app = Blazing()
 
-    # Create task
-    unit = await app.create_workflow_task(
-        "fetch_timeseries",
-        symbol="AAPL",
-        points=100,
-        delay=0
-    )
+    @app.step
+    async def add(x: int, y: int, services=None):
+        return x + y
 
-    # Get results
-    results = await app.gather([unit])
-    result = results[0]
+    @app.workflow
+    async def add_flow(x: int, y: int, services=None):
+        return await add(x, y, services=services)
 
-    print(f"✓ Fetched {result['count']} points for {result['symbol']}")
+    await app.publish()
 
-    # Clean up
-    await app.close()
+    result = await app.add_flow(2, 3).wait_result()
+    print(result)
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## Key Concepts
+## 2. Return Types
 
-### Workflows
+Return JSON‑serializable values: dicts, lists, strings, numbers, and booleans.
 
-Workflows are multi-step task orchestrations that define:
-- Task parameters
-- Execution logic with multiple steps
-- Return types
+## 3. Next Steps
 
-Common workflows:
-- `fetch_timeseries` - Fetch time series data
-- `quick_lookup` - Quick data lookups
-- Custom workflows defined by your organization
-
-### Units
-
-A **unit** represents a single task execution:
-- Created by `create_workflow_task()`
-- Can be gathered for results
-- Executed asynchronously by workers
-
-### Gather vs Wait
-
-```python
-# gather() - Wait AND retrieve results
-results = await app.gather([unit1, unit2])
-
-# wait() - Just wait for completion (no results)
-await app.wait([unit1, unit2])
-```
-
-## Next Steps
-
-- [Parallel Task Execution](/docs/tutorials/parallel-execution) - Run multiple tasks concurrently
-- [Error Handling](/docs/tutorials/error-handling) - Handle failures gracefully
-- [Concurrency Patterns](/docs/tutorials/concurrency-patterns) - Advanced patterns
-
-## Source
-
-This example is based on the test suite:
-- `tests/test_infrastructure.py::test_simple_timeseries_fetch`
+- [Error Handling](/docs/blazing-flow/tutorials/error-handling)
+- [Parallel Execution](/docs/blazing-flow/tutorials/parallel-execution)
