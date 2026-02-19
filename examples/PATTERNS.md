@@ -91,8 +91,8 @@ await app.run()  # NO - app.run() is deprecated, use app.publish()
 async def process_data(data: dict, services=None):
     """Process data with full type hints and services injection."""
     # Access services if needed
-    if services and services.connectors:
-        postgres = services.connectors.postgres
+    if services and "PostgresService" in services:
+        postgres = services["PostgresService"]
         # Use connector...
 
     return {"processed": True, "data": data}
@@ -209,9 +209,9 @@ async def main():
     @app.step
     async def query_database(user_id: int, services=None):
         """Query database using injected service."""
-        # Access connectors via services parameter
-        if services and services.connectors:
-            postgres = services.connectors.postgres
+        # Access services via dict lookup
+        if services and "PostgresService" in services:
+            postgres = services["PostgresService"]
             result = await postgres.fetch_one(
                 "SELECT * FROM users WHERE id = $1",
                 user_id
@@ -236,7 +236,7 @@ async def main():
 
 **Key Elements:**
 - Declare `services=None` on any function that needs to access connectors or auth context
-- Access services via `services.connectors`, `services.auth_context`, etc.
+- Access injected services via dict lookup: `services['ServiceName']`
 - Forward services when calling steps that use it: `await step(arg, services=services)`
 - Check if services is not None before accessing attributes
 
@@ -336,6 +336,7 @@ async def main():
 
 ```python
 from blazing import Blazing
+from blazing.web import create_asgi_app
 from blazing.middleware import (
     CORSMiddleware,
     LoggingMiddleware,
@@ -345,28 +346,30 @@ from blazing.middleware import (
 async def main():
     app = Blazing()
 
-    # Add middleware to all endpoints
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    app.add_middleware(
-        LoggingMiddleware,
-        log_level="INFO",
-    )
-    app.add_middleware(
-        CompressionMiddleware,
-        min_size=1000,
-    )
-
     @app.endpoint(path="/data")
     @app.workflow
     async def get_data(services=None):
         return {"data": "example"}
 
     await app.publish()
+
+    # Apply middleware globally via create_asgi_app()
+    fastapi_app = await create_asgi_app(
+        app,
+        title="My API",
+        global_middleware=[
+            CORSMiddleware(allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]),
+            LoggingMiddleware(log_level="INFO"),
+            CompressionMiddleware(min_size=1000),
+        ],
+    )
+
+    import uvicorn
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=8080)
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
 ```
 
 **Available Middleware Classes:**
@@ -383,7 +386,7 @@ From `blazing.middleware`:
 
 **Key Elements:**
 - Per-endpoint: Pass `middleware=[...]` to `@app.endpoint()`
-- App-level: Call `app.add_middleware(MiddlewareClass, **config)`
+- App-level: Pass `global_middleware=[...]` to `create_asgi_app()` to apply middleware to all endpoints
 - Import middleware classes from `blazing.middleware`
 
 ---
