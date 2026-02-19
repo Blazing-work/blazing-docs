@@ -494,24 +494,32 @@ From `blazing.auth`:
 
 ```python
 from blazing import Blazing
-from blazing import execute_signed_function
+from blazing import serialize_user_function, execute_signed_function, create_signing_key
+
+SIGNING_KEY = create_signing_key()
 
 async def main():
     app = Blazing()
 
     @app.step(sandboxed=True)
-    async def untrusted_computation(code: str, services=None):
-        """Execute untrusted code in Pyodide sandbox."""
+    async def run_signed_step(serialized_func: str, sig: str, args: list, services=None):
+        """Execute a signed serialized function in Pyodide sandbox."""
         result = await execute_signed_function(
-            code,
-            timeout=5.0,
+            serialized_func,
+            sig,
+            args=tuple(args),
+            signing_key=SIGNING_KEY,
         )
         return result
 
     @app.workflow
-    async def safe_execution(user_code: str, services=None):
-        """Safely execute user-provided code."""
-        result = await untrusted_computation(user_code, services=services)
+    async def safe_execution(services=None):
+        """Serialize a trusted callable and execute it in the sandbox."""
+        def my_func(x: int) -> int:
+            return x * 2
+
+        serialized, sig = serialize_user_function(my_func, signing_key=SIGNING_KEY)
+        result = await run_signed_step(serialized, sig, [5], services=services)
         return result
 
     await app.publish()
@@ -519,9 +527,9 @@ async def main():
 
 **Key Elements:**
 - Use `@app.step(sandboxed=True)` for steps that execute untrusted code
-- Use `execute_signed_function()` to execute code in Pyodide sandbox
+- `serialize_user_function(callable, signing_key=...)` takes a Python **Callable** (not a string) and returns a `(serialized, signature)` tuple
+- `execute_signed_function(serialized_func, signature, ...)` requires both `serialized_func` and `signature` as the first two positional arguments
 - Sandbox provides memory isolation and limited API access
-- Specify timeout to prevent infinite loops
 
 ---
 
@@ -537,48 +545,50 @@ from blazing import (
     create_signing_key,
 )
 
+MY_SIGNING_KEY = create_signing_key()
+
 async def main():
     app = Blazing(
-        signing_key=create_signing_key(),
+        signing_key=MY_SIGNING_KEY,
         enable_attestation=True,
     )
 
-    # Serialize user function client-side
+    # Serialize a trusted callable client-side before the workflow runs
     def user_function(x: int) -> int:
         return x * 2
 
-    serialized = serialize_user_function(user_function)
+    serialized, sig = serialize_user_function(user_function, signing_key=MY_SIGNING_KEY)
 
     @app.step(sandboxed=True)
-    async def execute_user_code(serialized_func: str, args: list, services=None):
+    async def execute_user_code(serialized_func: str, sig: str, args: list, services=None):
         """Execute serialized user function in sandbox."""
         result = await execute_signed_function(
             serialized_func,
-            args=args,
-            timeout=10.0,
+            sig,
+            args=tuple(args),
+            signing_key=MY_SIGNING_KEY,
         )
         return result
 
     @app.workflow
-    async def run_user_workflow(func_code: str, input_data: list, services=None):
+    async def run_user_workflow(func_code: str, func_sig: str, input_data: list, services=None):
         """Workflow that executes user-provided functions safely."""
-        result = await execute_user_code(func_code, input_data, services=services)
+        result = await execute_user_code(func_code, func_sig, input_data, services=services)
         return result
 
     await app.publish()
 
-    # Execute with serialized function
-    result = await app.run_user_workflow(serialized, [5]).wait_result()
+    # Execute with serialized function and its signature
+    result = await app.run_user_workflow(serialized, sig, [5]).wait_result()
     print(result)  # 10
 ```
 
 **Key Elements:**
-- Use `serialize_user_function()` to serialize untrusted functions
-- Use `create_signing_key()` to generate signing key for attestation
+- Use `serialize_user_function(callable, signing_key=...)` to serialize trusted callables — it returns a `(serialized, signature)` tuple that must be unpacked
+- Use `create_signing_key()` to generate a signing key for attestation
 - Pass `signing_key` and `enable_attestation=True` to Blazing constructor
 - Use `@app.step(sandboxed=True)` for execution step
-- Use `execute_signed_function()` with serialized code
-- Specify timeout for safety
+- `execute_signed_function(serialized_func, signature, ...)` requires both as the first two positional arguments
 
 ---
 
