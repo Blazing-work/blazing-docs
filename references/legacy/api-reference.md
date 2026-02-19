@@ -64,8 +64,8 @@ async def my_workflow(arg1, services=None):
 
 **Requirements:**
 
-*   The decorated function must be `async`.
-*   The decorated function must accept a `services` keyword argument.
+*   The decorated function must be `async` (`@app.workflow` enforces this at decoration time).
+*   Declare `services=None` when the function needs service injection; it is optional.
 
 ### `@app.step`
 
@@ -85,8 +85,8 @@ def my_blocking_step(data, services=None):
 
 **Requirements:**
 
-*   The decorated function can be `async` (for I/O-bound tasks) or synchronous (for CPU-bound tasks).
-*   The decorated function must accept a `services` keyword argument.
+*   The decorated function can be `async` (routes to NON-BLOCKING worker) or synchronous (routes to BLOCKING worker).
+*   Declare `services=None` when the step needs service injection; it is optional.
 
 ### `@app.service`
 
@@ -97,7 +97,7 @@ A decorator to register a class as a service.
 ```python
 @app.service
 class MyService(BaseService):
-    def __init__(self, connector_instances):
+    def __init__(self, connector_instances=None):
         # ...
 ```
 
@@ -116,12 +116,18 @@ A base class for creating services.
 ```python
 from blazing import BaseService
 
+# Service with connectors — declare connector_instances
 class MyService(BaseService):
-    def __init__(self, connector_instances):
-        self.db_connection = connector_instances["my_db"]
+    def __init__(self, connector_instances=None):
+        self.db_connection = (connector_instances or {}).get("my_db")
 
     def my_method(self):
         # ...
+
+# Pure-compute service — connector_instances omitted entirely
+class MathService(BaseService):
+    async def add(self, a: float, b: float) -> float:
+        return a + b
 ```
 
-The `__init__` method of a service receives a dictionary of `connector_instances` that have been configured for the application.
+`connector_instances` is **optional**. Declare it when your service needs connectors; omit it for pure-compute services. The executor injects it automatically when declared.

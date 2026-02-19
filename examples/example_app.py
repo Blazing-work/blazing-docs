@@ -15,21 +15,21 @@ app = Blazing(
 class ExampleService(BaseService):
     """Example service for demo."""
 
-    def __init__(self, connector_instances):
-        self.connector_instances = connector_instances
+    def __init__(self, connector_instances=None):
+        self.connector_instances = connector_instances or {}
 
     async def process_data(self, data):
         """Process some data."""
         return f"Processed: {data}"
 
 
-@app.route
+@app.workflow
 async def hello_world(name: str, services=None):
     """Simple hello world route."""
     return f"Hello, {name}!"
 
 
-@app.route
+@app.workflow
 async def process_with_service(data: str, services=None):
     """Route that uses a service."""
     result = await services["ExampleService"].process_data(data)
