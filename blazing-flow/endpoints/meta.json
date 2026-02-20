@@ -1,6 +1,6 @@
 {
   "title": "Blazing Flow Endpoints",
-  "description": "Turn workflows into production REST APIs with HTTP/WebSocket support",
+  "description": "Blazing Flow Endpoints: covers Blazing Flow Endpoints, Quick Start, and Authentication in Blazing Flow \u2014 serverless persistent async pipeline framework",
   "position": 6,
   "pages": [
     "overview",

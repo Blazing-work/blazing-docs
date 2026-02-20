@@ -1,7 +1,7 @@
 {
   "title": "Use Cases",
   "position": 2,
-  "description": "Real-world use cases and implementation examples for Blazing Gateway",
+  "description": "Use Cases for Blazing Gateway: covers Use Cases & Examples and more \u2014 edge networking and VoIP gateway solution for low-latency real-time communication",
   "product": "blazing-gateway",
   "parentProduct": "blazing-core",
   "category": "guide"

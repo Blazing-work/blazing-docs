@@ -1,7 +1,7 @@
 {
   "title": "Getting Started",
   "position": 0,
-  "description": "Get started with Blazing Gateway and deploy your first edge gateway",
+  "description": "Getting Started for Blazing Gateway: covers Blazing Gateway Introduction, Quick Start Guide, and more \u2014 edge networking and VoIP gateway solution for",
   "product": "blazing-gateway",
   "parentProduct": "blazing-core",
   "category": "guide"

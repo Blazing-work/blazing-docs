@@ -1,7 +1,7 @@
 {
   "title": "Provider Configuration",
   "position": 2,
-  "description": "Configure cloud providers and infrastructure preferences",
+  "description": "Provider Configuration for Blazing Core: covers Akash Provider Configuration, DFC Provider Configuration, GCP Provider Configuration, and more \u2014",
   "product": "blazing-core",
   "category": "guide"
 }

@@ -1,7 +1,7 @@
 {
   "title": "Features",
   "position": 1,
-  "description": "Comprehensive guide to Flow Sandbox features and capabilities",
+  "description": "Features for Blazing Flow Sandbox: covers Features Overview and more \u2014 secure Pyodide-based WebAssembly sandbox for safely executing untrusted user code",
   "product": "blazing-flow-sandbox",
   "parentProduct": "blazing-flow",
   "category": "guide"

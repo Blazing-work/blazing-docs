@@ -1,7 +1,7 @@
 {
   "title": "Examples",
   "position": 2,
-  "description": "Practical examples and use cases for Flow Sandbox",
+  "description": "Examples for Blazing Flow Sandbox: covers Sandbox Examples and more \u2014 secure Pyodide-based WebAssembly sandbox for safely executing untrusted user code",
   "product": "blazing-flow-sandbox",
   "parentProduct": "blazing-flow",
   "category": "examples"

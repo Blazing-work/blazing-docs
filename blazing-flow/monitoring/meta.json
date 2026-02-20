@@ -1,7 +1,7 @@
 {
   "title": "Monitoring",
   "position": 4,
-  "description": "Monitor, observe, and troubleshoot Blazing Flow workflows",
+  "description": "Monitoring for Blazing Flow: covers Flow Monitoring and more \u2014 serverless persistent async pipeline framework with automatic recovery, step-based",
   "product": "blazing-flow",
   "category": "guide"
 }

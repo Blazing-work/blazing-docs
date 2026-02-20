@@ -1,7 +1,7 @@
 {
   "title": "Getting Started",
   "position": 0,
-  "description": "Isolated workflow orchestration environment for testing and development",
+  "description": "Getting Started for Blazing Flow Sandbox: covers Flow Sandbox Introduction, Quick Start Guide, and more \u2014 secure Pyodide-based WebAssembly sandbox for",
   "product": "blazing-flow-sandbox",
   "parentProduct": "blazing-flow",
   "category": "guide"
