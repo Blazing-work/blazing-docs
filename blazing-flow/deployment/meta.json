@@ -3,5 +3,6 @@
   "position": 3,
   "description": "Deploy and manage Blazing Flow workflows in production",
   "product": "blazing-flow",
-  "category": "guide"
+  "category": "guide",
+  "previewTier": "dev-preview"
 }

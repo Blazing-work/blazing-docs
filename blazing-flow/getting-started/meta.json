@@ -4,5 +4,6 @@
   "position": 0,
   "product": "blazing-flow",
   "category": "guide",
-  "isProductLanding": true
+  "isProductLanding": true,
+  "previewTier": "dev-preview"
 }
