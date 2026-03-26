@@ -3,5 +3,6 @@
   "position": 0,
   "description": "Quick start guide and introduction to Blazing Core Compose",
   "product": "blazing-core",
-  "category": "guide"
+  "category": "guide",
+  "isProductLanding": true
 }

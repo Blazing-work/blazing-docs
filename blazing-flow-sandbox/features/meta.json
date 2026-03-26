@@ -4,5 +4,6 @@
   "description": "Comprehensive guide to Flow Sandbox features and capabilities",
   "product": "blazing-flow-sandbox",
   "parentProduct": "blazing-flow",
-  "category": "guide"
+  "category": "guide",
+  "previewTier": "dev-preview"
 }

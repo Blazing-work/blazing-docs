@@ -3,5 +3,7 @@
   "description": "Build resilient async pipelines with automatic recovery and dynamic optimization",
   "position": 0,
   "product": "blazing-flow",
-  "category": "guide"
+  "category": "guide",
+  "isProductLanding": true,
+  "previewTier": "dev-preview"
 }
