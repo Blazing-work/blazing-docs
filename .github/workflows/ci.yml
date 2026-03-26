@@ -12,12 +12,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Lint MDX files
-        run: |
-          echo "Checking for placeholder Akash addresses..."
-          if grep -rn 'akash1\.\.\.' --include="*.mdx" --include="*.md" .; then
-            echo "Error: placeholder Akash addresses found (akash1...xxx)"
-            exit 1
-          fi
-
-          echo "Lint passed."
+      - name: Lint docs
+        run: bash .github/scripts/lint-docs.sh
