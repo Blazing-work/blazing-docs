@@ -1,0 +1,62 @@
+---
+title: Billing Overview
+label: Billing
+description: Postpaid usage-based billing with per-second metering
+position: 0
+---
+
+Blazing uses a **postpaid, usage-based billing model**. You are billed for the compute, memory, storage, and network resources your workloads actually consume. There are no upfront costs or prepaid credits required.
+
+## How Billing Works
+
+1. **Deploy workloads** across any supported provider (GCP, Akash, DFC)
+2. **Usage is metered** every hour based on actual resource consumption
+3. **Stripe generates an invoice** at the end of each billing period
+4. **Payment is charged** to your card on file automatically
+
+## What Gets Metered
+
+Blazing meters four resource dimensions:
+
+| Meter | Unit | Description |
+|-------|------|-------------|
+| **CPU** | vCPU-hours | Virtual CPU cores consumed per hour |
+| **Memory** | GiB-hours | Memory allocated per hour |
+| **Storage** | GiB-months | Persistent storage provisioned |
+| **Network Egress** | GiB | Outbound data transfer |
+
+Metering uses **Max(Reserved, Used)** logic: you are billed for whichever is higher between your requested allocation and actual usage. This prevents under-billing when workloads burst beyond their reservations.
+
+## Billing Cycle
+
+- Usage is aggregated **hourly** into billable units
+- Hourly aggregates are synced to Stripe Billing Meters
+- Stripe generates a monthly invoice based on accumulated usage
+- Invoices include a per-resource breakdown by provider and SKU class
+
+## Plans
+
+| Plan | Base Fee | Description |
+|------|----------|-------------|
+| **Starter** | $0/month | Usage-only billing, no base fee. Up to 100 containers, 2 regions, 5 projects. |
+| **Team** | $250/month | Includes base fee plus usage overages. Up to 1,000 containers, 5 regions, 20 projects. |
+| **Enterprise** | Custom | Negotiated pricing with unlimited resources. Contact sales. |
+
+All plans include usage-based billing on top of the base fee. The Starter plan has no minimum commitment.
+
+## Billing Dashboard
+
+Access your billing dashboard at **Settings > Organization > Billing**. From there you can:
+
+- View forecasted costs for the current period
+- See cost breakdown by cloud provider
+- Review usage trends and historical patterns
+- Download invoices
+- Manage your payment method
+- Configure usage alerts
+
+## Next Steps
+
+- [Pricing](/docs/blazing-core/billing/pricing) -- Detailed rates by provider and SKU class
+- [Usage Alerts](/docs/blazing-core/billing/usage-alerts) -- Set up spending threshold notifications
+- [Invoices & Payments](/docs/blazing-core/billing/invoices-and-payments) -- Manage invoices and payment methods

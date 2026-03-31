@@ -1,0 +1,83 @@
+---
+title: Invoices & Payments
+label: Invoices & Payments
+description: Manage invoices, payment methods, and billing history
+position: 3
+---
+
+Blazing handles all payment processing through Stripe. Invoices are generated automatically at the end of each billing period based on your metered usage.
+
+## Invoices
+
+### Viewing Invoices
+
+Go to **Settings > Organization > Billing** and scroll to the **Invoice History** section. Each invoice shows:
+
+- Invoice number (format: `PF{YY}-{NNNNN}`)
+- Billing period (start and end dates)
+- Total amount
+- Payment status (Paid, Payment Failed, Past Due)
+- Download link for the invoice PDF
+
+### Invoice Contents
+
+Each invoice includes a detailed breakdown of:
+
+- CPU core-hours by SKU class (spot, on-demand, confidential)
+- Memory GiB-hours by SKU class
+- Storage GiB-hours by storage class
+- Network egress by tier (premium, standard)
+- Base plan fee (Team plan: $250/month)
+- Total amount due
+
+### Invoice Revisions
+
+If an invoice needs correction (e.g., due to a billing dispute), revised invoices are issued with a revision suffix: `PF26-00001-R1`, `PF26-00001-R2`, etc. The original invoice number is preserved for audit traceability.
+
+## Payment Methods
+
+### Adding a Payment Method
+
+1. Go to **Settings > Organization > Billing**
+2. Click **Manage Payment Method** (opens Stripe Billing Portal)
+3. Add or update your credit card
+
+Alternatively, during initial setup, you will be prompted to add a payment method through Stripe Checkout. This collects your card without an immediate charge.
+
+### Supported Methods
+
+Blazing accepts all payment methods supported by Stripe, including:
+- Visa, Mastercard, American Express
+- Bank transfers (where available)
+
+### Billing Portal
+
+The **Manage Billing** button opens Stripe's hosted billing portal where you can:
+- Update your payment method
+- View all invoices
+- Download receipts
+- Manage your subscription
+
+## Payment Failures
+
+If a payment fails, Blazing handles it automatically:
+
+1. **Email notification** sent immediately with failure details and next retry date
+2. **Smart retries** managed by Stripe (typically retries at 1, 3, 5, and 7 days)
+3. **Payment Overdue banner** appears on the billing dashboard
+4. **Failure tracking** records the number of consecutive failures
+
+Your workloads continue running during the retry period. Contact support if you need to resolve a payment issue before the automatic retry.
+
+## Billing State
+
+Your organization's billing status is tracked as one of:
+
+| Status | Meaning |
+|--------|---------|
+| **Active** | Normal billing state, no issues |
+| **Paid** | Most recent invoice paid successfully |
+| **Payment Failed** | Payment attempt failed, retry scheduled |
+| **Past Due** | Multiple payment retries failed |
+
+The current billing state is visible on the billing dashboard.

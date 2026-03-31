@@ -1,0 +1,84 @@
+---
+title: Pricing
+label: Pricing
+description: Per-resource rates by provider and SKU class
+position: 1
+---
+
+All pricing is **per-second billing** with **hourly aggregation**. Rates shown below are per-hour for readability. The backend source of truth is `compiler/data/pricing.yaml`.
+
+## Compute Pricing
+
+### By SKU Class
+
+| SKU Class | CPU (per vCPU/hr) | Memory (per GiB/hr) | vs On-Demand | Preemption Risk |
+|-----------|-------------------|---------------------|--------------|-----------------|
+| **Spot** | $0.0472 | $0.008 | -67% | High (30s eviction) |
+| **On-Demand** | $0.1416 | $0.024 | Baseline | None |
+| **CUD 1-Year** | $0.1020 | $0.0173 | -28% | None |
+| **CUD 3-Year** | $0.0765 | $0.0130 | -46% | None |
+| **Confidential** | $0.1841 | $0.0312 | +30% premium | None |
+
+**Spot** instances can be preempted with 30 seconds notice. Use for fault-tolerant, stateless workloads.
+
+**CUD (Committed Use Discount)** requires a 1-year or 3-year commitment. In return, you receive a guaranteed discount on compute rates.
+
+**Confidential** VMs use AMD SEV hardware-based memory encryption. Ideal for sensitive data processing.
+
+### Akash Network (DePIN)
+
+Akash uses a **reverse auction** pricing model. The rates below are **maximum ceilings** -- actual costs are determined at deploy time by the lowest bidder.
+
+| Resource | Max Rate | Description |
+|----------|----------|-------------|
+| CPU | $0.012/vCPU/hr | Ceiling = DFC spot equivalent |
+| Memory | $0.001/GiB/hr | Ceiling = DFC spot equivalent |
+| Storage | $0.01/GiB/month | Ceiling = DFC spot equivalent |
+| Egress | $0.001/GiB | Ceiling = DFC spot equivalent |
+
+A **platform fee** of $0.002 per vCPU per hour is added on top of the auction-determined lease cost. This covers Blazing's orchestration, monitoring, and support.
+
+## Storage Pricing
+
+| Storage Class | Rate (per GiB/month) |
+|--------------|---------------------|
+| **Standard SSD** | $0.17 |
+| **Balanced SSD** | $0.10 |
+| **Performance SSD** | $0.34 |
+| **Standard HDD** | $0.04 |
+
+Storage is billed per GiB-month. Partial months are prorated to the hour.
+
+## Network Egress Pricing
+
+| Tier | Rate (per GiB) |
+|------|---------------|
+| **Premium** | $0.085 |
+| **Standard** | $0.005 |
+
+Premium egress uses Google's premium network tier with lower latency and higher throughput. Standard egress uses the standard tier.
+
+Internal cross-zone traffic within the same cluster is not billed.
+
+## Region Multipliers
+
+Base rates apply to US regions. Other regions incur a multiplier:
+
+| Region | Multiplier |
+|--------|-----------|
+| us-central1, us-east1, us-west1 | 1.00x |
+| europe-west1, europe-west4, europe-north1 | 1.05x |
+| asia-east1, asia-southeast1 | 1.10x |
+| southamerica-east1 | 1.25x |
+
+## Cost Estimation
+
+The **Cost tab** in the IDE shows real-time cost estimates based on your YAML configuration. For deployed workloads, the **Live Costs** section shows actual spending from Stripe metering data.
+
+To estimate costs before deploying:
+1. Open your cluster in the IDE
+2. Switch to the **Cost** tab
+3. Review the infrastructure breakdown (compute, memory, storage, networking)
+4. Check per-region and per-service breakdowns
+
+All cost values are rounded to 2 decimal places at the API boundary for consistent display.

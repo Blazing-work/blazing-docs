@@ -1,0 +1,64 @@
+---
+title: Usage Alerts
+label: Usage Alerts
+description: Configure spending threshold notifications
+position: 2
+---
+
+Usage alerts notify you when your spending approaches a threshold you define. This helps prevent unexpected bills by giving you early warning at 80%, 90%, and 100% of your budget.
+
+## Setting Up an Alert
+
+1. Go to **Settings > Organization > Billing**
+2. Scroll to the **Usage Alerts** section
+3. Click **Add Alert**
+4. Select a **meter** (Compute Hours, Storage, or Network Egress)
+5. Enter a **threshold** in USD (e.g., $500)
+6. Click **Create Alert**
+
+## How Alerts Work
+
+When you create an alert with a $500 threshold:
+
+| Spending Level | What Happens |
+|---------------|-------------|
+| **$400 (80%)** | Email notification: "Approaching threshold" |
+| **$450 (90%)** | Email notification: "Approaching threshold" |
+| **$500 (100%)** | Stripe billing alert triggers, email notification sent |
+
+Alerts are checked **every 6 hours** by an automated cron job. The 100% threshold is additionally monitored by Stripe's real-time billing alert system.
+
+## Available Meters
+
+| Meter | What It Tracks |
+|-------|---------------|
+| **Compute Hours** | CPU core-hours across all deployments |
+| **Storage** | Persistent storage provisioned (GiB-months) |
+| **Network Egress** | Outbound data transfer (GiB) |
+
+Each meter can have its own threshold. For example, you might set a $200 alert on Compute Hours and a $50 alert on Network Egress.
+
+## Managing Alerts
+
+From the Usage Alerts section on the billing page, you can:
+
+- **View** all configured alerts with their current status (Enabled/Disabled)
+- **Delete** alerts you no longer need
+- **See active notifications** via the alert banner at the top of the billing page
+
+## Alert Banner
+
+When an alert threshold is approaching, a banner appears at the top of the billing dashboard showing:
+- Which meter is approaching its threshold
+- The current spending level as a percentage
+- A link to manage the alert
+
+The banner is dismissible but will reappear if spending continues to increase past the next notification level.
+
+## Important Notes
+
+- Alerts are **per-organization**, not per-project or per-cluster
+- Notification percentages are fixed at **80%, 90%, and 100%** of the threshold
+- Alerts do **not** automatically stop or scale down workloads -- they are notifications only
+- The 6-hour check interval means alerts may fire slightly after the threshold is crossed
+- Stripe's 100% alert fires in near-real-time
