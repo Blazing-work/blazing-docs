@@ -13,11 +13,11 @@ Blazing handles all payment processing through Stripe. Invoices are generated au
 
 Go to **Settings > Organization > Billing** and scroll to the **Invoice History** section. Each invoice shows:
 
-- Invoice number (format: `PF{YY}-{NNNNN}`)
+- Invoice number
 - Billing period (start and end dates)
 - Total amount
 - Payment status (Paid, Payment Failed, Past Due)
-- Download link for the invoice PDF
+- Download link for the invoice PDF (hosted by Stripe)
 
 ### Invoice Contents
 
@@ -29,10 +29,6 @@ Each invoice includes a detailed breakdown of:
 - Network egress by tier (premium, standard)
 - Base plan fee (Team plan: $250/month)
 - Total amount due
-
-### Invoice Revisions
-
-If an invoice needs correction (e.g., due to a billing dispute), revised invoices are issued with a revision suffix: `PF26-00001-R1`, `PF26-00001-R2`, etc. The original invoice number is preserved for audit traceability.
 
 ## Payment Methods
 
