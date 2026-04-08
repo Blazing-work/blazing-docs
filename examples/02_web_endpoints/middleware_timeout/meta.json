@@ -1,0 +1,11 @@
+{
+  "id": "middleware_timeout",
+  "title": "Request Timeout Enforcement",
+  "description": "Prevent endpoints from hanging indefinitely using TimeoutMiddleware with configurable timeout limits.",
+  "category": "Web Endpoints",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": ["middleware", "timeout", "endpoint", "http", "resilience"],
+  "products": ["blazing-flow"],
+  "primaryProduct": "blazing-flow"
+}

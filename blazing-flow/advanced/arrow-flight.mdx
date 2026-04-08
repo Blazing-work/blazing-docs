@@ -1,0 +1,312 @@
+---
+title: Arrow Flight Data Transfer
+label: Arrow Flight
+description: "Apache Arrow Flight is Blazing's internal infrastructure for high-performance columnar data transfer between services. When you pass large DataFrames or"
+position: 1
+---
+
+# Arrow Flight Data Transfer
+
+Apache Arrow Flight is Blazing's internal infrastructure for high-performance columnar data transfer between services. When you pass large DataFrames or NumPy arrays through workflows, Blazing automatically uses Arrow Flight under the hood to achieve 3-5x faster transfer speeds compared to traditional HTTP+pickle serialization.
+
+## Why Arrow Flight?
+
+Arrow Flight provides significant performance advantages for data-intensive workflows:
+
+**Performance Benefits:**
+- **3-5x faster** than HTTP+pickle for DataFrames >1MB
+- **Columnar format** optimized for analytics workloads
+- **Zero-copy reads** minimize memory overhead
+- **Streaming support** for datasets larger than memory
+
+**When Blazing Uses Arrow Flight:**
+- Passing pandas DataFrames between steps
+- Transferring NumPy arrays between services
+- Large result sets from database queries (>1MB)
+- Any PyArrow-compatible data structure
+
+## How It Works
+
+Arrow Flight operates as internal infrastructure between Blazing services:
+
+```
+┌─────────────┐      Arrow Flight       ┌──────────────┐
+│   Client    │ ────────(gRPC)─────────▶│   Executor   │
+│ (Your Code) │ ◀───── Fast Transfer ───│  (Internal)  │
+└─────────────┘                          └──────────────┘
+        │                                        │
+        │  1. Client calls workflow              │
+        │     with DataFrame                     │
+        │                                        │
+        │  2. Blazing stores data                │
+        │     via Arrow Flight                   │
+        │                                        │
+        │  3. Executor fetches data              │
+        │     via Arrow Flight                   │
+        │                                        │
+        │  4. Returns result via                 │
+        │     same Arrow Flight path             │
+        └────────────────────────────────────────┘
+```
+
+### Architecture Details
+
+**Data Flow:**
+1. When you pass a DataFrame to a workflow, Blazing detects it's Arrow-compatible
+2. Data is uploaded to an Arrow Flight server via `do_put()` (gRPC protocol)
+3. Executor receives an Arrow Flight address: `arrow|{grpc}|{app_id}|{pk}|{ipc}`
+4. Executor fetches data via `do_get()` using the address
+5. Result DataFrame follows the same path in reverse
+
+**Connection Pooling:**
+Arrow Flight maintains a pool of warm gRPC connections to minimize latency:
+- **5 connections per endpoint** (default, configurable)
+- **5-minute idle timeout** for automatic cleanup
+- **Health checks** on connection checkout to detect stale connections
+- **Thread-safe** connection management
+
+**Multi-Tenant Isolation:**
+Each Arrow Flight address includes an `app_id` for security:
+- Data stored with key: `{app_id}:{primary_key}`
+- Cross-tenant access attempts raise `PermissionError`
+- Automatic validation against current execution context
+
+## Configuration
+
+Arrow Flight behavior is controlled via environment variables:
+
+### Connection Pool Settings
+
+```bash
+# Maximum connections per gRPC endpoint (default: 5)
+ARROW_FLIGHT_MAX_CONNECTIONS_PER_ENDPOINT=5
+
+# Idle timeout in seconds before closing connection (default: 300)
+ARROW_FLIGHT_IDLE_TIMEOUT_SECONDS=300
+
+# Arrow Flight gRPC endpoint (default: localhost:8815)
+ARROW_GRPC_ADDRESS=localhost:8815
+
+# Arrow Flight IPC endpoint (default: localhost:8816)
+ARROW_IPC_ADDRESS=localhost:8816
+```
+
+### Retry Configuration
+
+Arrow Flight uses infinite retry by default for internal resilience:
+
+```bash
+# Initial retry delay in seconds (default: 0.1)
+JITTER_ARROW_BASE_DELAY=0.1
+
+# Maximum retry delay in seconds (default: 10.0)
+JITTER_ARROW_MAX_DELAY=10.0
+
+# Steady-state retry interval in seconds (default: 30.0)
+JITTER_ARROW_STEADY_STATE=30.0
+
+# Enable infinite retry (default: true)
+JITTER_ARROW_INFINITE=true
+```
+
+**Retry Behavior:**
+- **Exponential backoff:** 100ms → 200ms → 400ms → ... → 10s
+- **Steady state:** ~30 second intervals with jitter after reaching max delay
+- **Infinite mode:** Never gives up on retryable errors (connection issues, server unavailable)
+- **Non-retryable errors:** Fail immediately (auth errors, data not found)
+
+### TLS/mTLS Configuration
+
+Secure Arrow Flight connections with TLS:
+
+```bash
+# Enable TLS for Arrow Flight (default: false)
+ARROW_FLIGHT_TLS_ENABLED=true
+
+# CA certificate for server verification
+ARROW_FLIGHT_TLS_CA=/path/to/ca-cert.pem
+
+# Client certificate for mTLS (optional)
+ARROW_FLIGHT_TLS_CERT=/path/to/client-cert.pem
+ARROW_FLIGHT_TLS_KEY=/path/to/client-key.pem
+```
+
+**Security Features:**
+- **TLS encryption** for data in transit
+- **mTLS support** for client certificate verification
+- **JWT authentication** via Bearer tokens in Authorization header
+- **App ID validation** prevents cross-tenant data access
+
+## Usage Examples
+
+### Automatic DataFrame Transfer
+
+Arrow Flight is transparent when passing DataFrames through workflows:
+
+```python
+from blazing import Blazing
+import pandas as pd
+
+app = Blazing(api_url="https://api.blazingflow.com", api_token="your-token")
+
+@app.step
+async def load_data(source: str, services=None):
+    """Load large dataset - returns DataFrame."""
+    # Simulate loading 1M rows
+    df = pd.DataFrame({
+        'id': range(1_000_000),
+        'value': range(1_000_000)
+    })
+    return df  # Blazing detects DataFrame, uses Arrow Flight
+
+@app.step
+async def transform_data(df: pd.DataFrame, services=None):
+    """Transform DataFrame - receives via Arrow Flight."""
+    # DataFrame is automatically fetched via Arrow Flight
+    df['doubled'] = df['value'] * 2
+    return df  # Result sent back via Arrow Flight
+
+@app.workflow
+async def etl_pipeline(source: str, services=None):
+    """Large data pipeline - Arrow Flight handles transfer."""
+    data = await load_data(source, services=services)
+    transformed = await transform_data(data, services=services)
+    return {"rows": len(transformed)}
+
+await app.publish()
+result = await app.etl_pipeline("s3://data/large.csv")
+print(f"Processed {result['rows']} rows")  # 1,000,000 rows transferred via Arrow Flight
+```
+
+### Performance Comparison
+
+Arrow Flight vs HTTP+Pickle for different data sizes:
+
+| Data Size | HTTP+Pickle | Arrow Flight | Speedup |
+|-----------|-------------|--------------|---------|
+| 100 KB    | 50 ms       | 45 ms        | 1.1x    |
+| 1 MB      | 200 ms      | 80 ms        | 2.5x    |
+| 10 MB     | 2.5 s       | 600 ms       | 4.2x    |
+| 100 MB    | 28 s        | 6 s          | 4.7x    |
+
+**When to Use Arrow Flight:**
+- ✅ DataFrames >1MB (automatic, no configuration needed)
+- ✅ NumPy arrays with columnar data
+- ✅ PyArrow Table objects
+- ✅ High-throughput data pipelines
+
+**When NOT to Use Arrow Flight:**
+- ❌ Small JSON payloads (<1MB) - HTTP is faster
+- ❌ Non-columnar data structures - Use standard serialization
+- ❌ Single-row lookups - Connection overhead dominates
+
+### Advanced: Manual Arrow Flight Operations
+
+For advanced use cases, you can manually control Arrow Flight storage:
+
+```python
+from blazing_executor.data_fetching.arrow_client import (
+    store_to_arrow,
+    fetch_from_arrow,
+    is_arrow_available
+)
+import pandas as pd
+
+# Check if Arrow Flight is available
+if not is_arrow_available():
+    raise ImportError("pyarrow not installed")
+
+# Store DataFrame manually
+df = pd.DataFrame({'col1': [1, 2, 3], 'col2': ['a', 'b', 'c']})
+address = await store_to_arrow(
+    data=df,
+    primary_key="my_dataset",
+    app_id="my_app",
+    grpc_endpoint="localhost:8815",
+    ipc_endpoint="localhost:8816"
+)
+# Returns: "arrow|localhost:8815|my_app|my_dataset|localhost:8816"
+
+# Fetch DataFrame manually
+fetched_df = await fetch_from_arrow(
+    address=address,
+    validate_app_id=True  # Enforce tenant isolation
+)
+```
+
+**Note:** Manual operations are rarely needed. Blazing handles Arrow Flight automatically when you pass DataFrames through workflows.
+
+## Troubleshooting
+
+### Connection Issues
+
+**Symptom:** `flight.FlightUnavailableError` or connection timeouts
+
+**Causes:**
+- Arrow Flight server not running
+- Network connectivity issues
+- Firewall blocking gRPC ports
+
+**Solutions:**
+1. Verify Arrow Flight server is running: `netstat -an | grep 8815`
+2. Check firewall rules allow gRPC traffic on ports 8815-8816
+3. Review retry configuration (increase `JITTER_ARROW_MAX_DELAY`)
+4. Check server logs for startup errors
+
+### Performance Issues
+
+**Symptom:** Arrow Flight slower than expected
+
+**Causes:**
+- Cold connections (pool empty)
+- TLS overhead on small datasets
+- Network bandwidth constraints
+
+**Solutions:**
+1. Increase connection pool size: `ARROW_FLIGHT_MAX_CONNECTIONS_PER_ENDPOINT=10`
+2. Pre-warm connections by running a test workflow
+3. Disable TLS for local development: `ARROW_FLIGHT_TLS_ENABLED=false`
+4. Monitor network bandwidth usage
+
+### Authentication Errors
+
+**Symptom:** `flight.FlightUnauthenticatedError`
+
+**Causes:**
+- Missing JWT token
+- Invalid token signature
+- App ID mismatch in token claims
+
+**Solutions:**
+1. Verify JWT token is passed to `store_to_arrow()` and `fetch_from_arrow()`
+2. Check token contains valid `app_id` claim
+3. Ensure token hasn't expired
+4. Review server logs for authentication errors
+
+## Monitoring
+
+Arrow Flight operations emit Prometheus metrics for observability:
+
+```bash
+# Histogram of Arrow Flight operation duration (in seconds)
+blazing_arrow_operation_duration_seconds{operation="do_get",app_id="my_app"} 0.045
+blazing_arrow_operation_duration_seconds{operation="do_put",app_id="my_app"} 0.052
+```
+
+**Key Metrics:**
+- **`blazing_arrow_operation_duration_seconds`** - Histogram tracking Arrow Flight operation latency
+  - Labels: `operation` (do_get/do_put), `app_id` (tenant identifier)
+  - Buckets: 10ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
+  - **Target:** P95 latency <100ms for typical datasets (<10MB)
+
+**Monitoring Best Practices:**
+- Track P95/P99 latency trends to detect performance degradation
+- Alert on P95 >500ms for sustained periods (indicates connection pool exhaustion or network issues)
+- Monitor operation count by app_id to identify data-heavy tenants
+- Correlate with AIMD autoscaling metrics to understand worker load patterns
+
+## Next Steps
+
+- [AIMD Autoscaling](/blazing-flow/advanced/autoscaling) - Configure worker autoscaling for data-heavy workflows
+- [Worker Types](/blazing-flow/workers/overview) - Choose appropriate worker types for data processing
+- [Core Examples](/blazing-flow/core-examples) - See DataFrame workflows in action

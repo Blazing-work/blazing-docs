@@ -1,0 +1,17 @@
+{
+  "id": "data_processing_step",
+  "title": "Data Processing Step",
+  "description": "Filter and transform data in a single step.",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "5 min",
+  "tags": [
+    "step",
+    "data",
+    "filtering"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

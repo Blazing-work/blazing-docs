@@ -1,7 +1,7 @@
 {
   "title": "Configuration",
   "position": 2,
-  "description": "Configure Blazing Flow workflows, executors, and runtime settings",
+  "description": "Configuration for Blazing Flow: covers Flow Configuration and more \u2014 serverless persistent async pipeline framework with automatic recovery, step-based",
   "product": "blazing-flow",
   "category": "guide",
   "previewTier": "dev-preview"

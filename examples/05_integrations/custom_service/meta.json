@@ -1,0 +1,18 @@
+{
+  "id": "custom_service",
+  "title": "Custom Service Integration",
+  "description": "Create custom services by extending BaseService for reusable business logic.",
+  "category": "Integrations",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "service",
+    "custom",
+    "integration",
+    "extensibility"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

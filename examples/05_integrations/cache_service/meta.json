@@ -1,0 +1,18 @@
+{
+  "id": "cache_service",
+  "title": "Cache Service",
+  "description": "Implement caching with Redis for faster lookups.",
+  "category": "Integrations",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "service",
+    "cache",
+    "redis",
+    "performance"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

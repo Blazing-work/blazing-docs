@@ -1,7 +1,7 @@
 {
   "title": "Configuration",
   "position": 1,
-  "description": "Configure Blazing Gateway routing, security, and advanced features",
+  "description": "Configuration for Blazing Gateway: covers Configuration Reference and more \u2014 edge networking and VoIP gateway solution for low-latency real-time",
   "product": "blazing-gateway",
   "parentProduct": "blazing-core",
   "category": "guide",

@@ -1,0 +1,18 @@
+{
+  "id": "batch_processing_api",
+  "title": "Batch Processing API",
+  "description": "Process multiple items concurrently with result aggregation.",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "endpoint",
+    "batch",
+    "concurrent",
+    "aggregation"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

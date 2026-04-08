@@ -1,0 +1,18 @@
+{
+  "id": "endpoint_interact",
+  "title": "Interactive Service Communication",
+  "description": "Use app.interact() for bidirectional communication with running services.",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "interact",
+    "bidirectional",
+    "service-communication",
+    "endpoint"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

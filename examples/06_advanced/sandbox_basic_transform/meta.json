@@ -1,0 +1,18 @@
+{
+  "id": "sandbox_basic_transform",
+  "title": "Sandbox: Basic User-Provided Transform",
+  "description": "The simplest sandbox example: let users write transformation logic while your infrastructure stays protected.",
+  "category": "Advanced",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "sandbox",
+    "wasm",
+    "security",
+    "user-code"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}

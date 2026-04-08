@@ -1,0 +1,18 @@
+{
+  "id": "email_queue",
+  "title": "Email Queue Processor",
+  "description": "Process email queues in batches with Redis.",
+  "category": "Integrations",
+  "difficulty": "Intermediate",
+  "time": "25 min",
+  "tags": [
+    "queue",
+    "email",
+    "batch",
+    "redis"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

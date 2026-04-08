@@ -1,0 +1,28 @@
+{
+  "title": "OAuth2 Authentication",
+  "description": "Protect HTTP endpoints using OAuth2 token validation with introspection and built-in provider support",
+  "category": "Web Endpoints",
+  "difficulty": "Advanced",
+  "estimated_time_minutes": 25,
+  "tags": ["authentication", "oauth2", "token", "endpoint", "security"],
+  "prerequisites": [
+    "Understanding of OAuth2 authorization flow",
+    "Access to OAuth2 provider (or test environment)"
+  ],
+  "learning_objectives": [
+    "Configure OAuth2 authentication with token introspection",
+    "Use built-in provider support (Google, GitHub, Okta)",
+    "Validate OAuth2 access tokens",
+    "Access user information from token claims",
+    "Understand OAuth2 authorization flow"
+  ],
+  "blazing_features": [
+    "OAuth2Auth",
+    "endpoint",
+    "workflow",
+    "AuthContext"
+  ],
+  "external_dependencies": ["httpx"],
+  "requires_blazing_saas": false,
+  "requires_local_emulator": false
+}

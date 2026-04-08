@@ -1,0 +1,11 @@
+{
+  "id": "middleware_retry",
+  "title": "Automatic Retry with Exponential Backoff",
+  "description": "Automatically retry failed requests to external services using RetryMiddleware with exponential backoff and jitter.",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": ["middleware", "retry", "endpoint", "http", "resilience", "backoff"],
+  "products": ["blazing-flow"],
+  "primaryProduct": "blazing-flow"
+}

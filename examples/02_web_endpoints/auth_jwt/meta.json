@@ -1,0 +1,25 @@
+{
+  "title": "JWT Authentication",
+  "description": "Protect HTTP endpoints using JWT token authentication with claims validation and scope checking",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "estimated_time_minutes": 15,
+  "tags": ["authentication", "jwt", "token", "endpoint", "security"],
+  "prerequisites": ["Basic understanding of JWT tokens"],
+  "learning_objectives": [
+    "Configure JWT authentication with secret key",
+    "Validate JWT tokens with audience and issuer claims",
+    "Access user information from JWT claims",
+    "Implement scope-based authorization",
+    "Use AuthContext for authenticated requests"
+  ],
+  "blazing_features": [
+    "JWTAuth",
+    "endpoint",
+    "workflow",
+    "AuthContext"
+  ],
+  "external_dependencies": ["PyJWT"],
+  "requires_blazing_saas": false,
+  "requires_local_emulator": false
+}

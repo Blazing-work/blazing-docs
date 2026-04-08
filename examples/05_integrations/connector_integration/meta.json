@@ -1,0 +1,19 @@
+{
+  "id": "connector_integration",
+  "title": "Connector Integration Patterns",
+  "description": "This example demonstrates the connector pattern used in production Blazing\napplications. Connectors provide a standardized way to interact with external\nservices (REST APIs, databases, etc.) with built-in features:\n\n- Connection pooling\n- Throttling and rate limiting\n- Authentication management\n- Health checks\n\n**Pattern:**\n1. Define connector configurations\n2. Create a service that receives connector_instances\n3. Service methods use connectors to access external resources",
+  "category": "Integrations",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "connectors",
+    "rest",
+    "database",
+    "services",
+    "integration"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

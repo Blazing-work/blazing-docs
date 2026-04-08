@@ -1,0 +1,18 @@
+{
+  "id": "autoscaling_config",
+  "title": "AIMD Autoscaling Configuration",
+  "description": "Configure AIMD (Additive Increase Multiplicative Decrease) autoscaling for worker pools.",
+  "category": "Advanced",
+  "difficulty": "Advanced",
+  "time": "20 min",
+  "tags": [
+    "autoscaling",
+    "aimd",
+    "performance",
+    "workers"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

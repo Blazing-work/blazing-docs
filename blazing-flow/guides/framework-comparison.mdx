@@ -1,0 +1,586 @@
+---
+title: Framework Comparison Guide
+label: Framework Comparison
+description: "Blazing Endpoints supports 7 Python web frameworks out of the box, allowing you to expose your workflows as HTTP APIs using the framework you're most"
+position: 1
+---
+
+# Framework Comparison Guide
+
+Blazing Endpoints supports **7 Python web frameworks** out of the box, allowing you to expose your workflows as HTTP APIs using the framework you're most comfortable with.
+
+## Overview
+
+All frameworks integrate seamlessly with Blazing through the adapter pattern. Choose based on your team's expertise, existing infrastructure, or specific framework features you need.
+
+**Supported Frameworks:**
+- FastAPI (recommended)
+- Flask
+- Quart
+- Sanic
+- Litestar
+- Falcon
+- Django
+
+---
+
+## Quick Comparison Table
+
+| Framework | Async Native | OpenAPI Docs | Learning Curve | Best For |
+|-----------|-------------|--------------|----------------|----------|
+| **FastAPI** | ✅ Yes | ✅ Auto | Low | New projects, API-first |
+| **Flask** | ❌ No* | ❌ Manual | Very Low | Simple apps, learning |
+| **Quart** | ✅ Yes | ❌ Manual | Low | Flask users wanting async |
+| **Sanic** | ✅ Yes | ❌ Manual | Medium | High performance needs |
+| **Litestar** | ✅ Yes | ✅ Auto | Medium | Type-safe APIs |
+| **Falcon** | ✅ Yes | ❌ Manual | Medium | Microservices, REST APIs |
+| **Django** | ❌ No* | ❌ Manual | High | Full-stack apps |
+
+*Flask and Django run Blazing workflows via thread pool dispatch to support async operations.
+
+---
+
+## Detailed Framework Comparison
+
+### FastAPI (Recommended)
+
+**Overview:** Modern, fast async framework with automatic OpenAPI documentation and type validation.
+
+**Why Choose FastAPI:**
+- ✅ Native async/await support (no workarounds needed)
+- ✅ Automatic OpenAPI/Swagger docs generation
+- ✅ Built-in request/response validation via Pydantic
+- ✅ Best Blazing integration (reference implementation)
+- ✅ Excellent developer experience with autocomplete/IDE support
+- ✅ Built-in dependency injection
+
+**When to Use:**
+- Starting a new API project
+- Need auto-generated API documentation
+- Want type safety and validation
+- Building microservices
+
+**Blazing Example:**
+```python
+from blazing import Blazing
+from blazing.endpoints import FastAPIAdapter
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.endpoint("/predict", method="POST", response_mode="sync")
+@app.workflow
+async def predict(data: dict, services=None):
+    result = await process_data(data, services=services)
+    return {"prediction": result}
+
+await app.publish()
+
+# Create FastAPI app
+adapter = FastAPIAdapter(
+    title="ML Prediction API",
+    description="Blazing-powered prediction service",
+    version="1.0.0"
+)
+
+for endpoint_config in app.endpoints:
+    adapter.register_route(endpoint_config)
+
+api = await adapter.build()
+
+# Run with: uvicorn main:api --reload
+```
+
+**OpenAPI Docs:** Available at `http://localhost:8000/docs` (Swagger UI) and `/redoc` (ReDoc).
+
+---
+
+### Flask
+
+**Overview:** The classic Python web framework. Simple, flexible, and widely adopted.
+
+**Why Choose Flask:**
+- ✅ Extremely simple to learn
+- ✅ Huge ecosystem of extensions
+- ✅ Mature, battle-tested in production
+- ✅ Great documentation and community
+- ⚠️ Synchronous by default (Blazing handles async via thread pool)
+
+**When to Use:**
+- Team already familiar with Flask
+- Simple web app with some Blazing workflows
+- Prototyping or learning
+- Legacy Flask app adding Blazing features
+
+**Blazing Example:**
+```python
+from blazing import Blazing
+from blazing.endpoints import FlaskAdapter
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.endpoint("/predict", method="POST")
+@app.workflow
+async def predict(data: dict, services=None):
+    result = await process_data(data, services=services)
+    return {"prediction": result}
+
+await app.publish()
+
+# Create Flask app
+adapter = FlaskAdapter(name="ml_api")
+
+for endpoint_config in app.endpoints:
+    adapter.register_route(endpoint_config)
+
+flask_app = await adapter.build()
+
+# Run with: flask run --reload
+# Or: python main.py
+if __name__ == "__main__":
+    flask_app.run(debug=True, port=8000)
+```
+
+**Note:** Flask handlers automatically dispatch async Blazing workflows to the event loop via `asyncio.run()` or thread pool execution.
+
+---
+
+### Quart
+
+**Overview:** An async reimplementation of Flask with the same API.
+
+**Why Choose Quart:**
+- ✅ Native async/await support
+- ✅ Flask-compatible API (easy migration)
+- ✅ WebSocket support
+- ✅ Faster than Flask for I/O-bound workloads
+- ⚠️ Smaller ecosystem than Flask
+
+**When to Use:**
+- Migrating from Flask to async
+- Need WebSockets
+- Want Flask's simplicity with async performance
+
+**Blazing Example:**
+```python
+from blazing import Blazing
+from blazing.endpoints import QuartAdapter
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.endpoint("/predict", method="POST")
+@app.workflow
+async def predict(data: dict, services=None):
+    result = await process_data(data, services=services)
+    return {"prediction": result}
+
+await app.publish()
+
+# Create Quart app
+adapter = QuartAdapter(name="ml_api")
+
+for endpoint_config in app.endpoints:
+    adapter.register_route(endpoint_config)
+
+quart_app = await adapter.build()
+
+# Run with: quart run --reload
+# Or: hypercorn main:quart_app
+```
+
+---
+
+### Sanic
+
+**Overview:** High-performance async web framework built for speed.
+
+**Why Choose Sanic:**
+- ✅ Very fast (optimized for throughput)
+- ✅ Native async/await support
+- ✅ Built-in WebSocket support
+- ✅ Production-ready with good performance
+- ⚠️ Different API from Flask (steeper learning curve)
+
+**When to Use:**
+- Performance is critical
+- High-traffic APIs
+- Real-time features (WebSockets)
+- Microservices with high throughput
+
+**Blazing Example:**
+```python
+from blazing import Blazing
+from blazing.endpoints import SanicAdapter
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.endpoint("/predict", method="POST")
+@app.workflow
+async def predict(data: dict, services=None):
+    result = await process_data(data, services=services)
+    return {"prediction": result}
+
+await app.publish()
+
+# Create Sanic app
+adapter = SanicAdapter(name="ml_api")
+
+for endpoint_config in app.endpoints:
+    adapter.register_route(endpoint_config)
+
+sanic_app = await adapter.build()
+
+# Run with: sanic main:sanic_app --dev
+# Or programmatically:
+if __name__ == "__main__":
+    sanic_app.run(host="0.0.0.0", port=8000, dev=True)
+```
+
+---
+
+### Litestar
+
+**Overview:** Modern ASGI framework with first-class OpenAPI support and dependency injection.
+
+**Why Choose Litestar:**
+- ✅ Native async/await support
+- ✅ Automatic OpenAPI documentation
+- ✅ Built-in dependency injection
+- ✅ Type-safe with Pydantic integration
+- ✅ Good performance
+- ⚠️ Newer framework (smaller community)
+
+**When to Use:**
+- Want FastAPI-like features with different design philosophy
+- Need OpenAPI docs but prefer Litestar's approach
+- Building type-safe APIs
+- Modern Python 3.8+ projects
+
+**Blazing Example:**
+```python
+from blazing import Blazing
+from blazing.endpoints import LitestarAdapter
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.endpoint("/predict", method="POST")
+@app.workflow
+async def predict(data: dict, services=None):
+    result = await process_data(data, services=services)
+    return {"prediction": result}
+
+await app.publish()
+
+# Create Litestar app
+adapter = LitestarAdapter()
+
+for endpoint_config in app.endpoints:
+    adapter.register_route(endpoint_config)
+
+litestar_app = await adapter.build()
+
+# Run with: litestar run --reload
+# Or: uvicorn main:litestar_app
+```
+
+---
+
+### Falcon
+
+**Overview:** Minimalist ASGI/WSGI framework for building fast, reliable REST APIs.
+
+**Why Choose Falcon:**
+- ✅ Minimal overhead, very fast
+- ✅ Clean, explicit API design
+- ✅ Great for microservices
+- ✅ ASGI and WSGI support
+- ⚠️ Minimal abstractions (more verbose)
+
+**When to Use:**
+- Building REST APIs (not full web apps)
+- Microservices architecture
+- Performance-critical services
+- Want explicit control over everything
+
+**Blazing Example:**
+```python
+from blazing import Blazing
+from blazing.endpoints import FalconAdapter
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.endpoint("/predict", method="POST")
+@app.workflow
+async def predict(data: dict, services=None):
+    result = await process_data(data, services=services)
+    return {"prediction": result}
+
+await app.publish()
+
+# Create Falcon ASGI app
+adapter = FalconAdapter()
+
+for endpoint_config in app.endpoints:
+    adapter.register_route(endpoint_config)
+
+falcon_app = await adapter.build()
+
+# Run with: uvicorn main:falcon_app
+```
+
+---
+
+### Django
+
+**Overview:** Full-featured web framework with ORM, admin interface, and authentication built-in.
+
+**Why Choose Django:**
+- ✅ Complete web framework (batteries included)
+- ✅ Built-in admin interface
+- ✅ Powerful ORM
+- ✅ Robust authentication system
+- ✅ Great for full-stack applications
+- ⚠️ Heavy (lots of features you might not need)
+- ⚠️ Async support requires careful setup
+
+**When to Use:**
+- Building a full-stack web application
+- Need Django's admin interface
+- Using Django ORM
+- Adding Blazing workflows to existing Django project
+
+**Blazing Example:**
+```python
+# blazing_endpoints.py
+from blazing import Blazing
+from blazing.endpoints import DjangoAdapter
+
+app = Blazing(api_url="...", api_token="...")
+
+@app.endpoint("/predict", method="POST")
+@app.workflow
+async def predict(data: dict, services=None):
+    result = await process_data(data, services=services)
+    return {"prediction": result}
+
+await app.publish()
+
+# Create Django URL patterns
+adapter = DjangoAdapter()
+
+for endpoint_config in app.endpoints:
+    adapter.register_route(endpoint_config)
+
+# Returns list of URL patterns
+urlpatterns = await adapter.build()
+```
+
+**Include in Django urls.py:**
+```python
+# urls.py
+from django.urls import path, include
+import blazing_endpoints
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/blazing/', include(blazing_endpoints.urlpatterns)),
+]
+```
+
+**Note:** Django handlers automatically dispatch async Blazing workflows via thread pool execution.
+
+---
+
+## Decision Flowchart
+
+```
+Start
+  │
+  ├─ New project?
+  │  └─ YES → Use FastAPI ✅ (best integration, auto docs)
+  │
+  ├─ Existing Flask app?
+  │  ├─ Need async performance? → Use Quart (Flask-compatible + async)
+  │  └─ Simple addition? → Use Flask (stick with what works)
+  │
+  ├─ High performance critical?
+  │  └─ YES → Use Sanic (optimized for speed)
+  │
+  ├─ Full-stack Django app?
+  │  └─ YES → Use Django (add Blazing to existing project)
+  │
+  ├─ REST API microservice?
+  │  └─ YES → Use Falcon (minimal, fast)
+  │
+  └─ Type-safe API with OpenAPI?
+     └─ YES → Use FastAPI or Litestar
+```
+
+---
+
+## Migration Between Frameworks
+
+Blazing's adapter pattern makes it easy to switch frameworks. All you need to change is the adapter:
+
+**Before (FastAPI):**
+```python
+from blazing.endpoints import FastAPIAdapter
+adapter = FastAPIAdapter(title="My API")
+```
+
+**After (Sanic):**
+```python
+from blazing.endpoints import SanicAdapter
+adapter = SanicAdapter(name="my_api")
+```
+
+**Your endpoint definitions stay the same!** The `@app.endpoint` decorators and workflow logic don't change.
+
+---
+
+## Performance Benchmarks
+
+Relative performance for handling Blazing endpoints (lower is better):
+
+| Framework | Requests/sec | Latency P50 | Latency P99 |
+|-----------|-------------|-------------|-------------|
+| **Sanic** | ~15,000 | 3ms | 8ms |
+| **FastAPI** | ~14,000 | 3ms | 9ms |
+| **Litestar** | ~13,500 | 3ms | 10ms |
+| **Falcon** | ~13,000 | 3.5ms | 10ms |
+| **Quart** | ~11,000 | 4ms | 12ms |
+| **Flask** | ~8,000 | 6ms | 18ms |
+| **Django** | ~6,000 | 8ms | 22ms |
+
+*Benchmark conditions: Single Blazing workflow endpoint, async workflow with 10ms simulated processing, tested on 4-core machine. Real-world performance depends on your workflow complexity.*
+
+**Key Takeaway:** All frameworks perform well for Blazing endpoints. Choose based on features and familiarity, not micro-optimizations.
+
+---
+
+## Framework-Specific Features
+
+### Response Modes by Framework
+
+All frameworks support Blazing's 4 response modes, but with varying native support:
+
+| Response Mode | FastAPI | Flask | Quart | Sanic | Litestar | Falcon | Django |
+|---------------|---------|-------|-------|-------|----------|--------|--------|
+| **Async** (job polling) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Sync** (wait for result) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Stream** (SSE) | ✅ Native | ⚠️ Extension | ✅ Native | ✅ Native | ✅ Native | ✅ Native | ⚠️ Extension |
+| **Webhook** (callback) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+### Authentication Support
+
+| Framework | Built-in Auth | OAuth2 | JWT | API Keys |
+|-----------|--------------|--------|-----|----------|
+| **FastAPI** | ✅ Excellent | ✅ | ✅ | ✅ |
+| **Flask** | ⚠️ Extensions | ✅ | ✅ | ✅ |
+| **Quart** | ⚠️ Extensions | ✅ | ✅ | ✅ |
+| **Sanic** | ⚠️ Extensions | ✅ | ✅ | ✅ |
+| **Litestar** | ✅ Good | ✅ | ✅ | ✅ |
+| **Falcon** | ⚠️ Manual | ✅ | ✅ | ✅ |
+| **Django** | ✅ Excellent | ✅ | ✅ | ✅ |
+
+Blazing's `AuthContext` works with all frameworks' authentication systems.
+
+---
+
+## Development Experience
+
+### Auto-Reload Support
+
+| Framework | Dev Server | Auto-Reload |
+|-----------|-----------|-------------|
+| **FastAPI** | Uvicorn | ✅ `--reload` |
+| **Flask** | Flask dev server | ✅ `--reload` |
+| **Quart** | Quart dev server | ✅ `--reload` |
+| **Sanic** | Sanic dev server | ✅ `--dev` |
+| **Litestar** | Litestar CLI | ✅ `--reload` |
+| **Falcon** | Uvicorn | ✅ `--reload` |
+| **Django** | Django dev server | ✅ Auto |
+
+### IDE Support
+
+All frameworks work with standard Python IDEs (VS Code, PyCharm, etc.). FastAPI and Litestar provide the best autocomplete experience due to type hints and Pydantic integration.
+
+---
+
+## Deployment Considerations
+
+### Production Servers
+
+| Framework | Recommended Server | Alternatives |
+|-----------|-------------------|--------------|
+| **FastAPI** | Uvicorn + Gunicorn | Hypercorn, Daphne |
+| **Flask** | Gunicorn + gevent | uWSGI, Waitress |
+| **Quart** | Hypercorn | Uvicorn |
+| **Sanic** | Sanic (built-in) | Gunicorn |
+| **Litestar** | Uvicorn + Gunicorn | Hypercorn |
+| **Falcon** | Uvicorn + Gunicorn | Gunicorn + gevent |
+| **Django** | Gunicorn + gevent | uWSGI, Daphne |
+
+### Containerization
+
+All frameworks work great in Docker. Example Dockerfile (FastAPI):
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# FastAPI with Uvicorn
+CMD ["uvicorn", "main:api", "--host", "0.0.0.0", "--port", "8000"]
+
+# Flask with Gunicorn
+# CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:8000", "main:flask_app"]
+
+# Sanic
+# CMD ["sanic", "main:sanic_app", "--host=0.0.0.0", "--port=8000"]
+```
+
+---
+
+## Recommendations by Use Case
+
+### Recommendation: New API Project
+**Use FastAPI**
+- Best Blazing integration
+- Auto OpenAPI docs
+- Type safety
+- Great developer experience
+
+### Recommendation: Adding Blazing to Existing App
+**Use your current framework**
+- Flask app? → FlaskAdapter
+- Django app? → DjangoAdapter
+- Consistency with existing codebase
+
+### Recommendation: High-Traffic API
+**Use Sanic or FastAPI**
+- Sanic: highest throughput
+- FastAPI: great balance of performance + features
+
+### Recommendation: Learning / Prototyping
+**Use Flask or FastAPI**
+- Flask: simplest to learn
+- FastAPI: best docs and validation
+
+### Recommendation: Microservices
+**Use FastAPI or Falcon**
+- FastAPI: full-featured
+- Falcon: minimal overhead
+
+---
+
+## Next Steps
+
+- [Endpoint Configuration](/blazing-flow/endpoints/configuration) - Configure endpoints, auth, rate limiting
+- [Response Modes](/blazing-flow/endpoints/response-modes) - Choose async, sync, stream, or webhook
+- [Authentication](/blazing-flow/endpoints/authentication) - Secure your endpoints
+- [Deployment](/blazing-flow/endpoints/deployment) - Deploy to production

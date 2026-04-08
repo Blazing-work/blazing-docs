@@ -1,0 +1,17 @@
+{
+  "id": "basic_workflow",
+  "title": "Basic Workflow",
+  "description": "Multi-step orchestration - the foundation of distributed workflows.",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": [
+    "workflow",
+    "orchestration",
+    "multi-step"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

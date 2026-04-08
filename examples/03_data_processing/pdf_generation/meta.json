@@ -1,0 +1,18 @@
+{
+  "id": "pdf_generation",
+  "title": "PDF Generation Workflow",
+  "description": "Generate PDF documents from templates with data from multiple sources.",
+  "category": "Data Processing",
+  "difficulty": "Advanced",
+  "time": "35 min",
+  "tags": [
+    "pdf",
+    "generation",
+    "template",
+    "file-processing"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

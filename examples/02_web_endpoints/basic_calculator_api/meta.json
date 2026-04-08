@@ -1,0 +1,18 @@
+{
+  "id": "basic_calculator_api",
+  "title": "Basic Calculator API",
+  "description": "The simplest possible endpoint: expose a workflow as a public HTTP API.",
+  "category": "Web Endpoints",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": [
+    "endpoint",
+    "api",
+    "rest",
+    "basic"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

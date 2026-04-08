@@ -1,0 +1,18 @@
+{
+  "id": "rest_api_service",
+  "title": "REST API Service",
+  "description": "Call external REST APIs with httpx and handle responses.",
+  "category": "Integrations",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "service",
+    "api",
+    "httpx",
+    "rest"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

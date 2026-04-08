@@ -1,0 +1,853 @@
+---
+title: Local Development Emulators
+label: Local Dev
+description: "Blazing provides a complete local development stack that emulates all infrastructure services, enabling full-featured development and testing without"
+position: 3
+---
+
+# Local Development Emulators
+
+Blazing provides a complete local development stack that emulates all infrastructure services, enabling full-featured development and testing without external dependencies or cloud costs.
+
+## Why Use Local Emulators?
+
+**Develop offline**: Work on flights, trains, or anywhere without internet access. The entire Blazing infrastructure runs on your laptop.
+
+**Fast iteration**: No network latency, instant container builds, immediate feedback. Changes take milliseconds, not seconds.
+
+**Zero cloud costs**: Test complex workflows with thousands of executions during development without spending a dime.
+
+**Reproducible environments**: Same infrastructure locally and in production. No "works on my machine" problems.
+
+## What's Included
+
+The LocalStack provides 8 emulated services with production-matching APIs:
+
+| Service | Purpose | Production Backend | Local Backend |
+|---------|---------|-------------------|---------------|
+| Registry | Container image storage | Cloud registry (ECR/GCR) | Local filesystem |
+| Build | Docker image builds | Cloud build service | Local Docker daemon |
+| Volume | Persistent file storage | SeaweedFS + S3 | Local filesystem |
+| Secrets | Encrypted credentials | Vault/AWS Secrets | AES-256-GCM files |
+| Scheduler | Cron/periodic jobs | Distributed scheduler | In-process cron |
+| Dict | Distributed key-value | Redis with CRDT | In-memory dict |
+| Queue | Distributed messaging | Redis with segments | In-memory queue |
+| LLM | AI model connectors | OpenAI/Anthropic APIs | Mock responses |
+
+## Quick Start
+
+```python
+from blazing.local import LocalStack
+
+# Start the full local stack
+stack = LocalStack()
+await stack.start()
+
+# Use the services
+image = Image.debian_slim().pip_install("fastapi")
+result = await stack.build_and_push(
+    image_spec=image.spec,
+    name="my-app",
+    tag="v1",
+    token="my-token"
+)
+
+# Create a volume
+vol = await stack.create_volume("my-data", token="my-token")
+await vol.put_file("/config.json", b'{"setting": "value"}')
+await vol.commit()
+
+# Create a distributed dict
+cache = await stack.create_dict("inference-cache", token="my-token")
+await cache.put("model-v1", model_bytes)
+
+# Stop the stack
+await stack.stop()
+```
+
+> **Testing with Services:** For examples of testing with service injection (using the `services=None` parameter), see the [Service Injection example](/docs/service_injection). [View source](https://github.com/Blazing-work/blazing-examples/blob/main/01_getting_started/service_injection).
+
+## LocalStack Configuration
+
+The LocalStack orchestrates all services with a unified interface.
+
+### Constructor Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `registry_port` | int | 5000 | Port for registry HTTP API |
+| `registry_host` | str | "127.0.0.1" | Host for registry server |
+| `storage_path` | str | temp dir | Base path for all service data |
+
+```python
+# Custom configuration
+stack = LocalStack(
+    registry_port=5001,
+    registry_host="0.0.0.0",  # Allow external connections
+    storage_path="/tmp/my-blazing-dev"
+)
+await stack.start()
+```
+
+### Lifecycle Methods
+
+**`await stack.start(start_registry_server=True)`**
+- Initializes all 8 services
+- Starts registry HTTP server (optional)
+- Creates storage directories
+- Prints startup banner with service URLs
+
+**`await stack.stop()`**
+- Gracefully shuts down all services
+- Commits pending writes
+- Cancels background tasks
+- Preserves storage (unless temp dir)
+
+### Convenience Methods
+
+LocalStack provides shortcuts for common operations:
+
+```python
+# Volume operations
+vol = await stack.create_volume("data", token="my-token")
+await stack.delete_volume("data", token="my-token")
+volumes = await stack.list_volumes(token="my-token")
+
+# Dict operations
+cache = await stack.create_dict("cache", token="my-token")
+await stack.delete_dict("cache", token="my-token")
+dicts = await stack.list_dicts(token="my-token")
+
+# Queue operations
+jobs = await stack.create_queue("jobs", token="my-token", enable_priority=True)
+await stack.delete_queue("jobs", token="my-token")
+queues = await stack.list_queues(token="my-token")
+
+# Build and push image
+result = await stack.build_and_push(image.spec, "app", "v1", token="my-token")
+
+# Get Dockerfile from registry
+dockerfile = await stack.get_image_dockerfile("app", "v1", token="my-token")
+
+# Get combined statistics
+stats = stack.get_stats()
+```
+
+## Local Registry
+
+The registry stores container images with multi-tenant isolation.
+
+### Key Features
+- **Multi-tenant**: JWT-based isolation, each app sees only their images
+- **Storage**: Filesystem-backed with manifest indexing
+- **Docker Registry API v2**: Compatible with Docker clients
+- **Metadata**: Tracks layers, labels, creation time, content hashes
+
+### Basic Operations
+
+```python
+from blazing.local import LocalRegistry
+from blazing import Image
+
+# Start registry
+registry = LocalRegistry(
+    storage_path="/tmp/my-registry",
+    port=5000,
+    host="127.0.0.1"
+)
+await registry.start()
+
+# Push an image
+image = Image.debian_slim().pip_install("numpy", "pandas")
+manifest = await registry.push_image(
+    image_spec=image.spec,
+    name="data-processor",
+    tag="v1.0",
+    token="my-app-token",
+    labels={"env": "dev", "team": "ml"}
+)
+
+# List images
+images = await registry.list_images(token="my-app-token")
+for img in images:
+    print(f"{img.name}:{img.tag} - {img.size_bytes} bytes")
+
+# Get image
+manifest = await registry.get_image("data-processor", "v1.0", token="my-app-token")
+print(f"Created: {manifest.created_at}")
+print(f"Hash: {manifest.content_hash}")
+
+# Get Dockerfile
+dockerfile = await registry.get_dockerfile("data-processor", "v1.0", token="my-app-token")
+print(dockerfile)
+
+# Tag image
+await registry.tag_image("data-processor", "v1.0", "latest", token="my-app-token")
+
+# Delete image
+await registry.delete_image("data-processor", "v1.0", token="my-app-token")
+
+# Get statistics
+stats = registry.get_stats()
+print(f"Total images: {stats.total_images}")
+print(f"Total size: {stats.total_size_bytes / 1024 / 1024:.2f} MB")
+print(f"Tenants: {stats.tenants}")
+```
+
+## Local Build Service
+
+The build service creates Docker images from ImageSpec definitions.
+
+### Key Features
+- **Docker integration**: Uses local Docker daemon for real builds
+- **Emulated mode**: Falls back to simulation when Docker unavailable
+- **Build history**: Tracks all builds with logs and metrics
+- **Concurrent builds**: Semaphore-limited parallel execution
+
+### Building Images
+
+```python
+from blazing.local import LocalBuildService
+from blazing import Image
+
+# Create build service
+build_service = LocalBuildService(
+    registry_url="localhost:5000",
+    storage_path="/tmp/blazing-builds",
+    max_concurrent_builds=4
+)
+
+# Build an image
+image = Image.debian_slim().pip_install("fastapi", "uvicorn")
+result = await build_service.build(
+    image_spec=image.spec,
+    name="api-server",
+    tag="v2.0",
+    token="my-token",
+    push=True,  # Push to registry after build
+    build_args={"PYTHON_VERSION": "3.11"},
+    labels={"service": "api"},
+    no_cache=False,
+    wait=True  # Wait for completion
+)
+
+print(f"Build {result.build_id}: {result.status}")
+print(f"Duration: {result.duration_seconds}s")
+print(f"Image digest: {result.image_digest}")
+print(f"Registry URL: {result.registry_url}")
+
+# Check build status
+status = await build_service.get_build_status(result.build_id, token="my-token")
+print(f"Status: {status.status}")
+
+# Get build logs
+logs = await build_service.get_build_logs(result.build_id, token="my-token")
+for log in logs:
+    print(f"[{log.level}] {log.message}")
+
+# List builds
+builds = await build_service.list_builds(token="my-token", limit=10)
+for build in builds:
+    print(f"{build.name}:{build.tag} - {build.status.value}")
+
+# Cancel a running build
+cancelled = await build_service.cancel_build("build-id", token="my-token")
+```
+
+## Local Volume Service
+
+Volumes provide persistent file storage with Modal-compatible semantics.
+
+### Key Features
+- **Consistency model**: Buffered writes, explicit commit, background auto-commit
+- **Modal compatibility**: Matches Modal Volume API exactly
+- **Operations**: File and directory uploads/downloads
+- **Metadata**: File stats, size tracking, TTL support
+
+### Using Volumes
+
+```python
+from blazing.local import LocalVolumeService
+
+# Start volume service
+volume_service = LocalVolumeService(
+    storage_path="/tmp/blazing-volumes",
+    background_commit_interval=5.0  # Auto-commit every 5 seconds
+)
+await volume_service.start()
+
+# Create a volume
+vol = await volume_service.create_volume("ml-models", token="my-token")
+
+# Write files (buffered until commit)
+await vol.put_file("/models/v1.pt", model_bytes)
+await vol.put_file("/models/v2.pt", model_v2_bytes)
+await vol.put_file("/config.json", config_bytes)
+
+# Commit to durable storage
+await vol.commit()
+
+# Read files
+model_data = await vol.get_file("/models/v1.pt")
+config = await vol.get_file("/config.json")
+
+# Check if file exists
+exists = await vol.exists("/models/v3.pt")  # False
+
+# List directory contents
+files = await vol.listdir("/models")
+print(files)  # ['v1.pt', 'v2.pt']
+
+# Get file metadata
+stat = await vol.stat("/models/v1.pt")
+print(f"Size: {stat.size} bytes")
+print(f"Modified: {stat.mtime}")
+print(f"Hash: {stat.content_hash}")
+
+# Upload entire directory
+await vol.put_directory("/local/data", "/remote/data")
+
+# Download entire directory
+await vol.get_directory("/remote/data", "/local/backup")
+
+# Remove files
+await vol.remove("/models/v1.pt")
+await vol.commit()
+
+# Reload (invalidate cache, fetch latest from storage)
+await vol.reload()
+
+# Get volume size
+total_bytes = await vol.get_size()
+print(f"Volume size: {total_bytes / 1024 / 1024:.2f} MB")
+
+# Delete volume
+await volume_service.delete_volume("ml-models", token="my-token")
+
+# List all volumes
+volumes = await volume_service.list_volumes(token="my-token")
+```
+
+### Consistency Operations
+
+```python
+# Modal-compatible consistency semantics
+vol = await volume_service.create_volume("data", token="my-token")
+
+# Writes are buffered locally
+await vol.put_file("/data.csv", csv_bytes)
+
+# Not yet visible to other containers
+# Must commit to persist
+
+# Explicit commit (flush to durable storage)
+await vol.commit()
+# Now visible to other containers
+
+# Reload (invalidate local cache, fetch latest)
+await vol.reload()
+# See changes made by other containers
+```
+
+## Local Secrets Service
+
+Secrets provides encrypted storage for sensitive data.
+
+### Key Features
+- **Encryption**: AES-256-GCM with PBKDF2 key derivation
+- **Multi-tenant**: JWT-based isolation
+- **Security**: Restrictive file permissions (0o600), audit logging
+- **Formats**: Dictionary, .env file, environment variables
+
+### Managing Secrets
+
+```python
+from blazing.local import LocalSecretsService, Secret
+
+# Start secrets service
+secrets_service = LocalSecretsService(
+    storage_path="/tmp/blazing-secrets",
+    encryption_key="your-master-key"  # Or set BLAZING_SECRETS_KEY env var
+)
+await secrets_service.start()
+
+# Create secrets from dict
+secret = Secret.from_dict({
+    "DATABASE_URL": "postgres://localhost/mydb",
+    "API_KEY": "sk-xxxxx",
+    "STRIPE_SECRET": "sk_test_xxxxx"
+})
+
+# Save secret
+await secrets_service.save_secret("db-creds", secret, token="my-token")
+
+# Get secret values (decrypted)
+values = await secrets_service.get_secret("db-creds", token="my-token")
+print(values["DATABASE_URL"])
+
+# Create from .env file
+env_secret = Secret.from_dotenv(".env.production")
+await secrets_service.save_secret("prod-config", env_secret, token="my-token")
+
+# Create from environment variables
+env_vars = Secret.from_env(prefix="MYAPP_")
+# MYAPP_DATABASE_URL -> DATABASE_URL
+await secrets_service.save_secret("env-config", env_vars, token="my-token")
+
+# Get a connector for services
+connector = await secrets_service.get_connector("db-creds", token="my-token")
+db_url = await connector.get("DATABASE_URL")
+api_key = await connector.get("API_KEY", default="fallback-key")
+
+# Get all values
+all_values = await connector.get_all()
+
+# Get as environment dict (for subprocess)
+env_dict = connector.as_env_dict()
+
+# List secrets
+secrets = await secrets_service.list_secrets(token="my-token")
+print(secrets)  # ['db-creds', 'prod-config', 'env-config']
+
+# Delete secret
+await secrets_service.delete_secret("db-creds", token="my-token")
+```
+
+## Local Scheduler Service
+
+The scheduler executes cron and periodic jobs locally.
+
+### Key Features
+- **Cron expressions**: Standard 5-field cron syntax
+- **Period intervals**: Seconds, minutes, hours, days
+- **Multiple schedules**: One job can have multiple triggers
+- **Execution history**: Track runs with status and duration
+
+### Scheduling Jobs
+
+```python
+from blazing.local import LocalSchedulerService, Cron, Period
+
+# Start scheduler
+scheduler = LocalSchedulerService(
+    storage_path="/tmp/blazing-scheduler",
+    max_history_per_job=100,
+    tick_interval=1.0  # Check for due jobs every second
+)
+await scheduler.start()
+
+# Define a job callback
+async def generate_report():
+    print("Generating daily report...")
+    # Your report logic here
+    return {"status": "success"}
+
+# Schedule with cron (every day at 2 AM)
+await scheduler.register_job(
+    job_id="daily-report",
+    tenant_id="my-tenant",
+    schedule=Cron("0 2 * * *"),
+    callback=generate_report,
+    enabled=True
+)
+
+# Schedule with period (every 30 minutes)
+async def sync_data():
+    print("Syncing data...")
+    return {"synced": True}
+
+await scheduler.register_job(
+    job_id="sync-job",
+    tenant_id="my-tenant",
+    schedule=Period(minutes=30),
+    callback=sync_data
+)
+
+# Multiple schedules (run at 9 AM or every 4 hours)
+await scheduler.register_job(
+    job_id="multi-schedule",
+    tenant_id="my-tenant",
+    schedule=[
+        Cron("0 9 * * *"),
+        Period(hours=4)
+    ],
+    callback=my_callback
+)
+
+# List jobs
+jobs = await scheduler.list_jobs("my-tenant")
+for job in jobs:
+    print(f"{job.job_id}: next run at {job.next_run}")
+
+# Get job details
+job = await scheduler.get_job("daily-report", "my-tenant")
+print(f"Executed {job.execution_count} times")
+print(f"Failed {job.failure_count} times")
+
+# Pause job
+await scheduler.set_job_enabled("daily-report", "my-tenant", False)
+
+# Resume job
+await scheduler.set_job_enabled("daily-report", "my-tenant", True)
+
+# Manually trigger job
+record = await scheduler.trigger_job("daily-report", "my-tenant")
+print(f"Execution {record.execution_id}: {record.status}")
+
+# Get execution history
+history = await scheduler.get_execution_history("daily-report", "my-tenant", limit=10)
+for record in history:
+    print(f"{record.start_time}: {record.status} ({record.duration_seconds}s)")
+
+# Unregister job
+await scheduler.unregister_job("daily-report", "my-tenant")
+
+# Get statistics
+stats = scheduler.get_stats()
+print(f"Total jobs: {stats['total_jobs']}")
+print(f"Enabled: {stats['enabled_jobs']}")
+print(f"Executions: {stats['total_executions']}")
+```
+
+## Local Dict Service
+
+Distributed dictionaries with TTL support and atomic operations.
+
+### Key Features
+- **TTL support**: Per-key expiration with automatic cleanup
+- **Batch operations**: get_many, put_many, delete_many
+- **Iteration**: keys(), values(), items(), async iteration
+- **Persistence**: Optional disk persistence
+
+### Using Dicts
+
+```python
+from blazing.local import LocalDictService
+
+# Start dict service
+dict_service = LocalDictService(
+    storage_path="/tmp/blazing-dicts",
+    cleanup_interval=60.0,  # Clean expired keys every 60s
+    persist_to_disk=True
+)
+await dict_service.start()
+
+# Create a dict
+cache = await dict_service.create_dict("inference-cache", token="my-token")
+
+# Put values with TTL
+await cache.put("model-v1", model_bytes, ttl=3600)  # Expire in 1 hour
+await cache.put("model-v2", model_v2_bytes, ttl=7200)  # Expire in 2 hours
+await cache.put("config", config_dict)  # No expiration
+
+# Get values
+model = await cache.get("model-v1")
+config = await cache.get("config", default={})
+
+# Check existence
+exists = await cache.exists("model-v1")  # True
+
+# Batch operations
+await cache.put_many({
+    "key1": "value1",
+    "key2": "value2",
+    "key3": "value3"
+}, ttl=300)
+
+values = await cache.get_many(["key1", "key2"])
+# {"key1": "value1", "key2": "value2"}
+
+deleted_count = await cache.delete_many(["key1", "key2"])
+
+# Iteration
+keys = await cache.keys()
+values = await cache.values()
+items = await cache.items()  # [(key, value), ...]
+
+# Async iteration
+async for key, value in cache:
+    print(f"{key}: {value}")
+
+# TTL management
+remaining = await cache.ttl("model-v1")  # Seconds until expiration
+await cache.expire("model-v1", 1800)  # Set new TTL (30 min)
+await cache.persist("model-v1")  # Remove TTL, make permanent
+
+# Utility operations
+length = await cache.len()  # Number of keys
+await cache.clear()  # Delete all keys
+
+# Delete dict
+await dict_service.delete_dict("inference-cache", token="my-token")
+```
+
+## Local Queue Service
+
+Distributed FIFO queues with optional priority support.
+
+### Key Features
+- **FIFO ordering**: First-in-first-out by default
+- **Priority queues**: Optional priority-based ordering
+- **Blocking get**: Wait for items with timeout
+- **Batch operations**: put_many, get_many
+
+### Using Queues
+
+```python
+from blazing.local import LocalQueueService
+
+# Start queue service
+queue_service = LocalQueueService(
+    storage_path="/tmp/blazing-queues",
+    persist_to_disk=True
+)
+await queue_service.start()
+
+# Create a queue
+jobs = await queue_service.create_queue(
+    "batch-jobs",
+    token="my-token",
+    enable_priority=False  # FIFO queue
+)
+
+# Put items
+await jobs.put({"task": "process", "id": 1})
+await jobs.put({"task": "process", "id": 2})
+await jobs.put({"task": "process", "id": 3})
+
+# Get item (non-blocking)
+item = await jobs.get(timeout=None)
+# {"task": "process", "id": 1}
+
+# Blocking get with timeout
+item = await jobs.get(timeout=30)  # Wait up to 30 seconds
+if item is None:
+    print("Queue empty after timeout")
+
+# Batch operations
+await jobs.put_many([
+    {"task": "email", "to": "user1@example.com"},
+    {"task": "email", "to": "user2@example.com"}
+])
+
+items = await jobs.get_many(10, timeout=5)  # Get up to 10 items
+
+# Create priority queue
+priority_queue = await queue_service.create_queue(
+    "priority-jobs",
+    token="my-token",
+    enable_priority=True
+)
+
+# Put with priority (lower = higher priority)
+await priority_queue.put({"task": "urgent"}, priority=1)
+await priority_queue.put({"task": "normal"}, priority=5)
+await priority_queue.put({"task": "low"}, priority=10)
+
+# Get item (highest priority first)
+item = await priority_queue.get()
+# {"task": "urgent"} (priority 1)
+
+# Queue info
+length = await jobs.len()
+is_empty = await jobs.is_empty()
+next_item = await jobs.peek()  # Look without removing
+
+# Clear queue
+cleared_count = await jobs.clear()
+
+# Delete queue
+await queue_service.delete_queue("batch-jobs", token="my-token")
+```
+
+## LLM Connectors
+
+Connect to LLM APIs or use local emulators for testing.
+
+### OpenAI-Compatible Connector
+
+```python
+from blazing.local.llm import OpenAIConnector, openai_connector, ollama_connector
+
+# OpenAI
+llm = OpenAIConnector(
+    api_key="sk-xxxxx",  # Or use OPENAI_API_KEY env var
+    model="gpt-4o",
+    timeout=60.0,
+    max_retries=3,
+    default_temperature=0.7
+)
+await llm.connect()
+
+# Chat completion
+response = await llm.chat([
+    {"role": "system", "content": "You are a helpful assistant."},
+    {"role": "user", "content": "What is 2 + 2?"}
+])
+print(response.content)  # "4"
+print(f"Used {response.usage.total_tokens} tokens")
+
+# Streaming
+async for chunk in llm.chat_stream([
+    {"role": "user", "content": "Tell me a story"}
+]):
+    print(chunk.content, end="", flush=True)
+
+# Simple completion (convenience)
+answer = await llm.complete("What is the capital of France?")
+print(answer)  # "Paris"
+
+# Embeddings
+embeddings = await llm.embeddings("Hello, world!")
+print(len(embeddings[0]))  # 1536 for text-embedding-3-small
+
+# Azure OpenAI
+from blazing.local.llm import azure_openai_connector
+
+azure_llm = azure_openai_connector(
+    api_key="your-azure-key",
+    endpoint="https://your-resource.openai.azure.com",
+    deployment="gpt-4",
+    api_version="2024-02-15-preview"
+)
+
+# Ollama (local models)
+ollama_llm = ollama_connector(
+    model="llama3.2",
+    host="http://localhost:11434"
+)
+```
+
+### Local LLM Emulator
+
+Mock LLM for testing without API calls.
+
+```python
+from blazing.local.llm_emulator import LocalLLMEmulator, LLMEmulatorConnector, local_llm
+
+# Start emulator
+emulator = LocalLLMEmulator(port=11411)
+await emulator.start()
+
+# Configure custom responses
+emulator.add_response(
+    pattern=r"capital.*france",
+    response="The capital of France is Paris."
+)
+emulator.add_response(
+    pattern=r"hello",
+    response="Hello! How can I help you today?"
+)
+
+# Add function calling response
+emulator.add_function_response(
+    pattern=r"weather",
+    function_name="get_weather",
+    function_args={"city": "Paris", "units": "celsius"}
+)
+
+# Use emulator
+llm = LLMEmulatorConnector(emulator_port=11411)
+await llm.connect()
+
+response = await llm.chat([
+    {"role": "user", "content": "What is the capital of France?"}
+])
+print(response.content)  # "The capital of France is Paris."
+
+# Get statistics
+stats = emulator.get_stats()
+print(f"Total requests: {stats['total_requests']}")
+print(f"Chat requests: {stats['chat_requests']}")
+
+await emulator.stop()
+
+# Context manager for testing
+async with local_llm(responses=[
+    {"pattern": "hello", "response": "Hi there!"}
+]) as (emulator, llm):
+    response = await llm.chat([{"role": "user", "content": "hello"}])
+    assert "Hi there" in response.content
+```
+
+## Local vs Production Differences
+
+Understanding the differences helps avoid surprises when deploying.
+
+| Feature | Local Emulator | Production | Notes |
+|---------|---------------|------------|-------|
+| **Persistence** | Temporary directory (unless configured) | Durable cloud storage | Local data lost on restart unless you set storage_path |
+| **Networking** | Localhost (127.0.0.1) | Distributed across regions | Production spans multiple machines |
+| **Authentication** | Optional (simple tokens) | Required (JWT validation) | Local accepts any token for development |
+| **Scaling** | Single process | Horizontally scaled | Local runs all services in one Python process |
+| **Performance** | Limited by laptop | Production-grade infrastructure | Local good for functional testing, not load testing |
+| **Docker builds** | Uses local Docker daemon | Cloud build service | Requires Docker installed locally |
+| **GPU** | Emulated (mock) | Real GPU allocation | Local GPU service is placeholder only |
+| **Registry** | HTTP server on localhost | Cloud registry (ECR/GCR) | Local registry accessible at http://localhost:5000 |
+| **Volumes** | Local filesystem | SeaweedFS + S3 | Production has multi-region replication |
+| **Secrets** | AES-256 files | Vault/AWS Secrets Manager | Production has audit trails and rotation |
+
+## When NOT to Use Emulators
+
+**Production deployments**: Always use real infrastructure in production. Emulators are for development only.
+
+**Load testing**: Local emulators run in a single process and don't represent production performance characteristics.
+
+**Multi-node testing**: Distributed consensus, network partitions, and multi-master scenarios can't be tested locally.
+
+**GPU workloads**: The GPU service is a placeholder. For actual GPU testing, deploy to production or use GPU-enabled instances.
+
+**High-concurrency testing**: The local scheduler and services use in-process concurrency, not distributed coordination.
+
+## Debugging Tips
+
+### Inspect Storage
+
+All services write to the storage path. Explore it to debug issues:
+
+```bash
+# Find your storage path
+ls /tmp/blazing-local-*
+
+# Inspect structure
+tree /tmp/blazing-local-xxxxx
+```
+
+### Get Statistics
+
+The LocalStack provides combined statistics:
+
+```python
+stats = stack.get_stats()
+
+print(f"Registry: {stats['registry']['total_images']} images")
+print(f"Volumes: {stats['volumes']['total_volumes']} volumes")
+print(f"Secrets: {stats['secrets']['total_secrets']} secrets")
+print(f"Scheduler: {stats['scheduler']['total_jobs']} jobs")
+print(f"Dicts: {stats['dicts']['total_entries']} entries")
+print(f"Queues: {stats['queues']['total_items']} items")
+print(f"Storage: {stats['storage_path']}")
+```
+
+### Common Issues
+
+**Docker build fails**: Ensure Docker is installed and running. Check `docker version`.
+
+**Port already in use**: Registry port 5000 might conflict. Change it: `LocalStack(registry_port=5001)`.
+
+**Storage permission errors**: Ensure write access to storage_path. Check file permissions.
+
+**Out of disk space**: Emulators store images, volumes, etc. locally. Clean up old data periodically.
+
+**Slow builds**: Local Docker builds can be slow on resource-constrained laptops. Production uses optimized build infrastructure.
+
+## Cross-References
+
+- [Flow Quick Start](/blazing-flow/getting-started/flow-quick-start) - Get started with Blazing workflows
+- [Flow Deployment](/blazing-flow/deployment/flow-deployment) - Deploy to production infrastructure
+- [Sandbox Services](/blazing-flow-sandbox/services) - Using emulators in sandboxed environments
+- [Core Examples](/blazing-flow/core-examples) - Workflow patterns using local services
+
+## Summary
+
+Local emulators enable complete offline development with production-matching APIs. Start the LocalStack, use the services, and deploy to production with zero code changes. Perfect for rapid iteration, testing, and learning Blazing without cloud dependencies.

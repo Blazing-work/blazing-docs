@@ -1,0 +1,18 @@
+{
+  "id": "event_processing",
+  "title": "Event Processing Pipeline",
+  "description": "Validate, enrich, and store incoming events with multi-step processing.",
+  "category": "Data Processing",
+  "difficulty": "Intermediate",
+  "time": "25 min",
+  "tags": [
+    "events",
+    "pipeline",
+    "enrichment",
+    "validation"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

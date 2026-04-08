@@ -43,7 +43,7 @@ The `meta.json` file defines the navigation order (1-6 as listed above).
 ```python
 @app.endpoint(path="/calculate")
 @app.workflow
-async def calculate(x: int, y: int, skillsets=None):
+async def calculate(x: int, y: int, services=None):
     return x + y
 ```
 
