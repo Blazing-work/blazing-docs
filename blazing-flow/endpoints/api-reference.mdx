@@ -147,7 +147,7 @@ FastAPI application instance ready for deployment.
 from blazing import Blazing
 from blazing.web import create_asgi_app
 
-app = Blazing(, api_token="token")
+app = Blazing(api_token="token")
 
 @app.endpoint(path="/calculate")
 @app.workflow

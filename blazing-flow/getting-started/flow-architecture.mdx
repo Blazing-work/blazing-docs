@@ -41,7 +41,7 @@ Workers execute tasks from workflows and steps:
 
 ```python
 # Configure worker mix
-app = Blazing(,
+app = Blazing(
     worker_config={
         'async_workers': 4,
         'blocking_workers': 2,
@@ -263,7 +263,7 @@ All Foremen process tasks cooperatively.
 Increase workers per Foreman:
 
 ```python
-app = Blazing(,
+app = Blazing(
     worker_config={
         'async_workers': 16,  # Scale up for I/O workloads
         'blocking_workers': 8  # Scale up for CPU workloads
