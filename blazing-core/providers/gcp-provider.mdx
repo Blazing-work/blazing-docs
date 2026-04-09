@@ -95,7 +95,7 @@ Specify the certificate issuer for TLS:
 
 ## Node Pool Configuration
 
-GKE Standard mode with spot instance support for cost optimization.
+Blazing Core on GCP supports spot instance node pools for cost optimization.
 
 ```yaml
 gcp:
@@ -391,17 +391,16 @@ GCP has 35+ regions worldwide:
 - `asia-southeast1` (Singapore)
 - `asia-northeast1` (Tokyo)
 
-### GKE Features
+### GCP Features
 
-- **Autopilot**: Not used for org workloads (Standard mode only)
 - **Spot Instances**: 60-90% savings for burst workloads
 - **Node Auto-repair**: Automatic node health checks
-- **Workload Identity**: Secure service account binding
+- **Secure Workload Identity**: Service account binding
 - **Binary Authorization**: Image signing and verification
 
-### Integration with GCP Services
+### Integrated GCP Services
 
-Core Compose integrates with:
+Blazing Core on GCP integrates with:
 
 - **Cloud Monitoring**: Metrics and alerting
 - **Cloud Logging**: Centralized log aggregation

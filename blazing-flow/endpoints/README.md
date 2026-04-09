@@ -25,7 +25,7 @@ The `meta.json` file defines the navigation order (1-6 as listed above).
 ✅ **Authentication** - JWT, API keys, custom handlers
 ✅ **WebSocket** - Real-time updates with client examples
 ✅ **API Reference** - Every parameter documented
-✅ **Deployment** - Docker, Kubernetes, AWS Lambda
+✅ **Deployment** - Docker, Kubernetes, Blazing Core
 ✅ **Production Ready** - Security, monitoring, scaling
 
 ## 📖 Documentation Style

@@ -58,9 +58,9 @@ responsibilities:
 Provider compilers translate Core Compose specifications into native formats:
 
 - **DFC Compiler**: Generates Akash SDL + Gateway configs
-- **AWS Compiler**: CloudFormation/Terraform for EKS
-- **GCP Compiler**: GKE manifests + Cloud resources
-- **Azure Compiler**: AKS + ARM templates
+- **AWS Compiler**: Translates to AWS-native resources
+- **GCP Compiler**: Translates to GCP-native resources
+- **Azure Compiler**: Translates to Azure-native resources
 
 ## Deployment Flow
 
@@ -232,10 +232,9 @@ Every deployment creates an **immutable audit record**:
          │
     ┌────┴────┬──────┬──────┬──────┐
     ▼         ▼      ▼      ▼      ▼
-┌──────┐ ┌──────┐ ┌────┐ ┌────┐ ┌──────┐
-│ GCP  │ │ DFC  │ │AWS │ │Azure│ │Akash│
-│ GKE  │ │ SDL  │ │EKS │ │ AKS │ │ Net │
-└──────┘ └──────┘ └────┘ └────┘ └──────┘
+┌──────┐ ┌──────┐ ┌─────┐ ┌──────┐ ┌──────┐
+│ GCP  │ │ DFC  │ │ AWS │ │Azure │ │Akash │
+└──────┘ └──────┘ └─────┘ └──────┘ └──────┘
 ```
 
 ## Benefits of This Architecture

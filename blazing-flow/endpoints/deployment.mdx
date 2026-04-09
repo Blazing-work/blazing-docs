@@ -189,52 +189,30 @@ sudo systemctl start blazing-api
 
 ---
 
-## AWS Lambda / Serverless
+## Blazing Core Deployment
 
-### Using Mangum
+Deploy directly to Blazing Core infrastructure using the platform CLI or dashboard.
 
-Install:
+### Using the Dashboard
 
-```bash
-pip install mangum
-```
+1. Navigate to your project in the Blazing dashboard
+2. Select **Deploy** and choose your target provider (Akash, GCP, or DFC)
+3. Configure environment variables and resource limits
+4. Click **Deploy**
 
-Wrap FastAPI app:
-
-```python
-from mangum import Mangum
-
-# Your FastAPI app
-fastapi_app = await create_asgi_app(app)
-
-# Wrap for Lambda
-handler = Mangum(fastapi_app)
-```
-
-### serverless.yml
-
-```yaml
-service: blazing-api
-
-provider:
-  name: aws
-  runtime: python3.11
-  region: us-east-1
-  environment:
-    BLAZING_API_URL: ${env:BLAZING_API_URL}
-    BLAZING_API_TOKEN: ${env:BLAZING_API_TOKEN}
-
-functions:
-  api:
-    handler: main.handler
-    events:
-      - httpApi: '*'
-```
-
-Deploy:
+### Using the CLI
 
 ```bash
-serverless deploy
+# Deploy to your default provider
+blazing deploy --project my-api
+
+# Deploy to a specific provider
+blazing deploy --project my-api --provider gcp
+
+# Deploy with environment variables
+blazing deploy --project my-api \
+  --env BLAZING_API_URL=http://blazing-backend:8000 \
+  --env BLAZING_API_TOKEN=$API_TOKEN
 ```
 
 ---
