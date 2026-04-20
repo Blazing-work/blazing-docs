@@ -1,0 +1,17 @@
+{
+  "id": "error_handling_api",
+  "title": "Error Handling in APIs",
+  "description": "Proper error handling with custom error responses.",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "endpoint",
+    "error-handling",
+    "validation"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

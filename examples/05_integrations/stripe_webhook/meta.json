@@ -1,0 +1,18 @@
+{
+  "id": "stripe_webhook",
+  "title": "Stripe Payment Webhook",
+  "description": "Handle Stripe payment webhooks with signature verification.",
+  "category": "Integrations",
+  "difficulty": "Advanced",
+  "time": "30 min",
+  "tags": [
+    "webhook",
+    "stripe",
+    "payments",
+    "events"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "fan_out_fan_in",
+  "title": "Fan-Out / Fan-In Pattern",
+  "description": "Fetch data from multiple sources in parallel, then combine results.",
+  "category": "Async & Parallel",
+  "difficulty": "Advanced",
+  "time": "25 min",
+  "tags": [
+    "parallel",
+    "fan-out",
+    "fan-in",
+    "aggregation"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

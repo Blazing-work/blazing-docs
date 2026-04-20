@@ -1,0 +1,24 @@
+{
+  "title": "API Key Authentication",
+  "description": "Protect HTTP endpoints using API key authentication with header or query parameter validation",
+  "category": "Web Endpoints",
+  "difficulty": "Beginner",
+  "estimated_time_minutes": 10,
+  "tags": ["authentication", "api-key", "endpoint", "security"],
+  "prerequisites": [],
+  "learning_objectives": [
+    "Configure API key authentication for endpoints",
+    "Support both header and query parameter authentication",
+    "Access authentication context in protected endpoints",
+    "Contrast protected vs public endpoints"
+  ],
+  "blazing_features": [
+    "APIKeyAuth",
+    "endpoint",
+    "workflow",
+    "AuthContext"
+  ],
+  "external_dependencies": [],
+  "requires_blazing_saas": false,
+  "requires_local_emulator": false
+}

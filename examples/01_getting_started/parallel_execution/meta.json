@@ -1,0 +1,17 @@
+{
+  "id": "parallel_execution",
+  "title": "Parallel Execution",
+  "description": "Learn how to execute multiple tasks in parallel to dramatically improve throughput.\nThis example shows you how to:\n- Create batch tasks efficiently\n- Achieve 4-10x speedup with parallelization\n- Optimize for different workload sizes\n- Monitor concurrency levels",
+  "category": "Getting Started",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "concurrency",
+    "performance",
+    "parallel"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

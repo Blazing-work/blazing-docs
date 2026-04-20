@@ -1,7 +1,7 @@
 {
   "title": "Service Configuration",
   "position": 3,
-  "description": "Define and configure your services and workloads",
+  "description": "Service Configuration for Blazing Core: covers Autoscaling Configuration, Service Configuration Basics, and more \u2014 multi-cloud infrastructure platform",
   "product": "blazing-core",
   "category": "guide"
 }

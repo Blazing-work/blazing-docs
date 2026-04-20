@@ -1,0 +1,18 @@
+{
+  "id": "parallel_processing",
+  "title": "Parallel Data Processing",
+  "description": "Process multiple items concurrently with asyncio.gather.",
+  "category": "Async & Parallel",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "parallel",
+    "asyncio",
+    "batch",
+    "performance"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

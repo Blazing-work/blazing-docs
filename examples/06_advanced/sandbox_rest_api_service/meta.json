@@ -1,0 +1,18 @@
+{
+  "id": "sandbox_rest_api_service",
+  "title": "Sandbox: Service Bridge with REST APIs",
+  "description": "Let users integrate with external APIs while keeping API keys safe.",
+  "category": "Advanced",
+  "difficulty": "Advanced",
+  "time": "25 min",
+  "tags": [
+    "sandbox",
+    "service-bridge",
+    "api",
+    "security"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}

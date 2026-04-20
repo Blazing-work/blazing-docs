@@ -1,0 +1,18 @@
+{
+  "id": "aggregating_results",
+  "title": "Aggregating Results",
+  "description": "Fetch data from multiple sources and aggregate into summary statistics.",
+  "category": "Data Processing",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "aggregation",
+    "data",
+    "statistics",
+    "parallel"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

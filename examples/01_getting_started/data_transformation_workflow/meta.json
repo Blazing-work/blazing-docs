@@ -1,0 +1,18 @@
+{
+  "id": "data_transformation_workflow",
+  "title": "Data Transformation Workflow",
+  "description": "Multi-stage data pipeline with cleaning and normalization.",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": [
+    "workflow",
+    "data",
+    "transformation",
+    "pipeline"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

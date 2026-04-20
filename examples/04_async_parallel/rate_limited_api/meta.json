@@ -1,0 +1,18 @@
+{
+  "id": "rate_limited_api",
+  "title": "Rate-Limited API Calls",
+  "description": "Control concurrency with asyncio.Semaphore for rate limiting.",
+  "category": "Async & Parallel",
+  "difficulty": "Advanced",
+  "time": "25 min",
+  "tags": [
+    "rate-limiting",
+    "semaphore",
+    "api",
+    "concurrency"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

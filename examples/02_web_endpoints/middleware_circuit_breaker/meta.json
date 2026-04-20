@@ -1,0 +1,11 @@
+{
+  "id": "middleware_circuit_breaker",
+  "title": "Circuit Breaker for Fault Tolerance",
+  "description": "Protect against cascading failures using CircuitBreakerMiddleware with failure threshold and automatic recovery.",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": ["middleware", "circuit-breaker", "endpoint", "http", "resilience", "fault-tolerance"],
+  "products": ["blazing-flow"],
+  "primaryProduct": "blazing-flow"
+}

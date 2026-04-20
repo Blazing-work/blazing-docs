@@ -1,0 +1,18 @@
+{
+  "id": "service_injection",
+  "title": "Service Injection",
+  "description": "Pass custom services to workflows and steps for dependency injection.",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": [
+    "workflow",
+    "service-injection",
+    "dependency-injection",
+    "services"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

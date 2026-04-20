@@ -1,0 +1,17 @@
+{
+  "id": "step_with_math",
+  "title": "Step with Math",
+  "description": "Basic arithmetic operations in a distributed step.",
+  "category": "Getting Started",
+  "difficulty": "Beginner",
+  "time": "5 min",
+  "tags": [
+    "step",
+    "math",
+    "basics"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

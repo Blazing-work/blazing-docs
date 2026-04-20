@@ -1,0 +1,18 @@
+{
+  "id": "multi_step_pipeline_api",
+  "title": "Multi-Step Data Pipeline API",
+  "description": "Expose a multi-step workflow that processes data through several stages.",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "time": "15 min",
+  "tags": [
+    "endpoint",
+    "pipeline",
+    "multi-step",
+    "statistics"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

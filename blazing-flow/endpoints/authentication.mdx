@@ -1,232 +1,707 @@
 ---
 title: Authentication
 label: Authentication
-description: Secure your endpoints with custom authentication
+description: "Protect your Blazing Flow Endpoints with flexible authentication strategies. The blazing.auth module provides built-in strategies for JWT, API keys"
 position: 3
 ---
 
 # Authentication
 
-Protect your Blazing Flow Endpoints with custom authentication logic.
+Protect your Blazing Flow Endpoints with flexible authentication strategies. The `blazing.auth` module provides built-in strategies for JWT, API keys, OAuth2, HTTP Basic auth, and support for custom handlers.
 
-## Custom Authentication Handler
+## Quick Start
+
+The simplest way to add authentication is using the built-in API key strategy:
 
 ```python
-from fastapi.security import HTTPAuthorizationCredentials
+from blazing import Blazing
+from blazing.auth import APIKeyAuth
 
-async def verify_api_key(credentials: HTTPAuthorizationCredentials) -> bool:
-    """Verify API key from Authorization header."""
-    if not credentials:
-        return False
+app = Blazing()
 
-    # Check against database, validate JWT, etc.
-    api_key = credentials.credentials
-    return api_key in VALID_API_KEYS  # Your validation logic
-
-@app.endpoint(path="/secure", auth_handler=verify_api_key)
+@app.endpoint(path="/secure", auth=APIKeyAuth(keys=["secret-key-123"]))
 @app.workflow
 async def secure_workflow(data: str, services=None):
-    return data.upper()
+    """Only accessible with valid API key."""
+    return {"result": data.upper()}
 ```
 
-### Client Usage
+Test it:
 
 ```bash
+# Without auth - fails with 401
 curl -X POST http://localhost:8080/secure \
-  -H "Authorization: Bearer your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"data": "hello"}'
+
+# With auth - succeeds
+curl -X POST http://localhost:8080/secure \
+  -H "X-API-Key: secret-key-123" \
   -H "Content-Type: application/json" \
   -d '{"data": "hello"}'
 ```
 
-## JWT Authentication
+## Authentication Strategies
+
+Blazing provides five built-in authentication strategies. All strategies implement the `AuthStrategy` interface and return an `AuthContext` object when authentication succeeds.
+
+### JWTAuth
+
+JWT (JSON Web Token) authentication is the default for the Blazing ecosystem. Supports both symmetric (HS256) and asymmetric (RS256) algorithms.
+
+**Constructor Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `secret` | `str` | None | Secret key for HS256/HS384/HS512 algorithms |
+| `public_key` | `str` | None | Public key for RS256/RS384/RS512/ES256 algorithms |
+| `algorithms` | `List[str]` | `["HS256"]` | Allowed JWT algorithms |
+| `audience` | `str` | None | Expected `aud` claim |
+| `issuer` | `str` | None | Expected `iss` claim |
+| `leeway` | `int` | 0 | Seconds of leeway for exp/nbf validation |
+| `header_name` | `str` | `"Authorization"` | Header to extract token from |
+| `header_prefix` | `str` | `"Bearer"` | Expected prefix before token |
+| `extract_tenant_from` | `str` | `"app_id"` | Claim to use for tenant_id |
+| `extract_user_from` | `str` | `"sub"` | Claim to use for user_id |
+| `extract_scopes_from` | `str` | `"scopes"` | Claim containing scopes |
+
+**Example - Symmetric (HS256):**
 
 ```python
-import jwt
+from blazing.auth import JWTAuth
 
-async def verify_jwt(credentials: HTTPAuthorizationCredentials) -> bool:
-    """Verify JWT token."""
-    if not credentials:
-        return False
+# Simple JWT with shared secret
+auth = JWTAuth(secret="my-secret-key")
 
-    try:
-        token = credentials.credentials
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return payload.get("user_id") is not None
-    except jwt.InvalidTokenError:
-        return False
-
-@app.endpoint(path="/admin", auth_handler=verify_jwt)
+@app.endpoint(path="/internal", auth=auth)
 @app.workflow
-async def admin_action(action: str, services=None):
-    return f"Action {action} executed"
+async def internal_api(action: str, services=None):
+    return {"action": action}
 ```
 
-### Generate JWT Token
+**Example - Asymmetric (RS256):**
 
 ```python
-import jwt
-from datetime import datetime, timedelta
+# Load public key from file
+with open("public_key.pem") as f:
+    public_key = f.read()
 
-def create_jwt_token(user_id: int) -> str:
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(hours=24)
-    }
-    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
-```
-
-## API Key from Database
-
-```python
-from sqlalchemy import select
-from database import async_session, APIKey
-
-async def verify_api_key_db(credentials: HTTPAuthorizationCredentials) -> bool:
-    """Verify API key against database."""
-    if not credentials:
-        return False
-
-    async with async_session() as session:
-        result = await session.execute(
-            select(APIKey).where(
-                APIKey.key == credentials.credentials,
-                APIKey.is_active == True
-            )
-        )
-        api_key = result.scalar_one_or_none()
-        return api_key is not None
-
-@app.endpoint(path="/data", auth_handler=verify_api_key_db)
-@app.workflow
-async def fetch_data(query: str, services=None):
-    # Your logic
-    pass
-```
-
-## Multiple Auth Handlers
-
-Different endpoints can have different authentication:
-
-```python
-@app.endpoint(path="/public")
-@app.workflow
-async def public_workflow(x: int, services=None):
-    return x  # No auth required
-
-@app.endpoint(path="/user", auth_handler=verify_api_key)
-@app.workflow
-async def user_workflow(x: int, services=None):
-    return x * 2  # API key required
-
-@app.endpoint(path="/admin", auth_handler=verify_jwt)
-@app.workflow
-async def admin_workflow(x: int, services=none):
-    return x * 10  # JWT required
-```
-
-## Role-Based Access Control (RBAC)
-
-```python
-from enum import Enum
-
-class Role(Enum):
-    USER = "user"
-    ADMIN = "admin"
-
-async def require_role(required_role: Role):
-    """Create auth handler that checks for specific role."""
-    async def auth_handler(credentials: HTTPAuthorizationCredentials) -> bool:
-        if not credentials:
-            return False
-
-        try:
-            payload = jwt.decode(
-                credentials.credentials,
-                SECRET_KEY,
-                algorithms=["HS256"]
-            )
-            user_role = payload.get("role")
-            return user_role == required_role.value
-        except:
-            return False
-
-    return auth_handler
-
-# Admin-only endpoint
-@app.endpoint(path="/admin/delete", auth_handler=await require_role(Role.ADMIN))
-@app.workflow
-async def delete_user(user_id: int, services=None):
-    # Your logic
-    return {"deleted": user_id}
-```
-
-## OAuth 2.0 Integration
-
-```python
-from authlib.integrations.starlette_client import OAuth
-
-oauth = OAuth()
-oauth.register(
-    name='google',
-    client_id='YOUR_CLIENT_ID',
-    client_secret='YOUR_CLIENT_SECRET',
-    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_kwargs={'scope': 'openid email profile'}
+auth = JWTAuth(
+    public_key=public_key,
+    algorithms=["RS256"],
+    audience="my-api",
+    issuer="https://auth.example.com"
 )
 
-async def verify_oauth_token(credentials: HTTPAuthorizationCredentials) -> bool:
-    """Verify OAuth token."""
-    if not credentials:
-        return False
-
-    try:
-        # Verify token with OAuth provider
-        token_info = await oauth.google.parse_id_token(
-            None,
-            credentials.credentials
-        )
-        return token_info is not None
-    except:
-        return False
-
-@app.endpoint(path="/oauth", auth_handler=verify_oauth_token)
+@app.endpoint(path="/verify", auth=auth)
 @app.workflow
-async def oauth_workflow(data: str, services=None):
+async def verify_workflow(data: dict, services=None):
     return data
 ```
 
-## Error Handling
+**Token Format:**
 
-Authentication failures return appropriate HTTP status codes:
+```bash
+curl -X POST http://localhost:8080/internal \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
+  -H "Content-Type: application/json" \
+  -d '{"action": "process"}'
+```
 
-| Scenario | Status Code | Response |
-|----------|-------------|----------|
-| No credentials provided | 401 Unauthorized | `{"detail": "Not authenticated"}` |
-| Invalid credentials | 401 Unauthorized | `{"detail": "Invalid credentials"}` |
-| Expired token | 401 Unauthorized | `{"detail": "Token expired"}` |
-| Insufficient permissions | 403 Forbidden | `{"detail": "Insufficient permissions"}` |
+**JWT Claims:**
 
-### Custom Error Messages
+The JWT payload should contain:
+- `sub` - Subject (user identifier)
+- `app_id` - Application/tenant identifier
+- `scopes` - Array or space-separated string of permissions
+- `exp` - Expiration timestamp
+- `iat` - Issued at timestamp
+
+> **Example:** See the complete [JWT Authentication example](/docs/auth_jwt) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_jwt).
+
+### APIKeyAuth
+
+Validates API keys from headers or query parameters. Supports static keys, hashed keys, and dynamic validation.
+
+**Constructor Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `header` | `str` | `"X-API-Key"` | Header name to check |
+| `query_param` | `str` | None | Query parameter name to check |
+| `keys` | `List[str]` | `[]` | Static list of valid API keys |
+| `hashed_keys` | `set` | `set()` | Set of SHA-256 hashed keys |
+| `validator` | `Callable` | None | Async function for dynamic validation |
+| `key_prefix` | `str` | None | Optional prefix to strip (e.g. "ApiKey ") |
+| `extract_tenant_from_key` | `bool` | False | If True, first part of key is tenant_id |
+
+**Example - Static Keys:**
 
 ```python
-from fastapi import HTTPException
+from blazing.auth import APIKeyAuth
 
-async def verify_with_custom_errors(credentials: HTTPAuthorizationCredentials) -> bool:
-    """Auth handler with custom error messages."""
-    if not credentials:
-        raise HTTPException(
-            status_code=401,
-            detail="API key required. Include 'Authorization: Bearer <key>' header."
-        )
+auth = APIKeyAuth(
+    header="X-API-Key",
+    keys=["key-123", "key-456"]
+)
 
-    if credentials.credentials not in VALID_API_KEYS:
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid API key. Contact support@example.com for access."
-        )
-
-    return True
+@app.endpoint(path="/webhook", auth=auth)
+@app.workflow
+async def webhook_handler(payload: dict, services=None):
+    return {"received": True}
 ```
+
+**Example - Hashed Keys (Production):**
+
+```python
+import hashlib
+
+# Hash your keys for secure storage
+hashed = {
+    hashlib.sha256(b"prod-key-1").hexdigest(),
+    hashlib.sha256(b"prod-key-2").hexdigest()
+}
+
+auth = APIKeyAuth(hashed_keys=hashed)
+
+@app.endpoint(path="/api", auth=auth)
+@app.workflow
+async def api_endpoint(data: str, services=None):
+    return data
+```
+
+**Example - Dynamic Validation:**
+
+```python
+async def validate_api_key(key: str) -> tuple[bool, dict]:
+    """Validate key against database."""
+    # Query your database
+    record = await db.api_keys.find_one({"key": key, "active": True})
+
+    if record:
+        return True, {
+            "tenant_id": record["tenant_id"],
+            "user_id": record["user_id"],
+            "scopes": record["scopes"]
+        }
+
+    return False, {}
+
+auth = APIKeyAuth(validator=validate_api_key)
+
+@app.endpoint(path="/data", auth=auth)
+@app.workflow
+async def data_endpoint(query: str, services=None):
+    return {"query": query}
+```
+
+**Client Usage:**
+
+```bash
+# Header-based (default)
+curl -X POST http://localhost:8080/webhook \
+  -H "X-API-Key: key-123" \
+  -d '{"event": "user.created"}'
+
+# Query parameter
+curl -X POST http://localhost:8080/data?api_key=key-123 \
+  -d '{"query": "data"}'
+```
+
+> **Example:** See the complete [API Key Authentication example](/docs/auth_api_key) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_api_key).
+
+### OAuth2Auth
+
+OAuth2 authentication with token introspection or userinfo endpoint support. Includes presets for Google, GitHub, and Okta.
+
+**Constructor Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `introspection_url` | `str` | None | Token introspection endpoint URL |
+| `client_id` | `str` | None | OAuth2 client ID |
+| `client_secret` | `str` | None | OAuth2 client secret |
+| `userinfo_url` | `str` | None | UserInfo endpoint for user details |
+| `provider` | `str` | None | Built-in provider preset (google, github, okta) |
+| `scopes_claim` | `str` | `"scope"` | Claim containing scopes |
+| `validate_locally` | `bool` | False | Validate JWT locally without introspection |
+| `header_name` | `str` | `"Authorization"` | Header to extract token from |
+| `header_prefix` | `str` | `"Bearer"` | Expected prefix before token |
+
+**Example - Token Introspection:**
+
+```python
+from blazing.auth import OAuth2Auth
+
+auth = OAuth2Auth(
+    introspection_url="https://auth.example.com/oauth/introspect",
+    client_id="my-client-id",
+    client_secret="my-client-secret"
+)
+
+@app.endpoint(path="/oauth", auth=auth)
+@app.workflow
+async def oauth_endpoint(data: dict, services=None):
+    return data
+```
+
+**Example - Google Provider:**
+
+```python
+auth = OAuth2Auth(
+    provider="google",
+    client_id="your-google-client-id.apps.googleusercontent.com",
+    client_secret="your-client-secret"
+)
+
+@app.endpoint(path="/google-api", auth=auth)
+@app.workflow
+async def google_endpoint(action: str, services=None):
+    return {"action": action}
+```
+
+**Client Usage:**
+
+```bash
+curl -X POST http://localhost:8080/oauth \
+  -H "Authorization: Bearer ya29.a0AfH6..." \
+  -H "Content-Type: application/json" \
+  -d '{"data": "value"}'
+```
+
+> **Example:** See the complete [OAuth2 Authentication example](/docs/auth_oauth2) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/auth_oauth2).
+
+### BasicAuth
+
+HTTP Basic authentication with username/password validation. Supports static users, hashed passwords, and dynamic validation.
+
+**Constructor Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `users` | `Dict[str, str]` | `{}` | Static dict of username -> password |
+| `hashed_passwords` | `Dict[str, str]` | `{}` | Dict of username -> SHA-256 hashed password |
+| `validator` | `Callable` | None | Async function for dynamic validation |
+| `realm` | `str` | `"Blazing Endpoints"` | Authentication realm for 401 responses |
+
+**Example - Static Users:**
+
+```python
+from blazing.auth import BasicAuth
+
+auth = BasicAuth(users={
+    "admin": "secure-password",
+    "user": "another-password"
+})
+
+@app.endpoint(path="/admin", auth=auth)
+@app.workflow
+async def admin_endpoint(action: str, services=None):
+    return {"action": action}
+```
+
+**Example - Hashed Passwords:**
+
+```python
+import hashlib
+
+auth = BasicAuth(hashed_passwords={
+    "admin": hashlib.sha256(b"secure-password").hexdigest()
+})
+
+@app.endpoint(path="/secure", auth=auth)
+@app.workflow
+async def secure_endpoint(data: str, services=None):
+    return data
+```
+
+**Example - Database Validation:**
+
+```python
+async def check_credentials(username: str, password: str) -> tuple[bool, dict]:
+    """Validate against database."""
+    user = await db.users.find_one({"username": username})
+
+    if user and verify_password(password, user["password_hash"]):
+        return True, {
+            "user_id": str(user["_id"]),
+            "scopes": user.get("scopes", [])
+        }
+
+    return False, {}
+
+auth = BasicAuth(validator=check_credentials)
+
+@app.endpoint(path="/api", auth=auth)
+@app.workflow
+async def api_endpoint(data: str, services=None):
+    return data
+```
+
+**Client Usage:**
+
+```bash
+# Using curl -u flag
+curl -u admin:secure-password -X POST http://localhost:8080/admin \
+  -d '{"action": "delete"}'
+
+# Using Authorization header
+curl -X POST http://localhost:8080/admin \
+  -H "Authorization: Basic YWRtaW46c2VjdXJlLXBhc3N3b3Jk" \
+  -d '{"action": "delete"}'
+```
+
+### CompositeAuth
+
+Try multiple authentication strategies in order until one succeeds. Useful for endpoints that accept multiple auth methods.
+
+**Constructor Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `strategies` | `List[AuthStrategy]` | `[]` | List of strategies to try in order |
+| `require_all` | `bool` | False | If True, all strategies must succeed (AND logic) |
+
+**Example - Fallback Authentication:**
+
+```python
+from blazing.auth import CompositeAuth, JWTAuth, APIKeyAuth
+
+# Try JWT first, fall back to API key
+auth = CompositeAuth(strategies=[
+    JWTAuth(secret="jwt-secret"),
+    APIKeyAuth(keys=["fallback-key"])
+])
+
+@app.endpoint(path="/flexible", auth=auth)
+@app.workflow
+async def flexible_endpoint(data: dict, services=None):
+    return data
+```
+
+**Example - Shorthand Syntax:**
+
+```python
+# List syntax automatically creates CompositeAuth
+@app.endpoint(path="/multi-auth", auth=[
+    JWTAuth(secret="jwt-secret"),
+    APIKeyAuth(keys=["api-key"]),
+    BasicAuth(users={"admin": "password"})
+])
+@app.workflow
+async def multi_auth_endpoint(data: str, services=None):
+    return data
+```
+
+**Client Usage - Any Method Works:**
+
+```bash
+# JWT
+curl -X POST http://localhost:8080/flexible \
+  -H "Authorization: Bearer eyJhbGc..." \
+  -d '{"data": "value"}'
+
+# API Key
+curl -X POST http://localhost:8080/flexible \
+  -H "X-API-Key: fallback-key" \
+  -d '{"data": "value"}'
+
+# Basic Auth
+curl -u admin:password -X POST http://localhost:8080/flexible \
+  -d '{"data": "value"}'
+```
+
+## AuthContext
+
+When authentication succeeds, an `AuthContext` object is injected into your endpoint handler. Access it via the `auth` parameter.
+
+**AuthContext Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user_id` | `str` | Unique identifier for authenticated user |
+| `tenant_id` | `str` | Tenant/app identifier (multi-tenancy) |
+| `scopes` | `List[str]` | Authorization scopes/permissions |
+| `claims` | `Dict[str, Any]` | Full claims dictionary from JWT |
+| `raw_token` | `str` | Raw token string (if applicable) |
+| `auth_method` | `str` | Auth method used (jwt, api_key, oauth2, basic) |
+| `metadata` | `Dict[str, Any]` | Custom metadata from auth handler |
+
+**AuthContext Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `has_scope(scope)` | Check if context has a specific scope |
+| `has_any_scope(*scopes)` | Check if context has any of the scopes |
+| `has_all_scopes(*scopes)` | Check if context has all of the scopes |
+| `get_claim(key, default)` | Get a specific claim value |
+| `is_authenticated` | Check if user is authenticated |
+| `app_id` | Alias for tenant_id |
+
+**Example - Accessing Auth Context:**
+
+```python
+from blazing.auth import JWTAuth, AuthContext
+
+@app.endpoint(path="/user-info", auth=JWTAuth(secret="secret"))
+@app.workflow
+async def user_info(auth: AuthContext, services=None):
+    """Access authenticated user information."""
+    return {
+        "user_id": auth.user_id,
+        "tenant_id": auth.tenant_id,
+        "app_id": auth.app_id,  # Alias for tenant_id
+        "scopes": auth.scopes,
+        "auth_method": auth.auth_method
+    }
+```
+
+**Example - Scope-Based Authorization:**
+
+```python
+@app.endpoint(path="/admin/delete", auth=JWTAuth(secret="secret"))
+@app.workflow
+async def delete_resource(resource_id: str, auth: AuthContext, services=None):
+    """Delete requires admin scope."""
+    if not auth.has_scope("admin"):
+        raise Exception("Insufficient permissions")
+
+    # Proceed with deletion
+    return {"deleted": resource_id}
+```
+
+**Example - Multi-Scope Check:**
+
+```python
+@app.endpoint(path="/write", auth=JWTAuth(secret="secret"))
+@app.workflow
+async def write_data(data: dict, auth: AuthContext, services=None):
+    """Requires any write permission."""
+    if not auth.has_any_scope("write:data", "write:all", "admin"):
+        raise Exception("Write permission required")
+
+    return {"status": "written"}
+```
+
+## Custom Auth Handlers
+
+For custom authentication logic beyond the built-in strategies, provide an async function that returns an `AuthContext` or `None`.
+
+**Custom Handler Signature:**
+
+```python
+async def my_auth_handler(request: Request) -> Optional[AuthContext]:
+    """
+    Custom authentication handler.
+
+    Args:
+        request: Starlette Request object
+
+    Returns:
+        AuthContext if authentication succeeds, None otherwise
+    """
+    pass
+```
+
+### Example - Webhook Signature Verification
+
+```python
+import hmac
+import hashlib
+from blazing.auth import AuthContext
+
+async def verify_webhook_signature(request):
+    """Verify HMAC signature from webhook provider."""
+    # Extract signature from header
+    signature = request.headers.get("X-Webhook-Signature")
+    if not signature:
+        return None
+
+    # Read request body
+    body = await request.body()
+
+    # Calculate expected signature
+    secret = "webhook-secret-key"
+    expected = hmac.new(
+        secret.encode(),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+
+    # Compare signatures (constant-time)
+    if not hmac.compare_digest(signature, expected):
+        return None
+
+    # Return auth context
+    return AuthContext(
+        user_id="webhook-provider",
+        auth_method="webhook_signature",
+        metadata={"verified": True}
+    )
+
+@app.endpoint(path="/webhooks/stripe", auth=verify_webhook_signature)
+@app.workflow
+async def stripe_webhook(event: dict, services=None):
+    return {"processed": True}
+```
+
+### Example - Internal Service Authentication
+
+```python
+from blazing.auth import AuthContext
+
+async def verify_internal_service(request):
+    """Verify internal service-to-service authentication."""
+    # Check for internal service header
+    service_id = request.headers.get("X-Service-ID")
+    service_secret = request.headers.get("X-Service-Secret")
+
+    if not service_id or not service_secret:
+        return None
+
+    # Validate against known services
+    INTERNAL_SERVICES = {
+        "billing-service": "secret-123",
+        "analytics-service": "secret-456"
+    }
+
+    expected_secret = INTERNAL_SERVICES.get(service_id)
+    if not expected_secret or service_secret != expected_secret:
+        return None
+
+    return AuthContext(
+        user_id=service_id,
+        tenant_id="internal",
+        scopes=["internal"],
+        auth_method="service_to_service"
+    )
+
+@app.endpoint(path="/internal/data", auth=verify_internal_service)
+@app.workflow
+async def internal_data(query: str, services=None):
+    return {"data": "internal"}
+```
+
+### Example - IP Whitelist
+
+```python
+from blazing.auth import AuthContext
+
+ALLOWED_IPS = {"192.168.1.100", "10.0.0.5"}
+
+async def verify_ip_whitelist(request):
+    """Allow only whitelisted IP addresses."""
+    client_ip = request.client.host
+
+    if client_ip not in ALLOWED_IPS:
+        return None
+
+    return AuthContext(
+        user_id=client_ip,
+        auth_method="ip_whitelist",
+        metadata={"ip": client_ip}
+    )
+
+@app.endpoint(path="/admin/metrics", auth=verify_ip_whitelist)
+@app.workflow
+async def admin_metrics(services=None):
+    return {"metrics": "data"}
+```
+
+## NoAuth
+
+Use `NoAuth()` to explicitly disable authentication for an endpoint. This is useful for public endpoints like health checks.
+
+```python
+from blazing.auth import NoAuth
+
+@app.endpoint(path="/health", auth=NoAuth())
+@app.workflow
+async def health_check(services=None):
+    """Public health check endpoint."""
+    return {"status": "ok"}
+
+@app.endpoint(path="/version", auth=NoAuth())
+@app.workflow
+async def version(services=None):
+    """Public version endpoint."""
+    return {"version": "1.0.0"}
+```
+
+**Note:** Omitting the `auth` parameter entirely also creates a public endpoint. `NoAuth()` is explicit documentation that the endpoint is intentionally public.
+
+## Advanced Usage
+
+### create_auth_dependency
+
+For manual FastAPI integration, use `create_auth_dependency` to generate a FastAPI dependency from an auth strategy.
+
+```python
+from fastapi import Depends, FastAPI
+from blazing.auth import create_auth_dependency, JWTAuth, AuthContext
+
+app_fastapi = FastAPI()
+
+# Create auth dependency
+auth_dep = create_auth_dependency(JWTAuth(secret="secret"))
+
+@app_fastapi.get("/protected")
+async def protected_route(auth: AuthContext = Depends(auth_dep)):
+    """Manually protected FastAPI route."""
+    return {"user_id": auth.user_id}
+```
+
+### Multiple Auth Methods
+
+Configure different authentication per endpoint:
+
+```python
+from blazing.auth import JWTAuth, APIKeyAuth, NoAuth
+
+# Public endpoint
+@app.endpoint(path="/public", auth=NoAuth())
+@app.workflow
+async def public_endpoint(services=None):
+    return {"data": "public"}
+
+# API key required
+@app.endpoint(path="/api", auth=APIKeyAuth(keys=["key-123"]))
+@app.workflow
+async def api_endpoint(services=None):
+    return {"data": "api"}
+
+# JWT required
+@app.endpoint(path="/internal", auth=JWTAuth(secret="jwt-secret"))
+@app.workflow
+async def internal_endpoint(services=None):
+    return {"data": "internal"}
+
+# Multiple methods accepted
+@app.endpoint(path="/flexible", auth=[
+    JWTAuth(secret="jwt-secret"),
+    APIKeyAuth(keys=["key-123"])
+])
+@app.workflow
+async def flexible_endpoint(services=None):
+    return {"data": "flexible"}
+```
+
+### Shorthand Syntax
+
+Use string shortcuts for common auth strategies:
+
+```python
+# These are equivalent
+@app.endpoint(path="/jwt1", auth="jwt")
+@app.endpoint(path="/jwt2", auth=JWTAuth())
+
+# String shortcuts
+@app.endpoint(path="/api", auth="api_key")  # APIKeyAuth() with defaults
+@app.endpoint(path="/basic", auth="basic")  # BasicAuth() with defaults
+@app.endpoint(path="/oauth", auth="oauth2") # OAuth2Auth() with defaults
+```
+
+**Note:** String shortcuts use default configuration. For custom parameters, use the strategy classes directly.
 
 ## Best Practices
 
@@ -234,100 +709,96 @@ async def verify_with_custom_errors(credentials: HTTPAuthorizationCredentials) -
 
 ```python
 import os
+from blazing.auth import JWTAuth
 
+# Load from environment
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 API_KEYS = os.getenv("VALID_API_KEYS", "").split(",")
+
+auth_jwt = JWTAuth(secret=SECRET_KEY)
+auth_api = APIKeyAuth(keys=API_KEYS)
 ```
 
-### 2. Use HTTPS in Production
+### 2. Use Hashed Keys in Production
+
+```python
+import hashlib
+
+# Never store plain API keys
+def hash_key(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()
+
+# Store hashed keys
+HASHED_KEYS = {
+    hash_key("prod-key-1"),
+    hash_key("prod-key-2")
+}
+
+auth = APIKeyAuth(hashed_keys=HASHED_KEYS)
+```
+
+### 3. Use HTTPS in Production
 
 ```bash
-# Always use HTTPS in production
+# Always use HTTPS for production endpoints
 uvicorn main:fastapi_app --ssl-keyfile key.pem --ssl-certfile cert.pem
 ```
 
-### 3. Implement Rate Limiting
-
-```python
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
-limiter = Limiter(key_func=get_remote_address)
-
-@app.endpoint(path="/calculate")
-@limiter.limit("10/minute")
-@app.workflow
-async def calculate(x: int, services=None):
-    return x * 2
-```
-
-### 4. Log Authentication Failures
-
-```python
-import logging
-
-logger = logging.getLogger(__name__)
-
-async def verify_with_logging(credentials: HTTPAuthorizationCredentials) -> bool:
-    if not credentials:
-        logger.warning("Authentication attempt without credentials")
-        return False
-
-    api_key = credentials.credentials
-    if api_key not in VALID_API_KEYS:
-        logger.warning(f"Failed authentication attempt with key: {api_key[:8]}...")
-        return False
-
-    logger.info(f"Successful authentication with key: {api_key[:8]}...")
-    return True
-```
-
-### 5. Token Expiration
+### 4. Validate Token Expiration
 
 ```python
 from datetime import datetime, timedelta
+import jwt
 
-def create_token_with_expiry(user_id: int, expires_in_hours: int = 24) -> str:
-    """Create JWT token with expiration."""
+def create_jwt(user_id: str, expires_hours: int = 24) -> str:
+    """Create JWT with expiration."""
     payload = {
-        "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(hours=expires_in_hours),
+        "sub": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=expires_hours),
         "iat": datetime.utcnow()
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 ```
 
-## Testing Authentication
-
-### Test Without Auth
+### 5. Log Authentication Failures
 
 ```python
-import httpx
+import logging
+from blazing.auth import AuthContext
 
-async def test_no_auth():
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "http://localhost:8080/secure",
-            json={"data": "test"}
-        )
-        assert response.status_code == 401
+logger = logging.getLogger(__name__)
+
+async def auth_with_logging(request):
+    """Custom auth with audit logging."""
+    api_key = request.headers.get("X-API-Key")
+
+    if not api_key:
+        logger.warning(f"Auth attempt without key from {request.client.host}")
+        return None
+
+    if api_key not in VALID_KEYS:
+        logger.warning(f"Invalid key {api_key[:8]}... from {request.client.host}")
+        return None
+
+    logger.info(f"Successful auth with key {api_key[:8]}...")
+    return AuthContext(user_id="user", auth_method="api_key")
 ```
 
-### Test With Valid Auth
+## Error Handling
 
-```python
-async def test_valid_auth():
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "http://localhost:8080/secure",
-            json={"data": "test"},
-            headers={"Authorization": "Bearer valid-key"}
-        )
-        assert response.status_code == 200
-```
+Authentication failures return standard HTTP status codes:
+
+| Scenario | Status | Response |
+|----------|--------|----------|
+| No credentials | 401 Unauthorized | `{"detail": "Not authenticated"}` |
+| Invalid credentials | 401 Unauthorized | `{"detail": "Invalid credentials"}` |
+| Expired token | 401 Unauthorized | `{"detail": "Token expired"}` |
+| Missing scope | 403 Forbidden | `{"detail": "Insufficient permissions"}` |
+
+The `WWW-Authenticate` header is automatically set based on the auth strategy's `scheme` property.
 
 ## Next Steps
 
-- [WebSocket Authentication](/blazing-flow/endpoints/websocket#authentication) - Secure WebSocket connections
-- [API Reference](/blazing-flow/endpoints/api-reference) - Full auth_handler documentation
-- [Security Best Practices](/blazing-flow/endpoints/security) - Production security checklist
+- [Endpoints Overview](/blazing-flow/endpoints/overview) - Learn about endpoint configuration
+- [Middleware](/blazing-flow/endpoints/middleware) - Add rate limiting and request validation
+- [WebSocket](/blazing-flow/endpoints/websocket) - Secure WebSocket connections

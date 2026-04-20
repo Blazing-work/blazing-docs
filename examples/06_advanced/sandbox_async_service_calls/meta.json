@@ -1,0 +1,18 @@
+{
+  "id": "sandbox_async_service_calls",
+  "title": "Sandbox: Async Service Calls",
+  "description": "User code making concurrent service calls for performance.",
+  "category": "Advanced",
+  "difficulty": "Expert",
+  "time": "30 min",
+  "tags": [
+    "sandbox",
+    "async",
+    "concurrent",
+    "service-bridge"
+  ],
+  "products": [
+    "blazing-flow-sandbox"
+  ],
+  "primaryProduct": "blazing-flow-sandbox"
+}

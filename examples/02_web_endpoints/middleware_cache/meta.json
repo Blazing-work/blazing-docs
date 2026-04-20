@@ -1,0 +1,11 @@
+{
+  "id": "middleware_cache",
+  "title": "Response Caching for Performance",
+  "description": "Cache expensive endpoint responses using CacheMiddleware with configurable TTL.",
+  "category": "Web Endpoints",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": ["middleware", "cache", "endpoint", "http", "performance"],
+  "products": ["blazing-flow"],
+  "primaryProduct": "blazing-flow"
+}

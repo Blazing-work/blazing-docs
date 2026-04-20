@@ -1,0 +1,18 @@
+{
+  "id": "csv_import",
+  "title": "CSV Import Pipeline",
+  "description": "Download, parse, validate, and import CSV files from cloud storage.",
+  "category": "Data Processing",
+  "difficulty": "Advanced",
+  "time": "30 min",
+  "tags": [
+    "csv",
+    "file-processing",
+    "import",
+    "validation"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

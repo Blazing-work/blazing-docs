@@ -1,0 +1,808 @@
+---
+title: Middleware
+label: Middleware
+description: Production-ready middleware for CORS, rate limiting, caching, retries, circuit breakers, timeouts, compression, and logging
+position: 4
+---
+
+# Endpoint Middleware
+
+{/* Coverage: Documenting 18 middleware APIs from blazing.middleware domain */}
+
+Add production-ready middleware to your Blazing endpoints for CORS, rate limiting, caching, circuit breakers, retries, timeouts, compression, and logging.
+
+Middleware intercepts HTTP requests and responses, enabling cross-cutting concerns like authentication, monitoring, and error handling without cluttering your business logic.
+
+## What is Middleware?
+
+Middleware sits between the HTTP layer and your endpoint handlers, processing requests before they reach your workflow and responses before they're sent to clients.
+
+**Use middleware when you need:**
+- Cross-origin resource sharing (CORS) for browser clients
+- Rate limiting to prevent abuse
+- Response caching to reduce load
+- Retry logic for transient failures
+- Circuit breakers to prevent cascading failures
+- Request timeouts to prevent resource exhaustion
+- Response compression to reduce bandwidth
+- Request/response logging for observability
+
+## App-Level vs Per-Endpoint Middleware
+
+**App-level middleware** applies to all endpoints:
+
+```python
+from blazing import Blazing
+from blazing.middleware import CORSMiddleware, LoggingMiddleware
+
+app = Blazing(api_token="your-token")
+
+# Applies to ALL endpoints
+app.add_middleware(CORSMiddleware, allow_origins=["*"])
+app.add_middleware(LoggingMiddleware)
+```
+
+**Per-endpoint middleware** applies to specific endpoints:
+
+```python
+from blazing.middleware import RateLimitMiddleware, CacheMiddleware
+
+@app.endpoint("/api", middleware=[
+    RateLimitMiddleware(requests_per_minute=100),
+    CacheMiddleware(ttl=60),
+])
+@app.workflow
+async def api_handler(services=None):
+    return {"status": "ok"}
+```
+
+## Quick Navigation
+
+| I Need To... | Use This Middleware |
+|--------------|---------------------|
+| Enable browser CORS | [CORSMiddleware](#cors-cross-origin-resource-sharing) |
+| Prevent API abuse | [RateLimitMiddleware](#rate-limiting) |
+| Cache responses | [CacheMiddleware](#response-caching) |
+| Enforce timeouts | [TimeoutMiddleware](#timeout-enforcement) |
+| Retry failed requests | [RetryMiddleware](#automatic-retries) |
+| Prevent cascading failures | [CircuitBreakerMiddleware](#circuit-breaker) |
+| Compress responses | [CompressionMiddleware](#response-compression) |
+| Log requests/responses | [LoggingMiddleware](#request-logging) |
+
+---
+
+## CORS (Cross-Origin Resource Sharing)
+
+Enable cross-origin requests from browser clients. Handles preflight OPTIONS requests and adds appropriate CORS headers.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `allow_origins` | `List[str]` | `["*"]` | Allowed origins (use `["*"]` for all) |
+| `allow_origin_regex` | `Optional[str]` | `None` | Regex pattern for allowed origins |
+| `allow_methods` | `List[str]` | `["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]` | Allowed HTTP methods |
+| `allow_headers` | `List[str]` | `["*"]` | Allowed request headers |
+| `allow_credentials` | `bool` | `False` | Allow credentials (cookies, auth) |
+| `expose_headers` | `List[str]` | `[]` | Headers exposed to browser |
+| `max_age` | `int` | `600` | Preflight cache duration (seconds) |
+
+### App-Level CORS
+
+```python
+from blazing import Blazing
+from blazing.middleware import CORSMiddleware
+
+app = Blazing(api_token="your-token")
+
+# Allow all origins (development)
+app.add_middleware(CORSMiddleware, allow_origins=["*"])
+
+await app.publish()
+```
+
+### Per-Endpoint CORS with Credentials
+
+```python
+from blazing.middleware import CORSMiddleware
+
+@app.endpoint("/api/user", middleware=[
+    CORSMiddleware(
+        allow_origins=["https://app.example.com", "https://admin.example.com"],
+        allow_credentials=True,
+        expose_headers=["X-Request-ID"],
+    )
+])
+@app.workflow
+async def get_user_data(user_id: int, services=None):
+    return {"user_id": user_id, "name": "Alice"}
+
+await app.publish()
+```
+
+### Pattern-Based Origins
+
+```python
+from blazing.middleware import CORSMiddleware
+
+# Allow all subdomains of example.com
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https://.*\.example\.com",
+    allow_credentials=True,
+)
+```
+
+**Important:** When `allow_credentials=True`, you cannot use `allow_origins=["*"]`. Specify exact origins or use a regex pattern.
+
+> **Example:** See the complete [CORS Middleware example](/docs/middleware_cors) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_cors).
+
+---
+
+## Rate Limiting
+
+Protect endpoints from abuse with flexible rate limiting strategies. Supports per-minute, per-hour, and per-day limits with burst handling.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `requests_per_minute` | `Optional[int]` | `None` | Max requests per minute |
+| `requests_per_hour` | `Optional[int]` | `None` | Max requests per hour |
+| `requests_per_day` | `Optional[int]` | `None` | Max requests per day |
+| `burst_size` | `Optional[int]` | `None` | Max burst size (token bucket) |
+| `key_func` | `Optional[Callable]` | `None` | Custom rate limit key function |
+| `include_headers` | `bool` | `True` | Include rate limit headers in response |
+| `retry_after` | `int` | `60` | Seconds to wait (in 429 response) |
+
+### Basic Rate Limiting
+
+```python
+from blazing import Blazing
+from blazing.middleware import RateLimitMiddleware
+
+app = Blazing(api_token="your-token")
+
+@app.endpoint("/api", middleware=[
+    RateLimitMiddleware(requests_per_minute=100)
+])
+@app.workflow
+async def api_handler(services=None):
+    return {"status": "ok"}
+
+await app.publish()
+```
+
+### Multiple Limits
+
+```python
+from blazing.middleware import RateLimitMiddleware
+
+@app.endpoint("/api/search", middleware=[
+    RateLimitMiddleware(
+        requests_per_minute=60,
+        requests_per_hour=1000,
+        requests_per_day=10000,
+    )
+])
+@app.workflow
+async def search(query: str, services=None):
+    return {"results": []}
+
+await app.publish()
+```
+
+### Custom Rate Limit Key (Per User)
+
+```python
+from blazing.middleware import RateLimitMiddleware
+
+# Rate limit per authenticated user
+@app.endpoint("/api/user", middleware=[
+    RateLimitMiddleware(
+        requests_per_minute=100,
+        key_func=lambda req: req.state.auth.user_id if hasattr(req.state, 'auth') else req.client.host,
+    )
+])
+@app.workflow
+async def user_api(services=None):
+    return {"status": "ok"}
+
+await app.publish()
+```
+
+### Burst Handling
+
+```python
+from blazing.middleware import RateLimitMiddleware
+
+@app.endpoint("/api/burst", middleware=[
+    RateLimitMiddleware(
+        requests_per_minute=60,  # 1 per second average
+        burst_size=10,            # Allow bursts up to 10
+    )
+])
+@app.workflow
+async def burst_api(services=None):
+    return {"status": "ok"}
+
+await app.publish()
+```
+
+**Rate Limit Headers:** When `include_headers=True`, responses include `X-RateLimit-Limit-*`, `X-RateLimit-Remaining-*`, and `X-RateLimit-Reset-*` headers.
+
+**429 Response:** Rate-limited requests return HTTP 429 with `Retry-After` header.
+
+**Production Note:** The in-memory implementation is suitable for single-instance deployments. For multi-instance production, integrate with Redis for distributed rate limiting.
+
+> **Example:** See the complete [Rate Limiting Middleware example](/docs/middleware_rate_limit) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_rate_limit).
+
+---
+
+## Response Caching
+
+Cache responses in memory to reduce load and improve response times. Respects Cache-Control headers and supports custom cache keys.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `ttl` | `int` | `60` | Time-to-live in seconds |
+| `max_entries` | `int` | `1000` | Maximum cache entries |
+| `methods` | `Set[str]` | `{"GET"}` | HTTP methods to cache |
+| `key_func` | `Optional[Callable]` | `None` | Custom cache key function |
+| `vary_headers` | `List[str]` | `["Accept", "Accept-Encoding"]` | Headers affecting cache key |
+| `exclude_paths` | `List[str]` | `[]` | Paths to never cache |
+| `include_status_codes` | `Set[int]` | `{200, 301, 302}` | Only cache these status codes |
+
+### Basic Caching
+
+```python
+from blazing import Blazing
+from blazing.middleware import CacheMiddleware
+
+app = Blazing(api_token="your-token")
+
+@app.endpoint("/api/products", middleware=[
+    CacheMiddleware(ttl=60)
+])
+@app.workflow
+async def get_products(services=None):
+    products = await services['ProductDatabase'].get_all()
+    return {"products": products}
+
+await app.publish()
+```
+
+### Custom Cache Key (Multi-Tenant)
+
+```python
+from blazing.middleware import CacheMiddleware
+
+@app.endpoint("/api/tenant-data", middleware=[
+    CacheMiddleware(
+        ttl=300,
+        key_func=lambda req: f"{req.url.path}:{req.state.auth.tenant_id}",
+    )
+])
+@app.workflow
+async def get_tenant_data(services=None):
+    return {"data": "tenant-specific"}
+
+await app.publish()
+```
+
+### Vary by Accept-Language
+
+```python
+from blazing.middleware import CacheMiddleware
+
+@app.endpoint("/api/i18n", middleware=[
+    CacheMiddleware(
+        ttl=3600,
+        vary_headers=["Accept", "Accept-Language"],
+    )
+])
+@app.workflow
+async def get_localized_content(services=None):
+    return {"message": "Hello"}
+
+await app.publish()
+```
+
+**Cache Headers:** Responses include `X-Cache: HIT` or `X-Cache: MISS` and `Age` header showing cache entry age.
+
+**Private Content:** Cache automatically skips requests with `Authorization` or `Cookie` headers to avoid caching user-specific content.
+
+**Production Note:** For distributed caching across multiple instances, integrate with Redis or another distributed cache.
+
+> **Example:** See the complete [Cache Middleware example](/docs/middleware_cache) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_cache).
+
+---
+
+## Timeout Enforcement
+
+Enforce request timeouts to prevent resource exhaustion from slow handlers. Returns 504 Gateway Timeout when exceeded.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout` | `float` | `30.0` | Request timeout in seconds |
+| `message` | `str` | `"Request timeout"` | Error message for timeout response |
+| `status_code` | `int` | `504` | HTTP status code for timeout |
+
+### Basic Timeout
+
+```python
+from blazing import Blazing
+from blazing.middleware import TimeoutMiddleware
+
+app = Blazing(api_token="your-token")
+
+@app.endpoint("/api/slow", middleware=[
+    TimeoutMiddleware(timeout=30)
+])
+@app.workflow
+async def slow_operation(services=None):
+    import asyncio
+    await asyncio.sleep(5)  # Simulate slow operation
+    return {"result": "done"}
+
+await app.publish()
+```
+
+### Custom Timeout Message
+
+```python
+from blazing.middleware import TimeoutMiddleware
+
+@app.endpoint("/api/report", middleware=[
+    TimeoutMiddleware(
+        timeout=60,
+        message="Report generation took too long",
+    )
+])
+@app.workflow
+async def generate_report(services=None):
+    report = await services['ReportService'].generate()
+    return {"report": report}
+
+await app.publish()
+```
+
+**Timeout Response:** Returns JSON with `{"detail": "message", "timeout": seconds}` and specified status code.
+
+> **Example:** See the complete [Timeout Middleware example](/docs/middleware_timeout) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_timeout).
+
+---
+
+## Automatic Retries
+
+Retry failed requests with exponential backoff and AWS-style full jitter. Useful for proxying requests to unreliable upstream services.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `max_retries` | `int` | `3` | Maximum retry attempts |
+| `retry_on_status` | `Set[int]` | `{502, 503, 504}` | Status codes triggering retry |
+| `retry_on_exception` | `bool` | `True` | Retry on exceptions |
+| `initial_delay` | `float` | `0.1` | Initial delay between retries (seconds) |
+| `max_delay` | `float` | `10.0` | Maximum delay between retries (seconds) |
+| `exponential_base` | `float` | `2.0` | Base for exponential backoff |
+| `jitter` | `bool` | `True` | Add random jitter to delays |
+| `retry_condition` | `Optional[Callable]` | `None` | Custom retry condition function |
+
+### Retry on 5xx Errors
+
+```python
+from blazing import Blazing
+from blazing.middleware import RetryMiddleware
+
+app = Blazing(api_token="your-token")
+
+@app.endpoint("/api/proxy", middleware=[
+    RetryMiddleware(
+        max_retries=3,
+        retry_on_status={500, 502, 503, 504},
+    )
+])
+@app.workflow
+async def proxy_upstream(services=None):
+    import httpx
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://upstream.example.com/api")
+        return response.json()
+
+await app.publish()
+```
+
+### Custom Backoff Configuration
+
+```python
+from blazing.middleware import RetryMiddleware
+
+@app.endpoint("/api/flaky", middleware=[
+    RetryMiddleware(
+        max_retries=5,
+        initial_delay=0.1,
+        max_delay=30.0,
+        exponential_base=2.0,
+        jitter=True,
+    )
+])
+@app.workflow
+async def flaky_operation(services=None):
+    return {"status": "ok"}
+
+await app.publish()
+```
+
+### Custom Retry Condition
+
+```python
+from blazing.middleware import RetryMiddleware
+
+@app.endpoint("/api/custom-retry", middleware=[
+    RetryMiddleware(
+        max_retries=3,
+        retry_condition=lambda resp: resp.status_code >= 500,
+    )
+])
+@app.workflow
+async def custom_retry_handler(services=None):
+    return {"status": "ok"}
+
+await app.publish()
+```
+
+**Retry Headers:** Successful retries include `X-Retry-Attempt` header showing number of attempts.
+
+**Jitter Algorithm:** Uses AWS-style full jitter (`sleep = random_between(0, min(cap, base * 2^attempt))`) to prevent retry storms.
+
+> **Example:** See the complete [Retry Middleware example](/docs/middleware_retry) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_retry).
+
+---
+
+## Circuit Breaker
+
+Prevent cascading failures with the circuit breaker pattern. Monitors failures and "opens the circuit" to fail fast when downstream services are unhealthy.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `failure_threshold` | `int` | `5` | Failures before opening circuit |
+| `success_threshold` | `int` | `2` | Successes needed to close circuit |
+| `timeout` | `float` | `30.0` | Seconds before trying half-open |
+| `failure_status_codes` | `Set[int]` | `{500, 502, 503, 504}` | Status codes considered failures |
+| `exclude_paths` | `list` | `[]` | Paths to exclude from circuit breaker |
+| `fallback` | `Optional[Callable]` | `None` | Fallback function when circuit is open |
+
+### Basic Circuit Breaker
+
+```python
+from blazing import Blazing
+from blazing.middleware import CircuitBreakerMiddleware
+
+app = Blazing(api_token="your-token")
+
+@app.endpoint("/api/external", middleware=[
+    CircuitBreakerMiddleware(
+        failure_threshold=5,
+        timeout=30,
+    )
+])
+@app.workflow
+async def external_api_call(services=None):
+    result = await services['ExternalAPI'].call()
+    return {"result": result}
+
+await app.publish()
+```
+
+### Circuit Breaker with Fallback
+
+```python
+from blazing.middleware import CircuitBreakerMiddleware
+from starlette.responses import JSONResponse
+
+async def fallback_response(request):
+    return JSONResponse({"status": "degraded", "mode": "fallback"})
+
+@app.endpoint("/api/critical", middleware=[
+    CircuitBreakerMiddleware(
+        failure_threshold=5,
+        fallback=fallback_response,
+    )
+])
+@app.workflow
+async def critical_operation(services=None):
+    return {"status": "ok"}
+
+await app.publish()
+```
+
+**Circuit States:**
+- **CLOSED:** Normal operation, requests pass through
+- **OPEN:** Failing, requests rejected immediately (503 with `Retry-After` header)
+- **HALF_OPEN:** Testing recovery, limited requests pass through
+
+**Circuit Headers:** Responses include `X-Circuit-State` header showing current state (closed, open, half_open).
+
+> **Example:** See the complete [Circuit Breaker Middleware example](/docs/middleware_circuit_breaker) for a working implementation. [View source](https://github.com/Blazing-work/blazing-examples/blob/main/02_web_endpoints/middleware_circuit_breaker).
+
+---
+
+## Response Compression
+
+Compress responses using gzip or deflate to reduce bandwidth. Automatically skips images, videos, and already-compressed content.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `min_size` | `int` | `500` | Minimum response size to compress (bytes) |
+| `algorithms` | `List[str]` | `["gzip", "deflate"]` | Compression algorithms (order = preference) |
+| `compression_level` | `int` | `6` | Compression level (1-9 for gzip) |
+| `exclude_content_types` | `Set[str]` | See below | Content types to skip |
+| `include_content_types` | `Optional[Set[str]]` | `None` | Only compress these content types (if set) |
+
+**Default excluded content types:** `image/png`, `image/jpeg`, `image/gif`, `image/webp`, `video/mp4`, `video/webm`, `application/zip`, `application/gzip`
+
+### Basic Compression
+
+```python
+from blazing import Blazing
+from blazing.middleware import CompressionMiddleware
+
+app = Blazing(api_token="your-token")
+
+# Compress all responses (app-level)
+app.add_middleware(CompressionMiddleware)
+
+await app.publish()
+```
+
+### Custom Min Size
+
+```python
+from blazing.middleware import CompressionMiddleware
+
+@app.endpoint("/api/large", middleware=[
+    CompressionMiddleware(min_size=1000)
+])
+@app.workflow
+async def large_response(services=None):
+    return {"data": "..." * 1000}
+
+await app.publish()
+```
+
+### High Compression for JSON
+
+```python
+from blazing.middleware import CompressionMiddleware
+
+@app.endpoint("/api/json", middleware=[
+    CompressionMiddleware(
+        compression_level=9,
+        include_content_types={"application/json"},
+    )
+])
+@app.workflow
+async def json_api(services=None):
+    return {"large": "json", "payload": "..."}
+
+await app.publish()
+```
+
+**Compression Headers:** Compressed responses include `Content-Encoding: gzip` (or `deflate`) and updated `Content-Length`.
+
+**Smart Compression:** Only compresses if result is smaller than original. Skips already-compressed content and streaming responses.
+
+---
+
+## Request Logging
+
+Log HTTP requests and responses with structured data. Includes method, path, status, timing, and optional headers/bodies.
+
+### Configuration
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `logger` | `Optional[logging.Logger]` | `None` | Logger to use (defaults to "blazing.requests") |
+| `log_level` | `int` | `logging.INFO` | Log level for requests |
+| `log_request_body` | `bool` | `False` | Log request body |
+| `log_response_body` | `bool` | `False` | Log response body |
+| `log_headers` | `bool` | `False` | Log request headers |
+| `redact_headers` | `Set[str]` | See below | Headers to redact |
+| `max_body_length` | `int` | `1000` | Maximum body length to log |
+| `exclude_paths` | `List[str]` | `["/health", "/metrics"]` | Paths to exclude from logging |
+| `include_timing` | `bool` | `True` | Include request timing |
+| `request_id_header` | `str` | `"X-Request-ID"` | Header for request ID |
+
+**Default redacted headers:** `authorization`, `x-api-key`, `cookie`, `set-cookie`
+
+### Basic Logging
+
+```python
+from blazing import Blazing
+from blazing.middleware import LoggingMiddleware
+
+app = Blazing(api_token="your-token")
+
+# Log all requests (app-level)
+app.add_middleware(LoggingMiddleware)
+
+await app.publish()
+```
+
+### Detailed Logging with Bodies
+
+```python
+from blazing.middleware import LoggingMiddleware
+import logging
+
+@app.endpoint("/api/debug", middleware=[
+    LoggingMiddleware(
+        log_request_body=True,
+        log_response_body=True,
+        log_headers=True,
+        max_body_length=5000,
+        log_level=logging.DEBUG,
+    )
+])
+@app.workflow
+async def debug_api(data: dict, services=None):
+    return {"processed": data}
+
+await app.publish()
+```
+
+### Custom Logger
+
+```python
+from blazing.middleware import LoggingMiddleware
+import logging
+
+custom_logger = logging.getLogger("api.requests")
+custom_logger.setLevel(logging.INFO)
+
+app.add_middleware(
+    LoggingMiddleware,
+    logger=custom_logger,
+    exclude_paths=["/health", "/ready", "/metrics"],
+)
+```
+
+**Log Output:** Logs include method, path, status, duration (ms), client IP, and optional request ID. Headers are redacted for security.
+
+**Request ID:** Logging middleware generates a request ID (or uses provided `X-Request-ID` header) and adds it to the response headers.
+
+---
+
+## Middleware Chaining
+
+Combine multiple middleware on a single endpoint. Middleware executes in the order specified.
+
+```python
+from blazing import Blazing
+from blazing.middleware import (
+    CORSMiddleware,
+    RateLimitMiddleware,
+    CacheMiddleware,
+    TimeoutMiddleware,
+    LoggingMiddleware,
+)
+
+app = Blazing(api_token="your-token")
+
+@app.endpoint("/api/data", middleware=[
+    LoggingMiddleware(),                        # 1. Log request
+    CORSMiddleware(allow_origins=["*"]),        # 2. Handle CORS
+    RateLimitMiddleware(requests_per_minute=60),# 3. Rate limit
+    TimeoutMiddleware(timeout=30),              # 4. Enforce timeout
+    CacheMiddleware(ttl=300),                   # 5. Cache response
+])
+@app.workflow
+async def get_data(services=None):
+    data = await services['DataService'].fetch()
+    return {"data": data}
+
+await app.publish()
+```
+
+**Execution Order:** Middleware wraps requests in the order listed. In the example above:
+1. LoggingMiddleware logs the incoming request
+2. CORSMiddleware adds CORS headers
+3. RateLimitMiddleware checks rate limits
+4. TimeoutMiddleware enforces timeout
+5. CacheMiddleware checks cache (or caches response)
+6. Workflow executes (if not cached)
+
+---
+
+## Custom Middleware
+
+Extend the `Middleware` base class to create custom middleware.
+
+```python
+from blazing.middleware import Middleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+class CustomHeaderMiddleware(Middleware):
+    """Add custom header to all responses."""
+
+    def __init__(self, header_name: str, header_value: str, **kwargs):
+        super().__init__(**kwargs)
+        self.header_name = header_name
+        self.header_value = header_value
+
+    async def __call__(self, request: Request, call_next) -> Response:
+        """Add custom header to response."""
+        response = await call_next(request)
+        response.headers[self.header_name] = self.header_value
+        return response
+
+# Use custom middleware
+@app.endpoint("/api/custom", middleware=[
+    CustomHeaderMiddleware("X-Custom-Header", "custom-value")
+])
+@app.workflow
+async def custom_endpoint(services=None):
+    return {"status": "ok"}
+
+await app.publish()
+```
+
+### Middleware Hooks
+
+The `Middleware` base class provides optional hooks:
+
+```python
+from blazing.middleware import Middleware
+
+class HookMiddleware(Middleware):
+    """Middleware using before/after hooks."""
+
+    async def before_request(self, request: Request):
+        """Called before request is processed."""
+        # Modify request if needed
+        request.state.custom_data = "value"
+        return request  # or None to use original
+
+    async def after_response(self, request: Request, response: Response):
+        """Called after response is generated."""
+        # Modify response if needed
+        response.headers["X-After-Hook"] = "executed"
+        return response  # or None to use original
+
+    def should_process(self, request: Request) -> bool:
+        """Skip middleware for certain requests."""
+        return request.url.path != "/health"
+
+    async def __call__(self, request: Request, call_next):
+        """Main middleware logic."""
+        modified_request = await self.before_request(request)
+        if modified_request:
+            request = modified_request
+
+        response = await call_next(request)
+
+        modified_response = await self.after_response(request, response)
+        if modified_response:
+            response = modified_response
+
+        return response
+```
+
+---
+
+## Next Steps
+
+- [Endpoints Overview](/blazing-flow/endpoints/overview) - Learn about Blazing Flow Endpoints architecture
+- [Authentication](/blazing-flow/endpoints/authentication) - Add authentication middleware (coming soon)
+- [Core Examples](/blazing-flow/core-examples) - See middleware in context of workflows

@@ -1,0 +1,19 @@
+{
+  "id": "batch_stock_processing",
+  "title": "Batch Stock Processing",
+  "description": "This example demonstrates batch processing patterns inspired by financial data\npipelines. Process hundreds of stocks efficiently with:\n\n- Batch processing with configurable sizes\n- Throttling to respect API rate limits\n- Resilient error handling (partial failures don't stop the batch)\n- Progress tracking and reporting\n\n**Use Cases:**\n- Daily stock price updates\n- Portfolio rebalancing workflows\n- Market data synchronization\n- Financial indicator calculations",
+  "category": "Advanced",
+  "difficulty": "Advanced",
+  "time": "15 min",
+  "tags": [
+    "batch",
+    "stocks",
+    "throttling",
+    "resilient",
+    "fintech"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

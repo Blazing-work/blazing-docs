@@ -1,0 +1,11 @@
+{
+  "id": "middleware_cors",
+  "title": "CORS Middleware for Browser APIs",
+  "description": "Enable cross-origin requests from browsers using CORSMiddleware with configurable origins and headers.",
+  "category": "Web Endpoints",
+  "difficulty": "Beginner",
+  "time": "10 min",
+  "tags": ["middleware", "cors", "endpoint", "http", "browser"],
+  "products": ["blazing-flow"],
+  "primaryProduct": "blazing-flow"
+}

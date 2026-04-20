@@ -1,0 +1,19 @@
+{
+  "id": "authenticated_api",
+  "title": "API with Authentication",
+  "description": "Protect endpoints with custom authentication (JWT, API keys, OAuth).",
+  "category": "Web Endpoints",
+  "difficulty": "Intermediate",
+  "time": "20 min",
+  "tags": [
+    "endpoint",
+    "authentication",
+    "jwt",
+    "api-key",
+    "security"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

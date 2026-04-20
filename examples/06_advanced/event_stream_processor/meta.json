@@ -1,0 +1,18 @@
+{
+  "id": "event_stream_processor",
+  "title": "Event Stream Processor",
+  "description": "Process event streams from Kafka in batches with aggregation.",
+  "category": "Advanced",
+  "difficulty": "Expert",
+  "time": "40 min",
+  "tags": [
+    "streaming",
+    "kafka",
+    "events",
+    "real-time"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}

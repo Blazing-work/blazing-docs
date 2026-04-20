@@ -2,7 +2,7 @@
   "title": "Tutorials",
   "label": "Tutorials",
   "position": 1,
-  "description": "Step-by-step tutorials for common Blazing Flow use cases",
+  "description": "Tutorials for Blazing Flow: covers Basic Task Execution, Concurrency Patterns, Error Handling, and more \u2014 serverless persistent async pipeline framework",
   "product": "blazing-flow",
   "category": "guide",
   "previewTier": "dev-preview"

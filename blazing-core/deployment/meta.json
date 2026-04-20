@@ -1,7 +1,7 @@
 {
   "title": "Deployment & Operations",
   "position": 4,
-  "description": "Deploy, manage, and monitor your infrastructure",
+  "description": "Deployment & Operations for Blazing Core: covers Deployment Lifecycle and more \u2014 multi-cloud infrastructure platform supporting GCP, Akash, and hybrid",
   "product": "blazing-core",
   "category": "guide"
 }

@@ -1,0 +1,19 @@
+{
+  "id": "multi_channel_notification",
+  "title": "Multi-Channel Notification",
+  "description": "Send notifications across email, SMS, and push channels simultaneously.",
+  "category": "Integrations",
+  "difficulty": "Intermediate",
+  "time": "25 min",
+  "tags": [
+    "notifications",
+    "multi-channel",
+    "email",
+    "sms",
+    "push"
+  ],
+  "products": [
+    "blazing-flow"
+  ],
+  "primaryProduct": "blazing-flow"
+}
